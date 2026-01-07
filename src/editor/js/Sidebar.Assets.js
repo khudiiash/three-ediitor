@@ -14,10 +14,14 @@ function SidebarAssets( editor ) {
 	// Header bar
 	const headerBar = new UIRow();
 	headerBar.setId( 'assets-header' );
-	headerBar.setPadding( '8px' );
+	headerBar.setPadding( '4px 8px' );
 	headerBar.setBackground( '#2a2a2a' );
-	headerBar.setBorderBottom( '1px solid #444' );
+	headerBar.setBorderBottom( 'none' );
+	headerBar.setBorderTop( 'none' );
 	headerBar.dom.style.display = 'flex';
+	headerBar.dom.style.margin = '0';
+	headerBar.dom.style.borderTop = 'none';
+	headerBar.dom.style.borderBottom = 'none';
 	headerBar.dom.style.alignItems = 'center';
 	headerBar.dom.style.justifyContent = 'space-between';
 
@@ -117,20 +121,20 @@ function SidebarAssets( editor ) {
 
 	// Main content area (two panels side by side)
 	const contentArea = new UIPanel();
-	contentArea.dom.style.cssText = 'display: flex; flex: 1; overflow: hidden;';
+	contentArea.dom.style.cssText = 'display: flex; flex: 1; overflow: hidden; margin: 0; padding: 0; border-top: none;';
 
 	// Left panel: Folder hierarchy
 	const folderPanel = new UIPanel();
 	folderPanel.setId( 'assets-folders' );
 	folderPanel.setWidth( '200px' );
-	folderPanel.setBorderRight( '1px solid #444' );
+	folderPanel.setBorderRight( 'none' );
 	folderPanel.setOverflow( 'auto' );
 	folderPanel.dom.style.cssText += 'background: #252525;';
 
 	// Folder tree
 	const folderTree = document.createElement( 'div' );
 	folderTree.id = 'assets-folder-tree';
-	folderTree.style.cssText = 'padding: 4px; color: #aaa; font-size: 12px;';
+	folderTree.style.cssText = 'padding: 0; color: #aaa; font-size: 12px;';
 	folderPanel.dom.appendChild( folderTree );
 
 	// Right panel: Files list
@@ -148,20 +152,20 @@ function SidebarAssets( editor ) {
 
 	// Table header
 	const tableHeader = document.createElement( 'thead' );
-	tableHeader.style.cssText = 'background: #2a2a2a; border-bottom: 1px solid #444;';
+	tableHeader.style.cssText = 'background: #2a2a2a; border-bottom: none;';
 	const headerRow = document.createElement( 'tr' );
 
 	const nameHeader = document.createElement( 'th' );
 	nameHeader.textContent = 'Name';
-	nameHeader.style.cssText = 'text-align: left; padding: 8px; font-weight: bold; color: #aaa;';
+	nameHeader.style.cssText = 'text-align: left; padding: 4px 8px; font-weight: bold; color: #aaa;';
 
 	const typeHeader = document.createElement( 'th' );
 	typeHeader.textContent = 'Type';
-	typeHeader.style.cssText = 'text-align: left; padding: 8px; font-weight: bold; color: #aaa; width: 120px;';
+	typeHeader.style.cssText = 'text-align: left; padding: 4px 8px; font-weight: bold; color: #aaa; width: 120px;';
 
 	const sizeHeader = document.createElement( 'th' );
 	sizeHeader.textContent = 'Size';
-	sizeHeader.style.cssText = 'text-align: left; padding: 8px; font-weight: bold; color: #aaa; width: 100px;';
+	sizeHeader.style.cssText = 'text-align: left; padding: 4px 8px; font-weight: bold; color: #aaa; width: 100px;';
 
 	headerRow.appendChild( nameHeader );
 	headerRow.appendChild( typeHeader );
@@ -548,21 +552,21 @@ function SidebarAssets( editor ) {
 		// Show folders first
 		currentFolder.children.forEach( folder => {
 
-			const row = document.createElement( 'tr' );
-			row.style.cssText = 'border-bottom: 1px solid #333; cursor: pointer;';
-			row.dataset.path = folder.path;
+		const row = document.createElement( 'tr' );
+		row.style.cssText = 'border-bottom: none; cursor: pointer;';
+		row.dataset.path = folder.path;
 
 			const nameCell = document.createElement( 'td' );
-			nameCell.style.cssText = 'padding: 8px; display: flex; align-items: center; gap: 8px;';
+			nameCell.style.cssText = 'padding: 2px 8px; display: flex; align-items: center; gap: 8px;';
 			nameCell.innerHTML = '<span>📁</span><span>' + folder.name + '</span>';
 
 			const typeCell = document.createElement( 'td' );
 			typeCell.textContent = 'Folder';
-			typeCell.style.cssText = 'padding: 8px; color: #888;';
+			typeCell.style.cssText = 'padding: 2px 8px; color: #888;';
 
 			const sizeCell = document.createElement( 'td' );
 			sizeCell.textContent = '';
-			sizeCell.style.cssText = 'padding: 8px;';
+			sizeCell.style.cssText = 'padding: 2px 8px;';
 
 			row.appendChild( nameCell );
 			row.appendChild( typeCell );
@@ -590,20 +594,20 @@ function SidebarAssets( editor ) {
 		currentFolder.files.forEach( file => {
 
 			const row = document.createElement( 'tr' );
-			row.style.cssText = 'border-bottom: 1px solid #333; cursor: pointer;';
+			row.style.cssText = 'border-bottom: none; cursor: pointer;';
 			row.dataset.file = file.name;
 
 			const nameCell = document.createElement( 'td' );
-			nameCell.style.cssText = 'padding: 8px; display: flex; align-items: center; gap: 8px;';
+			nameCell.style.cssText = 'padding: 2px 8px; display: flex; align-items: center; gap: 8px;';
 			nameCell.innerHTML = '<span>' + getFileIcon( file.name ) + '</span><span>' + file.name + '</span>';
 
 			const typeCell = document.createElement( 'td' );
 			typeCell.textContent = file.type || 'File';
-			typeCell.style.cssText = 'padding: 8px; color: #888;';
+			typeCell.style.cssText = 'padding: 2px 8px; color: #888;';
 
 			const sizeCell = document.createElement( 'td' );
 			sizeCell.textContent = formatFileSize( file.size || 0 );
-			sizeCell.style.cssText = 'padding: 8px; color: #888;';
+			sizeCell.style.cssText = 'padding: 2px 8px; color: #888;';
 
 			row.appendChild( nameCell );
 			row.appendChild( typeCell );

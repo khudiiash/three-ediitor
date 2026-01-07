@@ -112,15 +112,15 @@
 			const viewport = new Viewport( editor );
 			document.body.appendChild( viewport.dom );
 
-			// Toolbar inside viewport
+			// Toolbar above viewport
 			const toolbar = new Toolbar( editor );
-			viewport.dom.appendChild( toolbar.dom );
+			document.body.appendChild( toolbar.dom );
 
 			const script = new Script( editor );
 			document.body.appendChild( script.dom );
 
 			const player = new Player( editor );
-			document.body.appendChild( player.dom );
+			// Player now renders inside viewport, no need to append to body
 
 			// Legacy sidebar (hidden, kept for compatibility)
 			const sidebar = new Sidebar( editor );

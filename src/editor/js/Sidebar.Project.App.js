@@ -47,33 +47,7 @@ function SidebarProjectApp( editor ) {
 
 	container.add( editableRow );
 
-	// Play/Stop
-
-	let isPlaying = false;
-
-	const playButton = new UIButton( strings.getKey( 'sidebar/project/app/play' ) );
-	playButton.setWidth( '170px' );
-	playButton.setMarginLeft( '120px' );
-	playButton.setMarginBottom( '10px' );
-	playButton.onClick( function () {
-
-		if ( isPlaying === false ) {
-
-			isPlaying = true;
-			playButton.setTextContent( strings.getKey( 'sidebar/project/app/stop' ) );
-			signals.startPlayer.dispatch();
-
-		} else {
-
-			isPlaying = false;
-			playButton.setTextContent( strings.getKey( 'sidebar/project/app/play' ) );
-			signals.stopPlayer.dispatch();
-
-		}
-
-	} );
-
-	container.add( playButton );
+	// Play/Stop button moved to viewport toolbar
 
 	// Publish
 

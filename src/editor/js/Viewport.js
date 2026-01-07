@@ -59,6 +59,30 @@ function Viewport( editor ) {
 	grid.add( grid2 );
 
 	const viewHelper = new ViewHelper( camera, container );
+	let isPlaying = false;
+
+	// Camera preview
+	let previewCamera = null;
+	let previewRenderer = null;
+	const previewContainer = document.createElement( 'div' );
+	previewContainer.id = 'camera-preview';
+	previewContainer.style.cssText = 'position: absolute; bottom: 20px; right: 20px; width: 200px; height: 150px; border: 2px solid #08f; background: #000; display: none; cursor: pointer; z-index: 1000;';
+	previewContainer.title = 'Click to switch to this camera';
+	container.dom.appendChild( previewContainer );
+
+	const previewCanvas = document.createElement( 'canvas' );
+	previewCanvas.style.cssText = 'width: 100%; height: 100%; display: block;';
+	previewContainer.appendChild( previewCanvas );
+
+	previewContainer.addEventListener( 'click', function () {
+
+		if ( previewCamera !== null ) {
+
+			editor.setViewportCamera( previewCamera.uuid );
+
+		}
+
+	} );
 
 	//
 
@@ -371,6 +395,14 @@ function Viewport( editor ) {
 
 		renderer = newRenderer;
 
+		// Create preview renderer
+		if ( previewRenderer !== null ) {
+			previewRenderer.dispose();
+		}
+		previewRenderer = new THREE.WebGLRenderer( { canvas: previewCanvas, antialias: true } );
+		previewRenderer.setSize( 200, 150 );
+		previewRenderer.setPixelRatio( window.devicePixelRatio );
+
 		renderer.setAnimationLoop( animate );
 		renderer.setClearColor( 0xaaaaaa );
 
@@ -411,6 +443,31 @@ function Viewport( editor ) {
 
 	} );
 
+	// Listen for play/stop signals to hide/show gizmos
+	signals.startPlayer.add( function () {
+
+		isPlaying = true;
+		transformControls.visible = false;
+		viewHelper.visible = false;
+		// Hide camera preview when playing
+		previewContainer.style.display = 'none';
+
+	} );
+
+	signals.stopPlayer.add( function () {
+
+		isPlaying = false;
+		transformControls.visible = true;
+		viewHelper.visible = true;
+		// Show camera preview again if a camera is selected
+		if ( previewCamera !== null ) {
+
+			previewContainer.style.display = 'block';
+
+		}
+
+	} );
+
 	signals.sceneGraphChanged.add( function () {
 
 		initPT();
@@ -430,6 +487,19 @@ function Viewport( editor ) {
 
 		selectionBox.visible = false;
 		transformControls.detach();
+
+		// Show/hide camera preview
+		if ( object !== null && ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== camera ) {
+
+			previewCamera = object;
+			previewContainer.style.display = 'block';
+
+		} else {
+
+			previewCamera = null;
+			previewContainer.style.display = 'none';
+
+		}
 
 		if ( object !== null && object !== scene && object !== camera ) {
 
@@ -497,12 +567,15 @@ function Viewport( editor ) {
 
 	signals.objectRemoved.add( function ( object ) {
 
-		controls.enabled = true; // see #14180
-
 		if ( object === transformControls.object ) {
 
 			transformControls.detach();
 
+		}
+
+		// Only re-enable controls if TransformControls is not active
+		if ( transformControls.object === null ) {
+			controls.enabled = true; // see #14180
 		}
 
 	} );
@@ -677,8 +750,10 @@ function Viewport( editor ) {
 		}
 
 		// disable EditorControls when setting a user camera
-
-		controls.enabled = ( viewportCamera === editor.camera );
+		// but don't re-enable if TransformControls is currently active
+		if ( transformControls.object === null ) {
+			controls.enabled = ( viewportCamera === editor.camera );
+		}
 
 		initPT();
 		render();
@@ -816,9 +891,9 @@ function Viewport( editor ) {
 
 		}
 
-		// View Helper
+		// View Helper (only when not playing)
 
-		if ( viewHelper.animating === true ) {
+		if ( ! isPlaying && viewHelper.animating === true ) {
 
 			viewHelper.update( delta );
 			needsUpdate = true;
@@ -902,11 +977,18 @@ function Viewport( editor ) {
 
 		if ( camera === editor.viewportCamera ) {
 
-			renderer.autoClear = false;
-			if ( grid.visible === true ) renderer.render( grid, camera );
-			if ( sceneHelpers.visible === true ) renderer.render( sceneHelpers, camera );
-			if ( renderer.xr.isPresenting !== true ) viewHelper.render( renderer );
-			renderer.autoClear = true;
+		renderer.autoClear = false;
+		if ( grid.visible === true ) renderer.render( grid, camera );
+		if ( ! isPlaying && sceneHelpers.visible === true ) renderer.render( sceneHelpers, camera );
+		if ( ! isPlaying && renderer.xr.isPresenting !== true ) viewHelper.render( renderer );
+		renderer.autoClear = true;
+
+		}
+
+		// Render camera preview (only when not playing)
+		if ( ! isPlaying && previewCamera !== null && previewRenderer !== null && previewContainer.style.display !== 'none' ) {
+
+			previewRenderer.render( scene, previewCamera );
 
 		}
 

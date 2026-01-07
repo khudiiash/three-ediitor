@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { UIPanel, UIRow, UIInput, UIButton, UIColor, UICheckbox, UIInteger, UITextArea, UIText, UINumber } from './libs/ui.js';
 import { UIBoolean } from './libs/ui.three.js';
 
-import { SetUuidCommand } from './commands/SetUuidCommand.js';
 import { SetValueCommand } from './commands/SetValueCommand.js';
 import { SetPositionCommand } from './commands/SetPositionCommand.js';
 import { SetRotationCommand } from './commands/SetRotationCommand.js';
@@ -77,23 +76,6 @@ function SidebarObject( editor ) {
 
 	container.add( objectTypeRow );
 
-	// uuid
-
-	const objectUUIDRow = new UIRow();
-	const objectUUID = new UIInput().setWidth( '102px' ).setFontSize( '12px' ).setDisabled( true );
-	const objectUUIDRenew = new UIButton( strings.getKey( 'sidebar/object/new' ) ).setMarginLeft( '7px' ).onClick( function () {
-
-		objectUUID.setValue( THREE.MathUtils.generateUUID() );
-
-		editor.execute( new SetUuidCommand( editor, editor.selected, objectUUID.getValue() ) );
-
-	} );
-
-	objectUUIDRow.add( new UIText( strings.getKey( 'sidebar/object/uuid' ) ).setClass( 'Label' ) );
-	objectUUIDRow.add( objectUUID );
-	objectUUIDRow.add( objectUUIDRenew );
-
-	container.add( objectUUIDRow );
 
 	// name
 
@@ -342,6 +324,56 @@ function SidebarObject( editor ) {
 	objectShadowRadiusRow.add( objectShadowRadius );
 
 	container.add( objectShadowRadiusRow );
+
+	// shadow map size (for lights)
+
+	const objectShadowMapSizeRow = new UIRow();
+	const objectShadowMapSize = new UINumber( 512 ).setWidth( '50px' ).setRange( 256, 4096 ).setStep( 256 ).onChange( update );
+
+	objectShadowMapSizeRow.add( new UIText( 'Map Size' ).setClass( 'Label' ) );
+	objectShadowMapSizeRow.add( objectShadowMapSize );
+
+	container.add( objectShadowMapSizeRow );
+
+	// shadow camera near
+
+	const objectShadowCameraNearRow = new UIRow();
+	const objectShadowCameraNear = new UINumber( 0.5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 100 ).onChange( update );
+
+	objectShadowCameraNearRow.add( new UIText( 'Camera Near' ).setClass( 'Label' ) );
+	objectShadowCameraNearRow.add( objectShadowCameraNear );
+
+	container.add( objectShadowCameraNearRow );
+
+	// shadow camera far
+
+	const objectShadowCameraFarRow = new UIRow();
+	const objectShadowCameraFar = new UINumber( 500 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 1, 10000 ).onChange( update );
+
+	objectShadowCameraFarRow.add( new UIText( 'Camera Far' ).setClass( 'Label' ) );
+	objectShadowCameraFarRow.add( objectShadowCameraFar );
+
+	container.add( objectShadowCameraFarRow );
+
+	// shadow camera area (directional lights) - single control for left/right/top/bottom
+
+	const objectShadowCameraAreaRow = new UIRow();
+	const objectShadowCameraArea = new UINumber( 5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 1000 ).onChange( update );
+
+	objectShadowCameraAreaRow.add( new UIText( 'Shadow Area' ).setClass( 'Label' ) );
+	objectShadowCameraAreaRow.add( objectShadowCameraArea );
+
+	container.add( objectShadowCameraAreaRow );
+
+	// shadow camera fov (spot lights)
+
+	const objectShadowCameraFovRow = new UIRow();
+	const objectShadowCameraFov = new UINumber( 50 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 10, 179 ).onChange( update );
+
+	objectShadowCameraFovRow.add( new UIText( 'Camera FOV' ).setClass( 'Label' ) );
+	objectShadowCameraFovRow.add( objectShadowCameraFov );
+
+	container.add( objectShadowCameraFovRow );
 
 	// visible
 
@@ -616,6 +648,69 @@ function SidebarObject( editor ) {
 
 				}
 
+				// Shadow map size
+				if ( object.shadow.mapSize !== undefined ) {
+
+					const mapSize = objectShadowMapSize.getValue();
+					if ( object.shadow.mapSize.width !== mapSize || object.shadow.mapSize.height !== mapSize ) {
+
+						object.shadow.mapSize.width = mapSize;
+						object.shadow.mapSize.height = mapSize;
+						editor.signals.objectChanged.dispatch( object );
+
+					}
+
+				}
+
+				// Shadow camera properties
+				if ( object.shadow.camera !== undefined ) {
+
+					if ( object.shadow.camera.near !== undefined && Math.abs( object.shadow.camera.near - objectShadowCameraNear.getValue() ) >= 0.01 ) {
+
+						object.shadow.camera.near = objectShadowCameraNear.getValue();
+						object.shadow.camera.updateProjectionMatrix();
+						editor.signals.objectChanged.dispatch( object );
+
+					}
+
+					if ( object.shadow.camera.far !== undefined && Math.abs( object.shadow.camera.far - objectShadowCameraFar.getValue() ) >= 0.01 ) {
+
+						object.shadow.camera.far = objectShadowCameraFar.getValue();
+						object.shadow.camera.updateProjectionMatrix();
+						editor.signals.objectChanged.dispatch( object );
+
+					}
+
+					// Directional light camera properties - use single area control
+					if ( object.shadow.camera.left !== undefined && object.shadow.camera.right !== undefined ) {
+
+						const area = objectShadowCameraArea.getValue();
+						const currentArea = Math.max( Math.abs( object.shadow.camera.right - object.shadow.camera.left ), Math.abs( object.shadow.camera.top - object.shadow.camera.bottom ) ) / 2;
+
+						if ( Math.abs( currentArea - area ) >= 0.01 ) {
+
+							object.shadow.camera.left = - area;
+							object.shadow.camera.right = area;
+							object.shadow.camera.top = area;
+							object.shadow.camera.bottom = - area;
+							object.shadow.camera.updateProjectionMatrix();
+							editor.signals.objectChanged.dispatch( object );
+
+						}
+
+					}
+
+					// Spot light camera properties
+					if ( object.shadow.camera.fov !== undefined && Math.abs( object.shadow.camera.fov - objectShadowCameraFov.getValue() ) >= 0.01 ) {
+
+						object.shadow.camera.fov = objectShadowCameraFov.getValue();
+						object.shadow.camera.updateProjectionMatrix();
+						editor.signals.objectChanged.dispatch( object );
+
+					}
+
+				}
+
 			}
 
 			try {
@@ -656,7 +751,7 @@ function SidebarObject( editor ) {
 			'decay': objectDecayRow,
 			'castShadow': objectShadowRow,
 			'receiveShadow': objectReceiveShadow,
-			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow ]
+			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow, objectShadowMapSizeRow, objectShadowCameraNearRow, objectShadowCameraFarRow, objectShadowCameraAreaRow, objectShadowCameraFovRow ]
 		};
 
 		for ( const property in properties ) {
@@ -684,6 +779,49 @@ function SidebarObject( editor ) {
 		if ( object.isLight ) {
 
 			objectReceiveShadow.setDisplay( 'none' );
+			// Show shadow camera properties for lights
+			if ( object.shadow !== undefined && object.shadow.camera !== undefined ) {
+
+				objectShadowMapSizeRow.setDisplay( '' );
+				objectShadowCameraNearRow.setDisplay( '' );
+				objectShadowCameraFarRow.setDisplay( '' );
+
+				// Show directional light camera properties
+				if ( object.isDirectionalLight && object.shadow.camera.left !== undefined ) {
+
+					objectShadowCameraAreaRow.setDisplay( '' );
+					objectShadowCameraFovRow.setDisplay( 'none' );
+
+				} else if ( object.isSpotLight && object.shadow.camera.fov !== undefined ) {
+
+					objectShadowCameraAreaRow.setDisplay( 'none' );
+					objectShadowCameraFovRow.setDisplay( '' );
+
+				} else {
+
+					objectShadowCameraAreaRow.setDisplay( 'none' );
+					objectShadowCameraFovRow.setDisplay( 'none' );
+
+				}
+
+			} else {
+
+				objectShadowMapSizeRow.setDisplay( 'none' );
+				objectShadowCameraNearRow.setDisplay( 'none' );
+				objectShadowCameraFarRow.setDisplay( 'none' );
+				objectShadowCameraAreaRow.setDisplay( 'none' );
+				objectShadowCameraFovRow.setDisplay( 'none' );
+
+			}
+
+		} else {
+
+			// Hide shadow camera properties for non-lights
+			objectShadowMapSizeRow.setDisplay( 'none' );
+			objectShadowCameraNearRow.setDisplay( 'none' );
+			objectShadowCameraFarRow.setDisplay( 'none' );
+			objectShadowCameraAreaRow.setDisplay( 'none' );
+			objectShadowCameraFovRow.setDisplay( 'none' );
 
 		}
 
@@ -750,7 +888,6 @@ function SidebarObject( editor ) {
 
 		objectType.setValue( object.type );
 
-		objectUUID.setValue( object.uuid );
 		objectName.setValue( object.name );
 
 		objectPositionX.setValue( object.position.x );
@@ -867,6 +1004,47 @@ function SidebarObject( editor ) {
 			objectShadowBias.setValue( object.shadow.bias );
 			objectShadowNormalBias.setValue( object.shadow.normalBias );
 			objectShadowRadius.setValue( object.shadow.radius );
+
+			// Shadow map size
+			if ( object.shadow.mapSize !== undefined ) {
+
+				objectShadowMapSize.setValue( object.shadow.mapSize.width );
+
+			}
+
+			// Shadow camera properties
+			if ( object.shadow.camera !== undefined ) {
+
+				if ( object.shadow.camera.near !== undefined ) {
+
+					objectShadowCameraNear.setValue( object.shadow.camera.near );
+
+				}
+
+				if ( object.shadow.camera.far !== undefined ) {
+
+					objectShadowCameraFar.setValue( object.shadow.camera.far );
+
+				}
+
+				// Directional light camera properties - calculate area from left/right/top/bottom
+				if ( object.shadow.camera.left !== undefined && object.shadow.camera.right !== undefined ) {
+
+					const width = object.shadow.camera.right - object.shadow.camera.left;
+					const height = object.shadow.camera.top - object.shadow.camera.bottom;
+					const area = Math.max( Math.abs( width ), Math.abs( height ) ) / 2;
+					objectShadowCameraArea.setValue( area );
+
+				}
+
+				// Spot light camera properties
+				if ( object.shadow.camera.fov !== undefined ) {
+
+					objectShadowCameraFov.setValue( object.shadow.camera.fov );
+
+				}
+
+			}
 
 		}
 

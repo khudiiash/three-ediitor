@@ -19,23 +19,27 @@ function SidebarProperties( editor ) {
 	// Inspector tab with collapsible sections
 	const inspectorPanel = new UIPanel();
 	inspectorPanel.setBorderTop( '0' );
-	inspectorPanel.setPaddingTop( '20px' );
+	inspectorPanel.setPaddingTop( '4px' );
 
 	const objectPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/object' ) || 'Object' );
 	const objectContent = new SidebarObject( editor );
 	objectPanel.add( objectContent );
+	objectPanel.collapse(); // Collapse by default
 
 	const geometryPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/geometry' ) || 'Geometry' );
 	const geometryContent = new SidebarGeometry( editor );
 	geometryPanel.add( geometryContent );
+	geometryPanel.collapse(); // Collapse by default
 
 	const materialPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/material' ) || 'Material' );
 	const materialContent = new SidebarMaterial( editor );
 	materialPanel.add( materialContent );
+	materialPanel.collapse(); // Collapse by default
 
 	const scriptPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/script' ) || 'Script' );
 	const scriptContent = new SidebarScript( editor );
 	scriptPanel.add( scriptContent );
+	scriptPanel.collapse(); // Collapse by default
 
 	inspectorPanel.add( objectPanel );
 	inspectorPanel.add( geometryPanel );
@@ -49,13 +53,10 @@ function SidebarProperties( editor ) {
 	const projectContent = new SidebarProject( editor );
 	projectPanel.add( projectContent );
 
-	// Settings tab (combines Scene Settings and Editor Settings)
+	// Settings tab
 	const settingsPanel = new UIPanel();
 	settingsPanel.setBorderTop( '0' );
-	settingsPanel.setPaddingTop( '20px' );
-	
-	const sceneSettingsContent = new SidebarSceneSettings( editor );
-	settingsPanel.add( sceneSettingsContent );
+	settingsPanel.setPaddingTop( '4px' );
 	
 	const editorSettingsContent = new SidebarSettings( editor );
 	settingsPanel.add( editorSettingsContent );

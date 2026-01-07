@@ -10,7 +10,11 @@ function SidebarScene( editor ) {
 
 	const container = new UIPanel();
 	container.setBorderTop( '0' );
-	container.setPaddingTop( '20px' );
+	container.setPaddingTop( '0' );
+	container.dom.style.height = 'calc(100% - 4px)';
+	container.dom.style.display = 'flex';
+	container.dom.style.flexDirection = 'column';
+	container.dom.style.marginBottom = '4px';
 
 	// outliner
 
@@ -131,6 +135,21 @@ function SidebarScene( editor ) {
 
 	const outliner = new UIOutliner( editor );
 	outliner.setId( 'outliner' );
+	outliner.dom.style.flex = '1';
+	outliner.dom.style.height = '100%';
+	
+	// Apply minimal scrollbar styling directly (only once)
+	if ( ! document.getElementById( 'outliner-scrollbar-style' ) ) {
+		const style = document.createElement( 'style' );
+		style.id = 'outliner-scrollbar-style';
+		style.textContent = `
+			#outliner::-webkit-scrollbar { width: 2px !important; height: 2px !important; }
+			#outliner::-webkit-scrollbar-track { background: transparent !important; }
+			#outliner::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05) !important; border-radius: 1px !important; }
+			#outliner::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.15) !important; }
+		`;
+		document.head.appendChild( style );
+	}
 	outliner.onChange( function () {
 
 		ignoreObjectSelectedSignal = true;

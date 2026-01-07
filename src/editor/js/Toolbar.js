@@ -77,6 +77,60 @@ function Toolbar( editor ) {
 
 	} );
 
+	// Play/Stop button
+	let isPlaying = false;
+	const playButton = new UIButton( '▶' );
+	playButton.dom.title = strings.getKey( 'sidebar/project/app/play' ) || 'Play';
+	playButton.dom.style.width = '24px';
+	playButton.dom.style.height = '24px';
+	playButton.dom.style.fontSize = '12px';
+	playButton.dom.style.marginLeft = '8px';
+	playButton.onClick( function () {
+
+		if ( isPlaying === false ) {
+
+			isPlaying = true;
+			playButton.dom.textContent = '■';
+			playButton.dom.title = strings.getKey( 'sidebar/project/app/stop' ) || 'Stop';
+			signals.startPlayer.dispatch();
+
+		} else {
+
+			isPlaying = false;
+			playButton.dom.textContent = '▶';
+			playButton.dom.title = strings.getKey( 'sidebar/project/app/play' ) || 'Play';
+			signals.stopPlayer.dispatch();
+
+		}
+
+	} );
+	container.add( playButton );
+
+	// Update button state when player starts/stops externally
+	signals.startPlayer.add( function () {
+
+		if ( ! isPlaying ) {
+
+			isPlaying = true;
+			playButton.dom.textContent = '■';
+			playButton.dom.title = strings.getKey( 'sidebar/project/app/stop' ) || 'Stop';
+
+		}
+
+	} );
+
+	signals.stopPlayer.add( function () {
+
+		if ( isPlaying ) {
+
+			isPlaying = false;
+			playButton.dom.textContent = '▶';
+			playButton.dom.title = strings.getKey( 'sidebar/project/app/play' ) || 'Play';
+
+		}
+
+	} );
+
 	return container;
 
 }
