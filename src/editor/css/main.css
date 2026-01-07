@@ -349,7 +349,8 @@ select {
 	top: 32px;
 	left: 250px; /* Start after left sidebar */
 	right: 350px; /* End before right sidebar */
-	bottom: 0;
+	bottom: 200px; /* Leave space for bottom sidebar */
+	z-index: 10;
 }
 
 #viewport #toolbar {
@@ -503,7 +504,7 @@ select {
 	position: absolute;
 	left: 0;
 	top: 32px;
-	bottom: 0;
+	bottom: 200px;
 	width: 250px;
 	overflow-y: auto;
 	overflow-x: hidden;
@@ -514,11 +515,120 @@ select {
 	position: absolute;
 	right: 0;
 	top: 32px;
-	bottom: 0;
+	bottom: 200px;
 	width: 350px;
 	overflow-y: auto;
 	overflow-x: hidden;
 	border-left: 1px solid #ccc;
+}
+
+#sidebar-bottom {
+	position: absolute;
+	left: 250px;
+	right: 350px;
+	bottom: 0;
+	height: 200px;
+	background: #1e1e1e;
+	border-top: 1px solid #444;
+	overflow: hidden;
+	z-index: 1;
+}
+
+/* Assets panel */
+#assets-container {
+	height: 100%;
+	background: #1e1e1e;
+}
+
+#assets-folders {
+	background: #252525;
+	color: #aaa;
+}
+
+#assets-folder-tree div:hover {
+	background: #333 !important;
+}
+
+#assets-files {
+	background: #1e1e1e;
+}
+
+#assets-files-grid {
+	background: #1e1e1e;
+}
+
+#assets-files-grid > div:hover {
+	background: #333;
+}
+
+#assets-drop-zone {
+	pointer-events: none;
+}
+
+/* Assets context menu */
+#assets-context-menu {
+	position: fixed !important;
+	background: #2a2a2a;
+	border: 1px solid #444;
+	box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+	z-index: 100000 !important;
+	width: auto !important;
+	min-width: 150px;
+	max-width: 300px;
+	padding: 4px 0;
+}
+
+#assets-context-menu .Row {
+	padding: 8px 16px;
+	cursor: pointer;
+	color: #aaa;
+	border: none;
+	margin: 0;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+#assets-context-menu .Row:hover {
+	background: #444;
+}
+
+#assets-context-menu .submenu-title {
+	position: relative;
+}
+
+#assets-context-menu .submenu-title:hover {
+	background: #444;
+}
+
+/* Submenu styling - separate from main menu */
+#assets-submenu {
+	position: fixed !important;
+	background: #2a2a2a !important;
+	border: 1px solid #444 !important;
+	box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+	z-index: 100001 !important;
+	min-width: 180px !important;
+	padding: 4px 0 !important;
+	border-radius: 4px !important;
+	width: auto !important;
+	max-width: 300px !important;
+}
+
+#assets-submenu .Row {
+	padding: 8px 16px !important;
+	cursor: pointer !important;
+	color: #aaa !important;
+	border: none !important;
+	margin: 0 !important;
+	display: flex !important;
+	align-items: center !important;
+	gap: 8px !important;
+	width: 100% !important;
+	box-sizing: border-box !important;
+}
+
+#assets-submenu .Row:hover {
+	background: #444 !important;
 }
 
 /* Collapsible Panel */
@@ -606,7 +716,7 @@ select {
 	width: 32px;
 	background: rgba(238, 238, 238, 0.9);
 	text-align: center;
-	z-index: 100;
+	z-index: 1000;
 	border-radius: 4px;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }

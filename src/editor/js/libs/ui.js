@@ -988,6 +988,12 @@ class UIButton extends UIElement {
 		this.dom.className = 'Button';
 		this.dom.textContent = value;
 
+		this.dom.addEventListener( 'pointerdown', function ( event ) {
+
+			event.stopPropagation();
+
+		} );
+
 	}
 
 }

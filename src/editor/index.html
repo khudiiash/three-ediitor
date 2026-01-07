@@ -72,6 +72,7 @@
 			import { SidebarScene } from './js/Sidebar.Scene.js';
 			import { SidebarProperties } from './js/Sidebar.Properties.js';
 			import { SidebarProject } from './js/Sidebar.Project.js';
+			import { SidebarAssets } from './js/Sidebar.Assets.js';
 			import { Menubar } from './js/Menubar.js';
 			import { Resizer } from './js/Resizer.js';
 
@@ -100,7 +101,12 @@
 			sidebarRight.appendChild( sidebarProperties.dom );
 			document.body.appendChild( sidebarRight );
 
-			// Bottom panel removed - content moved to Settings tab
+			// Bottom sidebar: Assets
+			const sidebarBottom = document.createElement( 'div' );
+			sidebarBottom.id = 'sidebar-bottom';
+			const sidebarAssets = new SidebarAssets( editor );
+			sidebarBottom.appendChild( sidebarAssets.dom );
+			document.body.appendChild( sidebarBottom );
 
 			// Viewport in center
 			const viewport = new Viewport( editor );
