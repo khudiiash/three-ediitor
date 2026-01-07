@@ -3,11 +3,9 @@ node_modules/
 target/
 dist/
 
-# Editor build artifacts
-editor/target/
-editor/ui/node_modules/
-editor/ui/editor-main.js
-editor/ui/editor-main.js.map
+# cargo
+target/
+Cargo.lock
 
 # OS files
 .DS_Store

@@ -125,8 +125,6 @@ class EditorControls extends THREE.EventDispatcher {
 
 		};
 
-		//
-
 		function onPointerDown( event ) {
 
 			if ( scope.enabled === false ) return;
