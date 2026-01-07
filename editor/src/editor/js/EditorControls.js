@@ -75,8 +75,12 @@ class EditorControls extends THREE.EventDispatcher {
 			var distance = object.position.distanceTo( center );
 
 			delta.multiplyScalar( distance * scope.panSpeed );
-			delta.applyMatrix3( normalMatrix.getNormalMatrix( object.matrix ) );
+			
+			// Transform delta from screen space to world space using camera's rotation only
+			var rotationMatrix = new THREE.Matrix4().extractRotation( object.matrix );
+			delta.applyMatrix4( rotationMatrix );
 
+			// Move both camera and center by the same world-space delta
 			object.position.add( delta );
 			center.add( delta );
 
@@ -126,6 +130,8 @@ class EditorControls extends THREE.EventDispatcher {
 		function onPointerDown( event ) {
 
 			if ( scope.enabled === false ) return;
+
+			if ( event.target !== domElement ) return;
 
 			if ( pointers.length === 0 ) {
 
@@ -207,7 +213,16 @@ class EditorControls extends THREE.EventDispatcher {
 
 			if ( event.button === 0 ) {
 
-				state = STATE.ROTATE;
+				// SHIFT + left click = pan (reposition orbit center)
+				if ( event.shiftKey ) {
+
+					state = STATE.PAN;
+
+				} else {
+
+					state = STATE.ROTATE;
+
+				}
 
 			} else if ( event.button === 1 ) {
 

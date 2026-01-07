@@ -111,7 +111,7 @@ textarea, input { outline: none; } /* osx */
 /* Listbox */
 .Listbox {
 	color: #444;
-	background-color: #fff;
+	background-color: #ddd;
 	padding: 0;
 	width: 100%;
 	min-height: 180px;
@@ -277,11 +277,11 @@ button {
 }
 
 	button:hover {
-		background-color: #fff;
+		background-color: #ddd;
 	}
 
 	button.selected {
-		background-color: #fff;
+		background-color: #ddd;
 	}
 
 input, textarea {
@@ -306,18 +306,29 @@ select {
 }
 
 	select:hover {
-		background-color: #fff;
+		background-color: #ddd;
 	}
 
 /* UI */
 
 #resizer {
 	position: absolute;
-	z-index: 2; /* Above #sidebar */
+	z-index: 2; /* Above sidebars */
 	top: 32px;
 	right: 350px;
 	width: 5px;
-	bottom: 0px;
+	bottom: 0;
+	transform: translatex(2.5px);
+	cursor: col-resize;
+}
+
+#resizer-left {
+	position: absolute;
+	z-index: 2;
+	top: 32px;
+	left: 250px;
+	width: 5px;
+	bottom: 0;
 	transform: translatex(2.5px);
 	cursor: col-resize;
 }
@@ -336,9 +347,21 @@ select {
 #viewport {
 	position: absolute;
 	top: 32px;
-	left: 0;
-	right: 350px;
+	left: 250px; /* Start after left sidebar */
+	right: 350px; /* End before right sidebar */
 	bottom: 0;
+}
+
+#viewport #toolbar {
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	width: 32px;
+	background: rgba(238, 238, 238, 0.9);
+	text-align: center;
+	z-index: 100;
+	border-radius: 4px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 	#viewport .Text {
@@ -372,6 +395,7 @@ select {
 	margin: 0;
 	right: 0;
 	top: 0;
+	z-index: 999;
 }
 
 	#menubar .menu {
@@ -474,18 +498,65 @@ select {
 
 		
 
+/* PlayCanvas-style layout */
+#sidebar-left {
+	position: absolute;
+	left: 0;
+	top: 32px;
+	bottom: 0;
+	width: 250px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	border-right: 1px solid #ccc;
+}
+
+#sidebar-right {
+	position: absolute;
+	right: 0;
+	top: 32px;
+	bottom: 0;
+	width: 350px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	border-left: 1px solid #ccc;
+}
+
+/* Collapsible Panel */
+.CollapsiblePanel {
+	border-top: 1px solid #ccc;
+}
+
+.CollapsiblePanelHeader {
+	padding: 8px 10px;
+	background: #333;
+	border-radius: 4px;
+	border-bottom: 1px solid #ccc;
+}
+
+.CollapsiblePanelHeader:hover {
+	background: #444;
+}
+
+.CollapsiblePanelContent {
+	padding: 10px;
+}
+
+/* Legacy sidebar support */
 #sidebar {
 	position: absolute;
 	right: 0;
 	top: 32px;
 	bottom: 0;
 	width: 350px;
-	background: #eee;
+	background: #ddd;
 	overflow: auto;
 	overflow-x: hidden;
 }
 
-	#sidebar .Panel {
+	#sidebar .Panel,
+	#sidebar-left .Panel,
+	#sidebar-right .Panel,
+	#sidebar-bottom .Panel {
 		color: #888;
 		padding: 10px;
 		border-top: 1px solid #ccc;
@@ -495,17 +566,21 @@ select {
 		margin-bottom: 0;
 	}
 
-	#sidebar .Row {
+	#sidebar .Row,
+	#sidebar-left .Row,
+	#sidebar-right .Row,
+	#sidebar-bottom .Row {
 		display: flex;
 		align-items: center;
 		min-height: 24px;
 		margin-bottom: 10px;
 	}
 
-	#sidebar .Row .Label {
-
+	#sidebar .Row .Label,
+	#sidebar-left .Row .Label,
+	#sidebar-right .Row .Label,
+	#sidebar-bottom .Row .Label {
 		width: 120px;
-
 	}
 
 #tabs {
@@ -521,16 +596,19 @@ select {
 
 	#tabs span.selected {
 		color: #888;
-		background-color: #eee;
+		background-color: #ddd;
 	}
 
 #toolbar {
 	position: absolute;
 	left: 10px;
-	top: 42px;
+	top: 10px;
 	width: 32px;
-	background: #eee;
+	background: rgba(238, 238, 238, 0.9);
 	text-align: center;
+	z-index: 100;
+	border-radius: 4px;
+	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 	#toolbar button, #toolbar input {
@@ -544,7 +622,7 @@ select {
 
 .Outliner {
 	color: #444;
-	background-color: #fff;
+	background-color: #eee;
 	padding: 0;
 	width: 100%;
 	height: 180px;
@@ -587,7 +665,7 @@ select {
 
 .Listbox {
 	color: #444;
-	background-color: #fff;
+	background-color: #eee;
 }
 
 .Panel {

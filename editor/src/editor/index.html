@@ -69,6 +69,9 @@
 			import { Script } from './js/Script.js';
 			import { Player } from './js/Player.js';
 			import { Sidebar } from './js/Sidebar.js';
+			import { SidebarScene } from './js/Sidebar.Scene.js';
+			import { SidebarProperties } from './js/Sidebar.Properties.js';
+			import { SidebarProject } from './js/Sidebar.Project.js';
 			import { Menubar } from './js/Menubar.js';
 			import { Resizer } from './js/Resizer.js';
 
@@ -82,11 +85,30 @@
 			window.editor = editor; // Expose editor to Console
 			window.THREE = THREE; // Expose THREE to APP Scripts and Console
 
+			// PlayCanvas-style layout
+			// Left sidebar: Hierarchy (Scene)
+			const sidebarLeft = document.createElement( 'div' );
+			sidebarLeft.id = 'sidebar-left';
+			const sidebarScene = new SidebarScene( editor );
+			sidebarLeft.appendChild( sidebarScene.dom );
+			document.body.appendChild( sidebarLeft );
+
+			// Right sidebar: Inspector (Properties/Object)
+			const sidebarRight = document.createElement( 'div' );
+			sidebarRight.id = 'sidebar-right';
+			const sidebarProperties = new SidebarProperties( editor );
+			sidebarRight.appendChild( sidebarProperties.dom );
+			document.body.appendChild( sidebarRight );
+
+			// Bottom panel removed - content moved to Settings tab
+
+			// Viewport in center
 			const viewport = new Viewport( editor );
 			document.body.appendChild( viewport.dom );
 
+			// Toolbar inside viewport
 			const toolbar = new Toolbar( editor );
-			document.body.appendChild( toolbar.dom );
+			viewport.dom.appendChild( toolbar.dom );
 
 			const script = new Script( editor );
 			document.body.appendChild( script.dom );
@@ -94,7 +116,9 @@
 			const player = new Player( editor );
 			document.body.appendChild( player.dom );
 
+			// Legacy sidebar (hidden, kept for compatibility)
 			const sidebar = new Sidebar( editor );
+			sidebar.dom.style.display = 'none';
 			document.body.appendChild( sidebar.dom );
 
 			const menubar = new Menubar( editor );
@@ -102,9 +126,6 @@
 
 			const resizer = new Resizer( editor );
 			document.body.appendChild( resizer.dom );
-
-			//
-
 			editor.storage.init( function () {
 
 				editor.storage.get( async function ( state ) {

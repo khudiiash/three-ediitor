@@ -1,9 +1,13 @@
-import { UITabbedPanel } from './libs/ui.js';
+import { UITabbedPanel, UIPanel } from './libs/ui.js';
+import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
 import { SidebarObject } from './Sidebar.Object.js';
 import { SidebarGeometry } from './Sidebar.Geometry.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
 import { SidebarScript } from './Sidebar.Script.js';
+import { SidebarProject } from './Sidebar.Project.js';
+import { SidebarSceneSettings } from './Sidebar.Scene.Settings.js';
+import { SidebarSettings } from './Sidebar.Settings.js';
 
 function SidebarProperties( editor ) {
 
@@ -12,59 +16,80 @@ function SidebarProperties( editor ) {
 	const container = new UITabbedPanel();
 	container.setId( 'properties' );
 
-	container.addTab( 'objectTab', strings.getKey( 'sidebar/properties/object' ), new SidebarObject( editor ) );
-	container.addTab( 'geometryTab', strings.getKey( 'sidebar/properties/geometry' ), new SidebarGeometry( editor ) );
-	container.addTab( 'materialTab', strings.getKey( 'sidebar/properties/material' ), new SidebarMaterial( editor ) );
-	container.addTab( 'scriptTab', strings.getKey( 'sidebar/properties/script' ), new SidebarScript( editor ) );
-	container.select( 'objectTab' );
+	// Inspector tab with collapsible sections
+	const inspectorPanel = new UIPanel();
+	inspectorPanel.setBorderTop( '0' );
+	inspectorPanel.setPaddingTop( '20px' );
 
-	function getTabByTabId( tabs, tabId ) {
+	const objectPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/object' ) || 'Object' );
+	const objectContent = new SidebarObject( editor );
+	objectPanel.add( objectContent );
 
-		return tabs.find( function ( tab ) {
+	const geometryPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/geometry' ) || 'Geometry' );
+	const geometryContent = new SidebarGeometry( editor );
+	geometryPanel.add( geometryContent );
 
-			return tab.dom.id === tabId;
+	const materialPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/material' ) || 'Material' );
+	const materialContent = new SidebarMaterial( editor );
+	materialPanel.add( materialContent );
 
-		} );
+	const scriptPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/script' ) || 'Script' );
+	const scriptContent = new SidebarScript( editor );
+	scriptPanel.add( scriptContent );
 
-	}
+	inspectorPanel.add( objectPanel );
+	inspectorPanel.add( geometryPanel );
+	inspectorPanel.add( materialPanel );
+	inspectorPanel.add( scriptPanel );
 
-	const geometryTab = getTabByTabId( container.tabs, 'geometryTab' );
-	const materialTab = getTabByTabId( container.tabs, 'materialTab' );
-	const scriptTab = getTabByTabId( container.tabs, 'scriptTab' );
+	// Project tab
+	const projectPanel = new UIPanel();
+	projectPanel.setBorderTop( '0' );
+	projectPanel.setPaddingTop( '20px' );
+	const projectContent = new SidebarProject( editor );
+	projectPanel.add( projectContent );
 
-	function toggleTabs( object ) {
+	// Settings tab (combines Scene Settings and Editor Settings)
+	const settingsPanel = new UIPanel();
+	settingsPanel.setBorderTop( '0' );
+	settingsPanel.setPaddingTop( '20px' );
+	
+	const sceneSettingsContent = new SidebarSceneSettings( editor );
+	settingsPanel.add( sceneSettingsContent );
+	
+	const editorSettingsContent = new SidebarSettings( editor );
+	settingsPanel.add( editorSettingsContent );
 
-		container.setHidden( object === null );
+	// Add tabs
+	container.addTab( 'inspector', 'Inspector', inspectorPanel );
+	container.addTab( 'project', 'Project', projectPanel );
+	container.addTab( 'settings', 'Settings', settingsPanel );
+	container.select( 'inspector' );
 
-		if ( object === null ) return;
+	function togglePanels( object ) {
 
-		geometryTab.setHidden( ! object.geometry );
+		if ( object === null ) {
 
-		materialTab.setHidden( ! object.material );
-
-		scriptTab.setHidden( object === editor.camera );
-
-		// set active tab
-
-		if ( container.selected === 'geometryTab' ) {
-
-			container.select( geometryTab.isHidden() ? 'objectTab' : 'geometryTab' );
-
-		} else if ( container.selected === 'materialTab' ) {
-
-			container.select( materialTab.isHidden() ? 'objectTab' : 'materialTab' );
-
-		} else if ( container.selected === 'scriptTab' ) {
-
-			container.select( scriptTab.isHidden() ? 'objectTab' : 'scriptTab' );
+			// When nothing selected, show scene settings tab
+			objectPanel.setHidden( true );
+			geometryPanel.setHidden( true );
+			materialPanel.setHidden( true );
+			scriptPanel.setHidden( true );
+			return;
 
 		}
 
+		// Show object panels when object is selected
+		objectPanel.setHidden( false );
+		geometryPanel.setHidden( ! object.geometry );
+		materialPanel.setHidden( ! object.material );
+		scriptPanel.setHidden( object === editor.camera );
+
 	}
 
-	editor.signals.objectSelected.add( toggleTabs );
+	editor.signals.objectSelected.add( togglePanels );
 
-	toggleTabs( editor.selected );
+	togglePanels( editor.selected );
 
 	return container;
 
