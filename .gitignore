@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+target/
+dist/
+
+# Editor build artifacts
+editor/target/
+editor/ui/node_modules/
+editor/ui/editor-main.js
+editor/ui/editor-main.js.map
+
+# OS files
+.DS_Store
+Thumbs.db
+nul
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
