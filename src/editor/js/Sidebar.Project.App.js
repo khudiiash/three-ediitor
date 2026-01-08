@@ -65,6 +65,24 @@ function SidebarProjectApp( editor ) {
 		output.metadata.type = 'App';
 		delete output.history;
 
+		let sceneCamera = null;
+		editor.scene.traverse( function ( object ) {
+
+			if ( ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== editor.camera ) {
+
+				sceneCamera = object;
+				return;
+
+			}
+
+		} );
+
+		if ( sceneCamera !== null ) {
+
+			output.camera = sceneCamera.toJSON();
+
+		}
+
 		output = JSON.stringify( output, null, '\t' );
 		output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
 
