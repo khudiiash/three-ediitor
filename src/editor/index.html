@@ -15,10 +15,9 @@
 		<script type="importmap">
 			{
 				"imports": {
-					"three": "/build/three.module.js",
-					"three/addons/": "/examples/jsm/",
-
-					"three/examples/": "/examples/",
+					"three": "./build/three.module.js",
+					"three/addons/": "./examples/jsm/",
+					"three/examples/": "./examples/",
 					"three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js",
 					"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js"
 				}
@@ -117,6 +116,31 @@
 			const toolbar = new Toolbar( editor );
 			document.body.appendChild( toolbar.dom );
 
+			// Loading overlay - shown while scene is loading
+			// Show it immediately from the start, hide only after scene is fully built
+			const loadingOverlay = document.createElement( 'div' );
+			loadingOverlay.id = 'loading-overlay';
+			loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 30, 30, 0.9); display: flex; z-index: 10000; align-items: center; justify-content: center; flex-direction: column;';
+			
+			const loadingSpinner = document.createElement( 'div' );
+			loadingSpinner.style.cssText = 'width: 50px; height: 50px; border: 4px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;';
+			
+			const loadingText = document.createElement( 'div' );
+			loadingText.textContent = 'Loading scene...';
+			loadingText.style.cssText = 'color: #fff; margin-top: 20px; font-size: 16px; font-family: Helvetica, Arial, sans-serif;';
+			
+			loadingOverlay.appendChild( loadingSpinner );
+			loadingOverlay.appendChild( loadingText );
+			document.body.appendChild( loadingOverlay );
+			
+			// Add spinner animation
+			const style = document.createElement( 'style' );
+			style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+			document.head.appendChild( style );
+			
+			// Track if we should hide the overlay
+			let shouldHideOverlay = false;
+
 			const script = new Script( editor );
 			document.body.appendChild( script.dom );
 
@@ -128,16 +152,162 @@
 			sidebar.dom.style.display = 'none';
 			document.body.appendChild( sidebar.dom );
 
+			// Listen for project-opened event from Tauri
+			// Set this up immediately, before other initialization
+			if ( window.__TAURI__ ) {
+
+				console.log( '[Editor] Setting up project-opened event listener...' );
+				
+				// Set up the listener as early as possible
+				window.__TAURI__.event.listen( 'project-opened', async ( event ) => {
+
+					console.log( '[Editor] Project opened event received:', event.payload );
+					const projectPath = event.payload;
+					
+					// Overlay is already visible from the start
+					console.log( '[Editor] Loading overlay is already visible, loading scene...' );
+					shouldHideOverlay = false;
+					
+					// Set the project path in storage BEFORE loading
+					if ( editor.storage.setProjectPath ) {
+
+						editor.storage.setProjectPath( projectPath );
+						console.log( '[Editor] Project path set in storage:', projectPath );
+
+					}
+
+					// Load the scene from the project directory
+					// Note: We use editor.storage.get() which handles path conversion
+					// This ensures consistency with the save path format
+					try {
+
+						// Use storage.get() which handles path conversion for Tauri
+						await new Promise( ( resolve, reject ) => {
+							
+							// Track when hierarchy is updated
+							let hierarchyUpdated = false;
+							const onSceneGraphChanged = function () {
+								console.log( '[Editor] Hierarchy updated (sceneGraphChanged signal)' );
+								hierarchyUpdated = true;
+								editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
+								
+								// Wait a bit more to ensure UI is fully updated
+								setTimeout( () => {
+									if ( shouldHideOverlay ) {
+										console.log( '[Editor] Hiding loading overlay after hierarchy update...' );
+										loadingOverlay.style.display = 'none';
+									}
+									resolve();
+								}, 100 );
+							};
+							
+							// Listen for hierarchy updates
+							editor.signals.sceneGraphChanged.add( onSceneGraphChanged );
+							
+							// Mark that we should hide overlay when done
+							shouldHideOverlay = true;
+							
+							editor.storage.get( async function ( state ) {
+								
+								try {
+									
+									if ( state !== undefined ) {
+										
+										console.log( '[Editor] Scene data loaded, constructing scene...' );
+										
+										// Clear any existing scene before loading
+										editor.clear();
+										
+										await editor.fromJSON( state );
+										console.log( '[Editor] fromJSON completed, waiting for hierarchy update...' );
+										
+										// If hierarchy hasn't updated after a delay, hide overlay anyway
+										setTimeout( () => {
+											if ( ! hierarchyUpdated ) {
+												console.log( '[Editor] Hierarchy update timeout, hiding overlay...' );
+												editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
+												if ( shouldHideOverlay ) {
+													loadingOverlay.style.display = 'none';
+												}
+												resolve();
+											}
+										}, 2000 );
+										
+									} else {
+										
+										console.log( '[Editor] No scene.json found, starting with empty scene' );
+										editor.clear();
+										
+										// Remove listener and hide overlay for empty scene
+										editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
+										shouldHideOverlay = true;
+										console.log( '[Editor] Hiding loading overlay (empty scene)...' );
+										loadingOverlay.style.display = 'none';
+										resolve();
+										
+									}
+									
+								} catch ( error ) {
+									
+									editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
+									shouldHideOverlay = true;
+									loadingOverlay.style.display = 'none';
+									reject( error );
+									
+								}
+								
+							} );
+							
+						} );
+
+					} catch ( error ) {
+
+						console.warn( '[Editor] Failed to load scene from project, starting with empty scene:', error );
+						// Clear the editor to start fresh
+						editor.clear();
+						
+						// Hide loading overlay on error
+						shouldHideOverlay = true;
+						console.log( '[Editor] Hiding loading overlay due to error...' );
+						loadingOverlay.style.display = 'none';
+
+					}
+
+				} ).then( () => {
+					console.log( '[Editor] Project-opened event listener registered successfully' );
+				} ).catch( ( error ) => {
+					console.error( '[Editor] Failed to register project-opened event listener:', error );
+				} );
+
+			} else {
+				console.warn( '[Editor] Tauri API not available, cannot listen for project-opened events' );
+			}
+
 			const menubar = new Menubar( editor );
 			document.body.appendChild( menubar.dom );
 
 			const resizer = new Resizer( editor );
 			document.body.appendChild( resizer.dom );
+			
+			// Declare isLoadingFromHash before it's used
+			let isLoadingFromHash = false;
+			
 			editor.storage.init( function () {
 
 				editor.storage.get( async function ( state ) {
 
 					if ( isLoadingFromHash ) return;
+
+					// In Tauri mode, only load from storage if we have a project path
+					// Otherwise, wait for the project-opened event
+					if ( window.__TAURI__ ) {
+						// Check if project path is set by checking if storage.get would return undefined
+						// If no project path, the project-opened event will handle loading
+						if ( state === undefined ) {
+							console.log( '[Editor] Tauri mode: No project path set yet, waiting for project-opened event' );
+							return;
+						}
+					}
 
 					if ( state !== undefined ) {
 
@@ -242,7 +412,7 @@
 
 			//
 
-			let isLoadingFromHash = false;
+			// isLoadingFromHash is declared earlier, above editor.storage.init
 			const hash = window.location.hash;
 
 			if ( hash.slice( 1, 6 ) === 'file=' ) {

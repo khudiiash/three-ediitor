@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Three.js Editor Hub</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link rel="stylesheet" href="css/hub.css">
+	</head>
+	<body>
+		<div id="app-container">
+			<!-- Top Bar -->
+			<div id="top-bar">
+				<div class="top-bar-left">
+					<span class="app-title">Three.js Editor Hub</span>
+				</div>
+				<div class="top-bar-right">
+					<!-- Window controls handled by OS -->
+				</div>
+			</div>
+
+			<!-- Main Layout -->
+			<div id="main-layout">
+				<!-- Left Sidebar -->
+				<div id="sidebar">
+					<div class="sidebar-header">
+						<div class="user-profile">
+							<div class="profile-icon">U</div>
+							<span class="profile-arrow">▼</span>
+							<span class="profile-settings">⚙</span>
+						</div>
+					</div>
+					<nav class="sidebar-nav">
+						<a href="#" class="nav-item active" data-section="projects">
+							<span class="nav-icon">📁</span>
+							<span class="nav-label">Projects</span>
+						</a>
+						<a href="#" class="nav-item" data-section="installs">
+							<span class="nav-icon">💻</span>
+							<span class="nav-label">Installs</span>
+						</a>
+						<a href="#" class="nav-item" data-section="learn">
+							<span class="nav-icon">🎓</span>
+							<span class="nav-label">Learn</span>
+						</a>
+					</nav>
+					<div class="sidebar-footer">
+						<a href="#" class="nav-item" data-section="downloads">
+							<span class="nav-icon">⬇</span>
+							<span class="nav-label">Downloads</span>
+						</a>
+					</div>
+				</div>
+
+				<!-- Main Content -->
+				<div id="main-content">
+					<div class="content-header">
+						<h1>Projects</h1>
+						<div class="header-actions">
+							<div class="dropdown">
+								<button class="btn btn-secondary" id="add-btn">
+									Add <span class="dropdown-arrow">▼</span>
+								</button>
+							</div>
+							<button class="btn btn-primary" id="new-project-btn">New project</button>
+						</div>
+					</div>
+
+					<div class="search-bar">
+						<span class="search-icon">🔍</span>
+						<input type="text" id="search-input" placeholder="Search...">
+					</div>
+
+					<div id="projects-container">
+						<div id="projects-loading">Loading projects...</div>
+						<table id="projects-table" style="display: none;">
+							<thead>
+								<tr>
+									<th class="col-favorite"></th>
+									<th class="col-link"></th>
+									<th class="col-name">NAME</th>
+									<th class="col-path">LOCATION</th>
+									<th class="col-modified sortable" data-sort="modified">
+										MODIFIED <span class="sort-indicator">▲</span>
+									</th>
+									<th class="col-actions"></th>
+								</tr>
+							</thead>
+							<tbody id="projects-tbody">
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- New Project Modal -->
+		<div id="new-project-modal" class="modal">
+			<div class="modal-content">
+				<h2>New Project</h2>
+				<form id="new-project-form">
+					<div class="form-group">
+						<label for="project-name-input">Project Name</label>
+						<input type="text" id="project-name-input" placeholder="My Project" required autofocus>
+					</div>
+					<div class="modal-actions">
+						<button type="button" class="btn btn-secondary" id="modal-cancel">Cancel</button>
+						<button type="submit" class="btn btn-primary" id="modal-create">Create</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Load Tauri API script first -->
+		<script src="../editor/js/libs/signals.min.js"></script>
+		<script type="module" src="js/hub.js"></script>
+	</body>
+</html>

@@ -457,9 +457,13 @@ function SidebarAssets( editor ) {
 	let viewMode = 'list'; // 'grid', 'list', 'detailed'
 	
 	// Assets storage
+	const isTauri = typeof window !== 'undefined' && window.__TAURI__;
 	const assetsDBName = 'threejs-editor-assets';
 	const assetsDBVersion = 1;
 	let assetsDatabase;
+	
+	// Get Tauri invoke function if available
+	const invoke = isTauri ? window.__TAURI__.invoke : null;
 
 	// Build folder tree
 	function buildFolderTree( folder, parentElement, level = 0 ) {
@@ -696,18 +700,30 @@ function SidebarAssets( editor ) {
 
 				reader.onload = function ( e ) {
 
+					// Normalize path
+					let normalizedPath = currentFolder.path;
+					if ( normalizedPath === '/' ) {
+						normalizedPath = '';
+					} else if ( normalizedPath.endsWith( '/' ) ) {
+						normalizedPath = normalizedPath.slice( 0, -1 );
+					}
+					const filePath = normalizedPath + '/' + file.name;
+					
 					const fileEntry = {
 						name: file.name,
 						content: e.target.result,
 						url: objectURL,
-						path: currentFolder.path + '/' + file.name,
+						path: filePath,
 						size: file.size,
 						type: file.type || 'File',
 						isBinary: file.type.startsWith( 'image/' ) || file.type.startsWith( 'audio/' ) || file.type.startsWith( 'video/' )
 					};
 
 					currentFolder.files.push( fileEntry );
-					saveAssets();
+					// saveAssets is async, but we don't need to await it here
+					saveAssets().catch( error => {
+						console.error( '[Assets] Error saving assets:', error );
+					} );
 					refreshFiles();
 
 				};
@@ -738,16 +754,27 @@ function SidebarAssets( editor ) {
 				return;
 			}
 
+			// Normalize path
+			let normalizedPath = currentFolder.path;
+			if ( normalizedPath === '/' ) {
+				normalizedPath = '';
+			} else if ( normalizedPath.endsWith( '/' ) ) {
+				normalizedPath = normalizedPath.slice( 0, -1 );
+			}
+			const folderPath = normalizedPath + '/' + folderName.trim();
+			
 			const newFolder = {
 				name: folderName.trim(),
-				path: currentFolder.path + '/' + folderName.trim(),
+				path: folderPath,
 				children: [],
 				files: [],
 				expanded: false
 			};
 
 			currentFolder.children.push( newFolder );
-			saveAssets();
+			saveAssets().catch( error => {
+				console.error( '[Assets] Error saving assets:', error );
+			} );
 			refreshFolderTree();
 			refreshFiles();
 
@@ -774,10 +801,19 @@ function SidebarAssets( editor ) {
 					const reader = new FileReader();
 					reader.onload = function ( e ) {
 
+						// Normalize path - remove double slashes and ensure proper format
+						let normalizedPath = currentFolder.path;
+						if ( normalizedPath === '/' ) {
+							normalizedPath = '';
+						} else if ( normalizedPath.endsWith( '/' ) ) {
+							normalizedPath = normalizedPath.slice( 0, -1 );
+						}
+						const filePath = normalizedPath + '/' + file.name;
+						
 						const fileEntry = {
 							name: file.name,
 							content: e.target.result,
-							path: currentFolder.path + '/' + file.name,
+							path: filePath,
 							size: file.size,
 							type: file.type || 'File',
 							isBinary: file.type.startsWith( 'image/' ) || file.type.startsWith( 'audio/' ) || file.type.startsWith( 'video/' )
@@ -835,17 +871,28 @@ function SidebarAssets( editor ) {
 
 		if ( fileName && fileName.trim() !== '' ) {
 
+			// Normalize path
+			let normalizedPath = currentFolder.path;
+			if ( normalizedPath === '/' ) {
+				normalizedPath = '';
+			} else if ( normalizedPath.endsWith( '/' ) ) {
+				normalizedPath = normalizedPath.slice( 0, -1 );
+			}
+			const filePath = normalizedPath + '/' + fileName.trim();
+			
 			const fileEntry = {
 				name: fileName.trim(),
 				content: defaultContent,
-				path: currentFolder.path + '/' + fileName.trim(),
+				path: filePath,
 				size: defaultContent.length,
 				type: type,
 				isBinary: false
 			};
 
 			currentFolder.files.push( fileEntry );
-			saveAssets();
+			saveAssets().catch( error => {
+				console.error( '[Assets] Error saving assets:', error );
+			} );
 			refreshFiles();
 
 		}
@@ -865,6 +912,12 @@ function SidebarAssets( editor ) {
 
 	// Initialize assets storage
 	function initAssetsStorage( callback ) {
+
+		if ( isTauri && invoke ) {
+			// In Tauri mode, we don't need IndexedDB
+			callback();
+			return;
+		}
 
 		const indexedDB = window.indexedDB;
 
@@ -903,12 +956,105 @@ function SidebarAssets( editor ) {
 	}
 
 	// Save assets to storage
-	function saveAssets() {
+	async function saveAssets() {
 
+		if ( isTauri && invoke ) {
+			// Save to local files in Tauri mode
+			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+			
+			if ( ! projectPath ) {
+				console.warn( '[Assets] No project path set, cannot save assets to file' );
+				return;
+			}
+
+			function serializeFolder( folder ) {
+				return {
+					name: folder.name,
+					path: folder.path,
+					expanded: folder.expanded,
+					children: folder.children.map( serializeFolder ),
+					files: folder.files.map( file => ( {
+						name: file.name,
+						path: file.path,
+						size: file.size,
+						type: file.type,
+						isBinary: file.isBinary || false,
+						// Don't store content in metadata - files are stored separately
+						content: '',
+						url: null
+					} ) )
+				};
+			}
+
+			const serialized = serializeFolder( assetsRoot );
+			
+			try {
+				// Save metadata
+				await invoke( 'write_assets_metadata', {
+					projectPath: projectPath,
+					content: JSON.stringify( serialized, null, '\t' )
+				} );
+
+				// Save all files to the assets folder
+				async function saveFolderFiles( folder ) {
+					for ( const file of folder.files ) {
+						try {
+							let fileContent;
+							if ( file.isBinary && file.content ) {
+								// Convert base64 to Uint8Array
+								const base64Data = file.content.split( ',' )[ 1 ] || file.content;
+								const byteCharacters = atob( base64Data );
+								const byteNumbers = new Array( byteCharacters.length );
+								for ( let i = 0; i < byteCharacters.length; i ++ ) {
+									byteNumbers[ i ] = byteCharacters.charCodeAt( i );
+								}
+								fileContent = Array.from( new Uint8Array( byteNumbers ) );
+							} else {
+								// Text file - convert to bytes
+								fileContent = Array.from( new TextEncoder().encode( file.content || '' ) );
+							}
+
+							// Normalize path - remove leading slash and double slashes
+							let assetPath = file.path;
+							if ( assetPath.startsWith( '/' ) ) {
+								assetPath = assetPath.slice( 1 );
+							}
+							// Replace any double slashes with single slash
+							assetPath = assetPath.replace( /\/+/g, '/' );
+							
+							console.log( '[Assets] Saving file:', assetPath, 'Size:', fileContent.length, 'bytes' );
+							
+							await invoke( 'write_asset_file', {
+								projectPath: projectPath,
+								assetPath: assetPath,
+								content: fileContent
+							} );
+							
+							console.log( '[Assets] File saved successfully:', assetPath );
+						} catch ( error ) {
+							console.error( '[Assets] Failed to save file:', file.path, error );
+						}
+					}
+
+					// Recursively save files in subfolders
+					for ( const child of folder.children ) {
+						await saveFolderFiles( child );
+					}
+				}
+
+				await saveFolderFiles( assetsRoot );
+				console.log( '[Assets] Assets saved to project folder' );
+			} catch ( error ) {
+				console.error( '[Assets] Failed to save assets:', error );
+			}
+
+			return;
+		}
+
+		// Fallback to IndexedDB
 		if ( ! assetsDatabase ) return;
 
 		function serializeFolder( folder ) {
-
 			return {
 				name: folder.name,
 				path: folder.path,
@@ -924,7 +1070,6 @@ function SidebarAssets( editor ) {
 					url: null
 				} ) )
 			};
-
 		}
 
 		const serialized = serializeFolder( assetsRoot );
@@ -935,8 +1080,109 @@ function SidebarAssets( editor ) {
 	}
 
 	// Load assets from storage
-	function loadAssets() {
+	async function loadAssets() {
 
+		if ( isTauri && invoke ) {
+			// Load from local files in Tauri mode
+			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+			
+			if ( ! projectPath ) {
+				console.log( '[Assets] No project path set, starting with empty assets' );
+				refreshFolderTree();
+				refreshFiles();
+				return;
+			}
+
+			try {
+				// Load metadata
+				const metadataContent = await invoke( 'read_assets_metadata', { projectPath: projectPath } );
+				const metadata = JSON.parse( metadataContent );
+				
+				console.log( '[Assets] Loaded metadata:', metadata );
+
+				// Check if metadata has actual content (not just empty object)
+				const hasContent = metadata && (
+					( metadata.children && metadata.children.length > 0 ) ||
+					( metadata.files && metadata.files.length > 0 )
+				);
+				
+				if ( hasContent ) {
+					async function deserializeFolder( folderData ) {
+						const folder = {
+							name: folderData.name,
+							path: folderData.path,
+							expanded: folderData.expanded !== undefined ? folderData.expanded : false,
+							children: [],
+							files: []
+						};
+
+						if ( folderData.children ) {
+							folder.children = await Promise.all( folderData.children.map( deserializeFolder ) );
+						}
+
+						if ( folderData.files ) {
+							folder.files = await Promise.all( folderData.files.map( async ( fileData ) => {
+								const file = {
+									name: fileData.name,
+									path: fileData.path,
+									size: fileData.size,
+									type: fileData.type,
+									isBinary: fileData.isBinary || false,
+									content: ''
+								};
+
+								// Load file content from disk
+								try {
+									const assetPath = fileData.path.startsWith( '/' ) ? fileData.path.slice( 1 ) : fileData.path;
+									const fileBytes = await invoke( 'read_asset_file', {
+										projectPath: projectPath,
+										assetPath: assetPath
+									} );
+
+									if ( file.isBinary ) {
+										// Create blob URL for binary files
+										const blob = new Blob( [ new Uint8Array( fileBytes ) ] );
+										file.url = URL.createObjectURL( blob );
+										// Store as base64 for saving later
+										const reader = new FileReader();
+										reader.onload = function( e ) {
+											file.content = e.target.result;
+										};
+										reader.readAsDataURL( blob );
+									} else {
+										// Text file
+										file.content = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+									}
+								} catch ( error ) {
+									console.warn( '[Assets] Failed to load file:', fileData.path, error );
+								}
+
+								return file;
+							} ) );
+						}
+
+						return folder;
+					}
+
+					assetsRoot = await deserializeFolder( metadata );
+					currentFolder = assetsRoot;
+					refreshFolderTree();
+					refreshFiles();
+					console.log( '[Assets] Assets loaded from project folder' );
+				} else {
+					refreshFolderTree();
+					refreshFiles();
+				}
+			} catch ( error ) {
+				console.error( '[Assets] Failed to load assets:', error );
+				refreshFolderTree();
+				refreshFiles();
+			}
+
+			return;
+		}
+
+		// Fallback to IndexedDB
 		if ( ! assetsDatabase ) {
 			refreshFolderTree();
 			refreshFiles();
@@ -1027,10 +1273,69 @@ function SidebarAssets( editor ) {
 
 	}
 
+	// Store reference to loadAssets for external calls
+	let assetsLoaded = false;
+	
+	// Expose a method to reload assets (can be called after project path is set)
+	function reloadAssets() {
+		if ( ! assetsLoaded ) {
+			assetsLoaded = true;
+			loadAssets().catch( error => {
+				console.error( '[Assets] Error loading assets:', error );
+				assetsLoaded = false;
+			} );
+		}
+	}
+	
 	// Initialize storage and load assets
 	initAssetsStorage( function () {
-		loadAssets();
+		// Try to load assets immediately (might not have project path yet)
+		loadAssets().catch( error => {
+			console.error( '[Assets] Error loading assets:', error );
+		} );
+		
+		// In Tauri mode, also listen for when project path is set
+		if ( isTauri && invoke ) {
+			// Poll for project path to be set (since it's set asynchronously)
+			const checkProjectPath = setInterval( function () {
+				const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+				if ( projectPath && ! assetsLoaded ) {
+					console.log( '[Assets] Project path detected, reloading assets...' );
+					assetsLoaded = true;
+					loadAssets().catch( error => {
+						console.error( '[Assets] Error loading assets:', error );
+						assetsLoaded = false;
+					} );
+					clearInterval( checkProjectPath );
+				}
+			}, 500 ); // Check every 500ms
+			
+			// Stop checking after 10 seconds
+			setTimeout( function () {
+				clearInterval( checkProjectPath );
+			}, 10000 );
+		}
 	} );
+	
+	// Also listen for sceneGraphChanged signal which fires after project is loaded
+	// This ensures assets are loaded after the project path is set
+	const onSceneGraphChanged = function () {
+		if ( isTauri && invoke ) {
+			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+			if ( projectPath ) {
+				// Reset assetsLoaded flag to allow reloading
+				assetsLoaded = false;
+				console.log( '[Assets] Scene loaded, reloading assets...' );
+				loadAssets().then( () => {
+					assetsLoaded = true;
+				} ).catch( error => {
+					console.error( '[Assets] Error loading assets:', error );
+					assetsLoaded = false;
+				} );
+			}
+		}
+	};
+	signals.sceneGraphChanged.add( onSceneGraphChanged );
 
 	return container;
 

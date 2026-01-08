@@ -7,6 +7,9 @@ dist/
 target/
 Cargo.lock
 
+# projects
+projects/*
+
 # OS files
 .DS_Store
 Thumbs.db

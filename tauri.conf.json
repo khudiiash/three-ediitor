@@ -2,8 +2,8 @@
   "build": {
     "beforeDevCommand": "",
     "beforeBuildCommand": "",
-    "devPath": "src/editor",
-    "distDir": "src/editor",
+    "devPath": "src",
+    "distDir": "src",
     "withGlobalTauri": true
   },
   "package": {
@@ -16,6 +16,21 @@
       "shell": {
         "all": false,
         "open": true
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "scope": ["$APPDATA/**", "$LOCALAPPDATA/**", "$RESOURCE/**", "$CWD/**"]
+      },
+      "dialog": {
+        "all": false,
+        "open": true,
+        "save": true
       }
     },
     "bundle": {
@@ -28,12 +43,25 @@
     },
     "windows": [
       {
+        "label": "hub",
         "fullscreen": false,
         "resizable": true,
-        "title": "Three.js Engine Editor",
+        "title": "Three.js Editor - Project Hub",
+        "width": 1000,
+        "height": 700,
+        "fileDropEnabled": false,
+        "url": "hub/index.html"
+      },
+      {
+        "label": "editor",
+        "fullscreen": false,
+        "resizable": true,
+        "title": "Three.js Editor",
         "width": 1280,
         "height": 720,
-        "fileDropEnabled": false
+        "fileDropEnabled": false,
+        "url": "editor/index.html",
+        "visible": false
       }
     ]
   }
