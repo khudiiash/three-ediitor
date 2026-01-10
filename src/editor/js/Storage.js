@@ -28,7 +28,6 @@ function Storage() {
 
 				try {
 
-					console.log( '[Storage] Loading scene from project path:', currentProjectPath );
 					
 					// Use Tauri command to read the file - handles path resolution on Rust side
 					const content = await invoke( 'read_scene_file', { projectPath: currentProjectPath } );
@@ -49,21 +48,63 @@ function Storage() {
 			set: async function ( data ) {
 
 				if ( ! currentProjectPath ) {
-
-					console.warn( '[Storage] No project path set, cannot save to file' );
-					console.warn( '[Storage] Make sure project-opened event was received and setProjectPath was called' );
 					return;
-
 				}
 
 				const start = performance.now();
 
 				try {
 
-					const content = JSON.stringify( data, null, '\t' );
-					
-					console.log( '[Storage] Saving scene to project path:', currentProjectPath );
-					console.log( '[Storage] Data size:', content.length, 'bytes' );
+					// Custom replacer to convert texture image base64 data to asset URLs
+					// This walks the JSON tree and replaces image.data (base64) with image.url (asset path)
+					function replaceTextureImages( obj, textureMap ) {
+						if ( Array.isArray( obj ) ) {
+							return obj.map( item => replaceTextureImages( item, textureMap ) );
+						} else if ( obj && typeof obj === 'object' ) {
+							const result = {};
+							for ( const key in obj ) {
+								if ( key === 'image' && obj[ key ] && typeof obj[ key ] === 'object' ) {
+									// This is a texture image object
+									const imageObj = obj[ key ];
+									if ( imageObj.data ) {
+										// Has base64 data - replace with URL reference
+										// Find texture UUID from parent (texture object should have uuid)
+										const textureUuid = obj.uuid || imageObj.uuid;
+										if ( textureUuid && textureMap && textureMap[ textureUuid ] ) {
+											// Use the asset path from the texture map
+											result[ key ] = {
+												uuid: imageObj.uuid || textureUuid,
+												url: textureMap[ textureUuid ].path || 'assets/textures/' + textureUuid + '.png'
+											};
+										} else {
+											// Fallback: keep original but remove base64 data
+											result[ key ] = {
+												uuid: imageObj.uuid || textureUuid,
+												url: 'assets/textures/' + ( textureUuid || 'unknown' ) + '.png'
+											};
+										}
+									} else {
+										result[ key ] = replaceTextureImages( imageObj, textureMap );
+									}
+								} else {
+									result[ key ] = replaceTextureImages( obj[ key ], textureMap );
+								}
+							}
+							return result;
+						}
+						return obj;
+					}
+
+					// Get texture map from editor if available
+					// The editor instance is passed via closure or we can access it from the global scope
+					// For now, we'll need to pass it differently - let's use a simpler approach
+					// and modify the toJSON method in Editor.js instead
+					let textureMap = null;
+
+					// Replace texture images with URLs
+					const processedData = replaceTextureImages( data, textureMap );
+
+					const content = JSON.stringify( processedData, null, '\t' );
 					
 					// Use Tauri command to write the file - handles path resolution on Rust side
 					await invoke( 'write_scene_file', { 
@@ -73,34 +114,21 @@ function Storage() {
 					
 					const elapsed = ( performance.now() - start ).toFixed( 2 );
 					console.log( '[' + /\d\d\:\d\d\:\d\d/.exec( new Date() )[ 0 ] + ']', 'Saved state to file. ' + elapsed + 'ms' );
-					console.log( '[Storage] File saved successfully to project:', currentProjectPath );
 
 				} catch ( error ) {
 
-					console.error( '[Storage] Failed to save scene to file!' );
-					console.error( '[Storage] Error:', error );
-					console.error( '[Storage] Error message:', error.message || String( error ) );
-					console.error( '[Storage] Project path:', currentProjectPath );
-					console.error( '[Storage] Full error object:', JSON.stringify( error, null, 2 ) );
+					console.error( 'Failed to save scene to file:', error );
 
 				}
 
 			},
 
 			clear: function () {
-
 				// Don't clear the project path - we need it for saving
-				// Only clear the data, not the path itself
-				// currentProjectPath should persist across editor.clear() calls
-				console.log( '[Storage] clear() called, but keeping project path:', currentProjectPath );
-
 			},
 
 			setProjectPath: function ( path ) {
-
 				currentProjectPath = path;
-				console.log( '[Storage] Project path set to:', path );
-
 			},
 
 			getProjectPath: function () {
@@ -182,10 +210,8 @@ function Storage() {
 			const transaction = database.transaction( [ 'states' ], 'readwrite' );
 			const objectStore = transaction.objectStore( 'states' );
 			const request = objectStore.put( data, 0 );
-			request.onsuccess = function () {
-
+			request.onsuccess = function () { 
 				console.log( '[' + /\d\d\:\d\d\:\d\d/.exec( new Date() )[ 0 ] + ']', 'Saved state to IndexedDB. ' + ( performance.now() - start ).toFixed( 2 ) + 'ms' );
-
 			};
 
 		},

@@ -19,7 +19,8 @@
 					"three/addons/": "./examples/jsm/",
 					"three/examples/": "./examples/",
 					"three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js",
-					"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js"
+					"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js",
+					"@engine/": "../engine/dist/"
 				}
 			}
 		</script>
@@ -35,6 +36,7 @@
 
 		<script src="js/libs/esprima.js"></script>
 		<script src="js/libs/jsonlint.js"></script>
+		<script src="https://cdn.jsdelivr.net/npm/typescript@5.3.3/lib/typescript.js"></script>
 
 		<!-- FFmpeg removed - not needed for basic editor functionality -->
 		<!-- <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script> -->
@@ -155,25 +157,16 @@
 			// Listen for project-opened event from Tauri
 			// Set this up immediately, before other initialization
 			if ( window.__TAURI__ ) {
-
-				console.log( '[Editor] Setting up project-opened event listener...' );
 				
 				// Set up the listener as early as possible
 				window.__TAURI__.event.listen( 'project-opened', async ( event ) => {
 
-					console.log( '[Editor] Project opened event received:', event.payload );
 					const projectPath = event.payload;
-					
-					// Overlay is already visible from the start
-					console.log( '[Editor] Loading overlay is already visible, loading scene...' );
 					shouldHideOverlay = false;
 					
 					// Set the project path in storage BEFORE loading
 					if ( editor.storage.setProjectPath ) {
-
 						editor.storage.setProjectPath( projectPath );
-						console.log( '[Editor] Project path set in storage:', projectPath );
-
 					}
 
 					// Load the scene from the project directory
@@ -187,14 +180,12 @@
 							// Track when hierarchy is updated
 							let hierarchyUpdated = false;
 							const onSceneGraphChanged = function () {
-								console.log( '[Editor] Hierarchy updated (sceneGraphChanged signal)' );
 								hierarchyUpdated = true;
 								editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
 								
 								// Wait a bit more to ensure UI is fully updated
 								setTimeout( () => {
 									if ( shouldHideOverlay ) {
-										console.log( '[Editor] Hiding loading overlay after hierarchy update...' );
 										loadingOverlay.style.display = 'none';
 									}
 									resolve();
@@ -213,18 +204,14 @@
 									
 									if ( state !== undefined ) {
 										
-										console.log( '[Editor] Scene data loaded, constructing scene...' );
-										
 										// Clear any existing scene before loading
 										editor.clear();
 										
 										await editor.fromJSON( state );
-										console.log( '[Editor] fromJSON completed, waiting for hierarchy update...' );
 										
 										// If hierarchy hasn't updated after a delay, hide overlay anyway
 										setTimeout( () => {
 											if ( ! hierarchyUpdated ) {
-												console.log( '[Editor] Hierarchy update timeout, hiding overlay...' );
 												editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
 												if ( shouldHideOverlay ) {
 													loadingOverlay.style.display = 'none';
@@ -235,13 +222,11 @@
 										
 									} else {
 										
-										console.log( '[Editor] No scene.json found, starting with empty scene' );
 										editor.clear();
 										
 										// Remove listener and hide overlay for empty scene
 										editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
 										shouldHideOverlay = true;
-										console.log( '[Editor] Hiding loading overlay (empty scene)...' );
 										loadingOverlay.style.display = 'none';
 										resolve();
 										
@@ -262,25 +247,18 @@
 
 					} catch ( error ) {
 
-						console.warn( '[Editor] Failed to load scene from project, starting with empty scene:', error );
+						console.warn( 'Failed to load scene from project:', error );
 						// Clear the editor to start fresh
 						editor.clear();
 						
 						// Hide loading overlay on error
 						shouldHideOverlay = true;
-						console.log( '[Editor] Hiding loading overlay due to error...' );
 						loadingOverlay.style.display = 'none';
 
 					}
 
-				} ).then( () => {
-					console.log( '[Editor] Project-opened event listener registered successfully' );
-				} ).catch( ( error ) => {
-					console.error( '[Editor] Failed to register project-opened event listener:', error );
 				} );
 
-			} else {
-				console.warn( '[Editor] Tauri API not available, cannot listen for project-opened events' );
 			}
 
 			const menubar = new Menubar( editor );
@@ -301,10 +279,7 @@
 					// In Tauri mode, only load from storage if we have a project path
 					// Otherwise, wait for the project-opened event
 					if ( window.__TAURI__ ) {
-						// Check if project path is set by checking if storage.get would return undefined
-						// If no project path, the project-opened event will handle loading
 						if ( state === undefined ) {
-							console.log( '[Editor] Tauri mode: No project path set yet, waiting for project-opened event' );
 							return;
 						}
 					}

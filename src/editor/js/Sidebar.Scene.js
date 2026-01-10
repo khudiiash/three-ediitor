@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { UIPanel, UIBreak, UIRow, UIColor, UISelect, UIText, UINumber } from './libs/ui.js';
+import { UIPanel, UIBreak, UIRow, UIColor, UISelect, UIText, UINumber, UIInput } from './libs/ui.js';
 import { UIOutliner, UITexture } from './libs/ui.three.js';
 
 function SidebarScene( editor ) {
@@ -16,7 +16,21 @@ function SidebarScene( editor ) {
 	container.dom.style.flexDirection = 'column';
 	container.dom.style.marginBottom = '4px';
 
-	// outliner
+	const searchRow = new UIRow();
+	searchRow.setPadding( '4px' );
+	const searchInput = new UIInput( '' ).setWidth( '100%' ).setFontSize( '12px' );
+	searchInput.dom.placeholder = 'Search...';
+	searchInput.dom.style.cssText = 'padding: 4px 8px; background: #1e1e1e; border: 1px solid #444; color: #aaa;';
+	searchRow.add( searchInput );
+	container.add( searchRow );
+
+	let searchFilter = '';
+
+	searchInput.onChange( function () {
+		const value = this.getValue();
+		searchFilter = ( value || '' ).toLowerCase().trim();
+		refreshUI();
+	} );
 
 	const nodeStates = new WeakMap();
 
@@ -65,7 +79,7 @@ function SidebarScene( editor ) {
 
 			for ( let i = 0; i < material.length; i ++ ) {
 
-				array.push( material[ i ].name );
+				array.push( material[ i ] && material[ i ].name ? material[ i ].name : '' );
 
 			}
 
@@ -73,13 +87,15 @@ function SidebarScene( editor ) {
 
 		}
 
-		return material.name;
+		return material && material.name ? material.name : '';
 
 	}
 
 	function escapeHTML( html ) {
 
-		return html
+		if ( html === undefined || html === null ) return '';
+
+		return String( html )
 			.replace( /&/g, '&amp;' )
 			.replace( /"/g, '&quot;' )
 			.replace( /'/g, '&#39;' )
@@ -103,15 +119,19 @@ function SidebarScene( editor ) {
 
 	function buildHTML( object ) {
 
-		let html = `<span class="type ${ getObjectType( object ) }"></span> ${ escapeHTML( object.name ) }`;
+		const objectName = object.name || '';
+		let html = `<span class="type ${ getObjectType( object ) }"></span> ${ escapeHTML( objectName ) }`;
 
 		if ( object.isMesh ) {
 
 			const geometry = object.geometry;
 			const material = object.material;
 
-			html += ` <span class="type Geometry"></span> ${ escapeHTML( geometry.name ) }`;
-			html += ` <span class="type Material"></span> ${ escapeHTML( getMaterialName( material ) ) }`;
+			const geometryName = geometry && geometry.name ? geometry.name : '';
+			const materialName = material ? getMaterialName( material ) : '';
+
+			html += ` <span class="type Geometry"></span> ${ escapeHTML( geometryName ) }`;
+			html += ` <span class="type Material"></span> ${ escapeHTML( materialName ) }`;
 
 		}
 
@@ -168,6 +188,22 @@ function SidebarScene( editor ) {
 
 	// Background, Environment, and Fog moved to Inspector tab
 
+	function matchesFilter( object ) {
+		if ( !searchFilter ) return true;
+		if ( !object.name ) return false;
+		return object.name.toLowerCase().includes( searchFilter );
+	}
+
+	function hasMatchingChild( object ) {
+		if ( matchesFilter( object ) ) return true;
+		for ( let i = 0; i < object.children.length; i ++ ) {
+			if ( hasMatchingChild( object.children[ i ] ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	function refreshUI() {
 
 		const camera = editor.camera;
@@ -175,8 +211,13 @@ function SidebarScene( editor ) {
 
 		const options = [];
 
-		options.push( buildOption( camera, false ) );
-		options.push( buildOption( scene, false ) );
+		if ( !searchFilter || matchesFilter( camera ) || hasMatchingChild( camera ) ) {
+			options.push( buildOption( camera, false ) );
+		}
+
+		if ( !searchFilter || matchesFilter( scene ) || hasMatchingChild( scene ) ) {
+			options.push( buildOption( scene, false ) );
+		}
 
 		( function addObjects( objects, pad ) {
 
@@ -184,19 +225,24 @@ function SidebarScene( editor ) {
 
 				const object = objects[ i ];
 
-				if ( nodeStates.has( object ) === false ) {
+				if ( !searchFilter || matchesFilter( object ) || hasMatchingChild( object ) ) {
 
-					nodeStates.set( object, false );
+					if ( nodeStates.has( object ) === false ) {
 
-				}
+						nodeStates.set( object, false );
 
-				const option = buildOption( object, true );
-				option.style.paddingLeft = ( pad * 18 ) + 'px';
-				options.push( option );
+					}
 
-				if ( nodeStates.get( object ) === true ) {
+					const option = buildOption( object, true );
+					option.style.paddingLeft = ( pad * 18 ) + 'px';
+					options.push( option );
 
-					addObjects( object.children, pad + 1 );
+					const shouldExpand = nodeStates.get( object ) === true || ( searchFilter && hasMatchingChild( object ) );
+					if ( shouldExpand ) {
+
+						addObjects( object.children, pad + 1 );
+
+					}
 
 				}
 

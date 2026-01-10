@@ -33,20 +33,6 @@ function SidebarProjectApp( editor ) {
 
 	container.add( titleRow );
 
-	// Editable
-
-	const editableRow = new UIRow();
-	const editable = new UICheckbox( config.getKey( 'project/editable' ) ).setLeft( '100px' ).onChange( function () {
-
-		config.setKey( 'project/editable', this.getValue() );
-
-	} );
-
-	editableRow.add( new UIText( strings.getKey( 'sidebar/project/app/editable' ) ).setClass( 'Label' ) );
-	editableRow.add( editable );
-
-	container.add( editableRow );
-
 	// Play/Stop button moved to viewport toolbar
 
 	// Publish
@@ -55,11 +41,101 @@ function SidebarProjectApp( editor ) {
 	publishButton.setWidth( '170px' );
 	publishButton.setMarginLeft( '120px' );
 	publishButton.setMarginBottom( '10px' );
-	publishButton.onClick( function () {
+	publishButton.onClick( async function () {
 
-		const toZip = {};
+		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
+		const invoke = isTauri ? window.__TAURI__.invoke : null;
+		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 
-		//
+		if ( ! isTauri || ! invoke || ! projectPath ) {
+			console.warn( '[Publish] Tauri not available or no project path, falling back to zip download' );
+			
+			const toZip = {};
+			let output = editor.toJSON();
+			output.metadata.type = 'App';
+			delete output.history;
+
+			let sceneCamera = null;
+			editor.scene.traverse( function ( object ) {
+				if ( ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== editor.camera ) {
+					sceneCamera = object;
+					return;
+				}
+			} );
+
+			if ( sceneCamera !== null ) {
+				output.camera = sceneCamera.toJSON();
+			}
+
+			output = JSON.stringify( output, null, '\t' );
+			output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
+			toZip[ 'app.json' ] = strToU8( output );
+
+			const title = config.getKey( 'project/title' );
+			const manager = new THREE.LoadingManager( function () {
+				const zipped = zipSync( toZip, { level: 9 } );
+				const blob = new Blob( [ zipped.buffer ], { type: 'application/zip' } );
+				save( blob, ( title !== '' ? title : 'untitled' ) + '.zip' );
+			} );
+
+			const loader = new THREE.FileLoader( manager );
+			loader.load( 'js/libs/app/index.html', function ( content ) {
+				content = content.replace( '<!-- title -->', title );
+				let editButton = '';
+				content = content.replace( '\t\t\t/* edit button */', editButton );
+				toZip[ 'index.html' ] = strToU8( content );
+			} );
+			loader.load( 'js/libs/app.js', function ( content ) {
+				toZip[ 'js/app.js' ] = strToU8( content );
+			} );
+			loader.load( '../build/three.core.min.js', function ( content ) {
+				toZip[ 'js/three.core.js' ] = strToU8( content );
+			} );
+			loader.load( '../build/three.module.min.js', function ( content ) {
+				toZip[ 'js/three.module.js' ] = strToU8( content );
+			} );
+			loader.load( '../engine/dist/three-engine.js', function ( content ) {
+				toZip[ 'js/three-engine.js' ] = strToU8( content );
+			} );
+			return;
+		}
+
+		const buildFiles = {};
+		let filesLoaded = 0;
+		const totalFiles = 6;
+
+		function checkComplete() {
+			filesLoaded++;
+			if ( filesLoaded === totalFiles ) {
+				writeBuildFiles();
+			}
+		}
+
+		async function writeBuildFiles() {
+			try {
+				console.log( '[Publish] Writing build files to project/build folder...' );
+				
+				for ( const filePath in buildFiles ) {
+					const content = buildFiles[ filePath ];
+					const bytes = typeof content === 'string' 
+						? Array.from( new TextEncoder().encode( content ) )
+						: Array.from( content );
+					
+					await invoke( 'write_build_file', {
+						projectPath: projectPath,
+						filePath: filePath,
+						content: bytes
+					} );
+					console.log( '[Publish] Written:', filePath );
+				}
+				
+				console.log( '[Publish] Build complete! Files saved to project/build folder' );
+				alert( 'Build published successfully to project/build folder!' );
+			} catch ( error ) {
+				console.error( '[Publish] Failed to write build files:', error );
+				alert( 'Failed to publish build: ' + error );
+			}
+		}
 
 		let output = editor.toJSON();
 		output.metadata.type = 'App';
@@ -67,81 +143,80 @@ function SidebarProjectApp( editor ) {
 
 		let sceneCamera = null;
 		editor.scene.traverse( function ( object ) {
-
 			if ( ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== editor.camera ) {
-
 				sceneCamera = object;
 				return;
-
 			}
-
 		} );
 
 		if ( sceneCamera !== null ) {
-
 			output.camera = sceneCamera.toJSON();
-
 		}
 
 		output = JSON.stringify( output, null, '\t' );
 		output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
-
-		toZip[ 'app.json' ] = strToU8( output );
-
-		//
+		buildFiles[ 'app.json' ] = output;
+		checkComplete();
 
 		const title = config.getKey( 'project/title' );
-
-		const manager = new THREE.LoadingManager( function () {
-
-			const zipped = zipSync( toZip, { level: 9 } );
-
-			const blob = new Blob( [ zipped.buffer ], { type: 'application/zip' } );
-
-			save( blob, ( title !== '' ? title : 'untitled' ) + '.zip' );
-
-		} );
-
-		const loader = new THREE.FileLoader( manager );
+		const loader = new THREE.FileLoader();
+		
 		loader.load( 'js/libs/app/index.html', function ( content ) {
-
 			content = content.replace( '<!-- title -->', title );
-
 			let editButton = '';
-
-			if ( config.getKey( 'project/editable' ) ) {
-
-				editButton = [
-					'			let button = document.createElement( \'a\' );',
-					'			button.href = \'https://threejs.org/editor/#file=\' + location.href.split( \'/\' ).slice( 0, - 1 ).join( \'/\' ) + \'/app.json\';',
-					'			button.style.cssText = \'position: absolute; bottom: 20px; right: 20px; padding: 10px 16px; color: #fff; border: 1px solid #fff; border-radius: 20px; text-decoration: none;\';',
-					'			button.target = \'_blank\';',
-					'			button.textContent = \'EDIT\';',
-					'			document.body.appendChild( button );',
-				].join( '\n' );
-
-			}
-
 			content = content.replace( '\t\t\t/* edit button */', editButton );
-
-			toZip[ 'index.html' ] = strToU8( content );
-
+			buildFiles[ 'index.html' ] = content;
+			checkComplete();
 		} );
+		
 		loader.load( 'js/libs/app.js', function ( content ) {
-
-			toZip[ 'js/app.js' ] = strToU8( content );
-
+			buildFiles[ 'js/app.js' ] = content;
+			checkComplete();
 		} );
-		loader.load( '../build/three.core.js', function ( content ) {
+		
+		fetch( './build/three.core.min.js' )
+			.then( response => {
+				if ( ! response.ok ) throw new Error( `HTTP ${response.status}` );
+				return response.text();
+			} )
+			.then( content => {
+				buildFiles[ 'js/three.core.min.js' ] = content;
+				checkComplete();
+			} )
+			.catch( error => {
+				console.error( '[Publish] Failed to load three.core.min.js:', error );
+				checkComplete();
+			} );
+		
+		fetch( './build/three.module.min.js' )
+			.then( response => {
+				if ( ! response.ok ) throw new Error( `HTTP ${response.status}` );
+				return response.text();
+			} )
+			.then( content => {
+				buildFiles[ 'js/three.module.min.js' ] = content;
+				checkComplete();
+			} )
+			.catch( error => {
+				console.error( '[Publish] Failed to load three.module.min.js:', error );
+				checkComplete();
+			} );
+		
+		fetch( '../engine/dist/three-engine.js' )
+			.then( response => {
+				if ( ! response.ok ) throw new Error( `HTTP ${response.status}` );
+				return response.text();
+			} )
+			.then( content => {
+				buildFiles[ 'js/three-engine.js' ] = content;
+				checkComplete();
+			} )
+			.catch( error => {
+				console.error( '[Publish] Failed to load three-engine.js:', error );
+				checkComplete();
+			} );
 
-			toZip[ 'js/three.core.js' ] = strToU8( content );
-
-		} );
-		loader.load( '../build/three.module.js', function ( content ) {
-
-			toZip[ 'js/three.module.js' ] = strToU8( content );
-
-		} );
+		console.log(buildFiles);
 
 	} );
 	container.add( publishButton );
@@ -154,6 +229,41 @@ function SidebarProjectApp( editor ) {
 		config.setKey( 'project/title', '' );
 
 	} );
+
+	// Load project name from project.json when project is opened (Tauri mode)
+	if ( typeof window !== 'undefined' && window.__TAURI__ ) {
+		const invoke = window.__TAURI__.invoke;
+		
+		// Listen for when project path is set
+		const checkProjectPath = setInterval( function () {
+			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+			if ( projectPath ) {
+				clearInterval( checkProjectPath );
+				
+				// Load project.json and set the title
+				invoke( 'read_project_metadata', { projectPath: projectPath } )
+					.then( function ( content ) {
+						try {
+							const metadata = JSON.parse( content );
+							if ( metadata && metadata.name ) {
+								title.setValue( metadata.name );
+								config.setKey( 'project/title', metadata.name );
+							}
+						} catch ( error ) {
+							console.warn( '[Project] Failed to parse project.json:', error );
+						}
+					} )
+					.catch( function ( error ) {
+						console.warn( '[Project] Failed to load project.json:', error );
+					} );
+			}
+		}, 500 );
+		
+		// Stop checking after 10 seconds
+		setTimeout( function () {
+			clearInterval( checkProjectPath );
+		}, 10000 );
+	}
 
 	return container;
 

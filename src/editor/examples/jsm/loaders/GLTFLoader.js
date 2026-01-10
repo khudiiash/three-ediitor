@@ -66,12 +66,11 @@ import {
 	InstancedBufferAttribute
 } from 'three';
 import { toTrianglesDrawMode } from '../utils/BufferGeometryUtils.js';
-import { clone } from '../utils/SkeletonUtils.js';
 
 /**
  * A loader for the glTF 2.0 format.
  *
- * [glTF](https://www.khronos.org/gltf/) (GL Transmission Format) is an [open format specification]{@link https://github.com/KhronosGroup/glTF/tree/main/specification/2.0)
+ * [glTF](https://www.khronos.org/gltf/} (GL Transmission Format) is an [open format specification]{@link https://github.com/KhronosGroup/glTF/tree/main/specification/2.0)
  * for efficient delivery and loading of 3D content. Assets may be provided either in JSON (.gltf) or binary (.glb)
  * format. External files store textures (.jpg, .png) and additional binary data (.bin). A glTF asset may deliver
  * one or more scenes, including meshes, materials, textures, skins, skeletons, morph targets, animations, lights,
@@ -92,7 +91,6 @@ import { clone } from '../utils/SkeletonUtils.js';
  * - KHR_materials_unlit
  * - KHR_materials_volume
  * - KHR_mesh_quantization
- * - KHR_meshopt_compression
  * - KHR_lights_punctual
  * - KHR_texture_basisu
  * - KHR_texture_transform
@@ -230,13 +228,7 @@ class GLTFLoader extends Loader {
 
 		this.register( function ( parser ) {
 
-			return new GLTFMeshoptCompression( parser, EXTENSIONS.EXT_MESHOPT_COMPRESSION );
-
-		} );
-
-		this.register( function ( parser ) {
-
-			return new GLTFMeshoptCompression( parser, EXTENSIONS.KHR_MESHOPT_COMPRESSION );
+			return new GLTFMeshoptCompression( parser );
 
 		} );
 
@@ -415,7 +407,7 @@ class GLTFLoader extends Loader {
 	}
 
 	/**
-	 * Parses the given glTF data and returns the resulting group.
+	 * Parses the given FBX data and returns the resulting group.
 	 *
 	 * @param {string|ArrayBuffer} data - The raw glTF data.
 	 * @param {string} path - The URL base path.
@@ -629,7 +621,6 @@ const EXTENSIONS = {
 	EXT_TEXTURE_WEBP: 'EXT_texture_webp',
 	EXT_TEXTURE_AVIF: 'EXT_texture_avif',
 	EXT_MESHOPT_COMPRESSION: 'EXT_meshopt_compression',
-	KHR_MESHOPT_COMPRESSION: 'KHR_meshopt_compression',
 	EXT_MESH_GPU_INSTANCING: 'EXT_mesh_gpu_instancing'
 };
 
@@ -1682,9 +1673,9 @@ class GLTFTextureAVIFExtension {
  */
 class GLTFMeshoptCompression {
 
-	constructor( parser, name ) {
+	constructor( parser ) {
 
-		this.name = name;
+		this.name = EXTENSIONS.EXT_MESHOPT_COMPRESSION;
 		this.parser = parser;
 
 	}
@@ -2671,7 +2662,7 @@ class GLTFParser {
 		let isFirefox = false;
 		let firefoxVersion = - 1;
 
-		if ( typeof navigator !== 'undefined' && typeof navigator.userAgent !== 'undefined' ) {
+		if ( typeof navigator !== 'undefined' ) {
 
 			const userAgent = navigator.userAgent;
 
@@ -4519,20 +4510,7 @@ class GLTFParser {
 
 			for ( let i = 0, il = nodes.length; i < il; i ++ ) {
 
-				const node = nodes[ i ];
-
-				// If the node already has a parent, it means it's being reused across multiple scenes.
-				// Clone it to avoid the second scene's add() removing it from the first scene.
-				// See: https://github.com/mrdoob/three.js/issues/27993
-				if ( node.parent !== null ) {
-
-					scene.add( clone( node ) );
-
-				} else {
-
-					scene.add( node );
-
-				}
+				scene.add( nodes[ i ] );
 
 			}
 

@@ -1,4 +1,5 @@
 import { UIPanel, UIRow, UIButton, UIText, UIInput, UISelect } from './libs/ui.js';
+import { ScriptCompiler } from './ScriptCompiler.js';
 
 function SidebarAssets( editor ) {
 
@@ -40,12 +41,57 @@ function SidebarAssets( editor ) {
 	assetsTitle.dom.style.cssText = 'color: #aaa; font-weight: bold; margin-right: 8px;';
 	headerLeft.appendChild( assetsTitle.dom );
 
-	// Add button
 	const addBtn = new UIButton( '+' );
 	addBtn.dom.style.cssText = 'width: 24px; height: 24px; padding: 0; font-size: 16px;';
-	addBtn.onClick( function () {
-		// TODO: Add new folder/file
+	
+	const addMenu = document.createElement( 'div' );
+	addMenu.style.cssText = 'position: absolute; background: #2a2a2a; border: 1px solid #444; padding: 4px 0; z-index: 1000; display: none; min-width: 150px;';
+	addMenu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+	
+	const menuItems = [
+		{ label: 'Script', action: 'script' },
+		{ label: 'Folder', action: 'folder' },
+		{ label: 'Import File...', action: 'import' }
+	];
+	
+	menuItems.forEach( item => {
+		const menuItem = document.createElement( 'div' );
+		menuItem.textContent = item.label;
+		menuItem.style.cssText = 'padding: 6px 12px; cursor: pointer; color: #aaa; font-size: 12px;';
+		menuItem.addEventListener( 'mouseenter', () => {
+			menuItem.style.background = '#333';
+		} );
+		menuItem.addEventListener( 'mouseleave', () => {
+			menuItem.style.background = 'transparent';
+		} );
+		menuItem.addEventListener( 'click', () => {
+			addMenu.style.display = 'none';
+			if ( item.action === 'script' ) {
+				createScriptAsset();
+			} else if ( item.action === 'folder' ) {
+				createFolder();
+			} else if ( item.action === 'import' ) {
+				addAsset();
+			}
+		} );
+		addMenu.appendChild( menuItem );
 	} );
+	
+	addBtn.onClick( function ( event ) {
+		const rect = addBtn.dom.getBoundingClientRect();
+		addMenu.style.left = rect.left + 'px';
+		addMenu.style.top = ( rect.bottom + 2 ) + 'px';
+		addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
+		event.stopPropagation();
+	} );
+	
+	document.addEventListener( 'click', function ( event ) {
+		if ( !addMenu.contains( event.target ) && event.target !== addBtn.dom ) {
+			addMenu.style.display = 'none';
+		}
+	} );
+	
+	document.body.appendChild( addMenu );
 	headerLeft.appendChild( addBtn.dom );
 
 	// Delete button
@@ -53,6 +99,11 @@ function SidebarAssets( editor ) {
 	deleteBtn.innerHTML = '🗑️';
 	deleteBtn.style.cssText = 'background: none; border: none; color: #aaa; cursor: pointer; padding: 4px; width: 24px; height: 24px;';
 	deleteBtn.title = 'Delete';
+	deleteBtn.addEventListener( 'click', function () {
+		if ( window.selectedAsset ) {
+			editor.deleteAsset( window.selectedAsset.path );
+		}
+	} );
 	headerLeft.appendChild( deleteBtn );
 
 	// Undo/Redo button
@@ -444,7 +495,6 @@ function SidebarAssets( editor ) {
 	contentArea.add( filesPanel );
 	container.add( contentArea );
 
-	// Assets folder structure (in-memory for now)
 	let assetsRoot = {
 		name: '/',
 		path: '/',
@@ -453,8 +503,13 @@ function SidebarAssets( editor ) {
 		expanded: true
 	};
 
+	window.assetsRoot = assetsRoot;
+
 	let currentFolder = assetsRoot;
-	let viewMode = 'list'; // 'grid', 'list', 'detailed'
+	window.currentFolder = currentFolder;
+	let viewMode = 'list';
+	let selectedAsset = null;
+	window.selectedAsset = selectedAsset;
 	
 	// Assets storage
 	const isTauri = typeof window !== 'undefined' && window.__TAURI__;
@@ -507,6 +562,7 @@ function SidebarAssets( editor ) {
 
 			folderItem.style.color = '#ff8800';
 			currentFolder = folder;
+			window.currentFolder = currentFolder;
 			refreshFiles();
 
 		} );
@@ -576,10 +632,28 @@ function SidebarAssets( editor ) {
 			row.appendChild( typeCell );
 			row.appendChild( sizeCell );
 
-			row.addEventListener( 'click', function () {
-				currentFolder = folder;
-				refreshFolderTree();
-				refreshFiles();
+			let clickTimeout = null;
+			row.addEventListener( 'click', function ( e ) {
+				if ( clickTimeout ) {
+					clearTimeout( clickTimeout );
+					clickTimeout = null;
+					currentFolder = folder;
+					window.currentFolder = currentFolder;
+					selectedAsset = null;
+					window.selectedAsset = null;
+					refreshFolderTree();
+					refreshFiles();
+					return;
+				}
+				clickTimeout = setTimeout( function () {
+					clickTimeout = null;
+					document.querySelectorAll( '#files-table-body tr' ).forEach( r => {
+						r.style.background = '';
+					} );
+					row.style.background = '#444';
+					selectedAsset = { type: 'folder', path: folder.path, name: folder.name, folder: currentFolder };
+					window.selectedAsset = selectedAsset;
+				}, 300 );
 			} );
 
 			row.addEventListener( 'mouseenter', function () {
@@ -594,12 +668,25 @@ function SidebarAssets( editor ) {
 
 		} );
 
-		// Then show files
-		currentFolder.files.forEach( file => {
+		// Then show files (filter out .js files that have corresponding .ts files)
+		const filesToShow = currentFolder.files.filter( file => {
+			if ( file.name.endsWith( '.js' ) || file.name.endsWith( '.jsx' ) ) {
+				const baseName = file.name.replace( /\.jsx?$/, '' );
+				const hasCorrespondingTs = currentFolder.files.some( f => {
+					const fBase = f.name.replace( /\.tsx?$/, '' );
+					return fBase === baseName && ( f.name.endsWith( '.ts' ) || f.name.endsWith( '.tsx' ) );
+				} );
+				return !hasCorrespondingTs;
+			}
+			return true;
+		} );
+		
+		filesToShow.forEach( file => {
 
 			const row = document.createElement( 'tr' );
 			row.style.cssText = 'border-bottom: none; cursor: pointer;';
 			row.dataset.file = file.name;
+			row.dataset.path = file.path;
 
 			const nameCell = document.createElement( 'td' );
 			nameCell.style.cssText = 'padding: 2px 8px; display: flex; align-items: center; gap: 8px;';
@@ -610,25 +697,73 @@ function SidebarAssets( editor ) {
 			typeCell.style.cssText = 'padding: 2px 8px; color: #888;';
 
 			const sizeCell = document.createElement( 'td' );
-			sizeCell.textContent = formatFileSize( file.size || 0 );
-			sizeCell.style.cssText = 'padding: 2px 8px; color: #888;';
+			sizeCell.style.cssText = 'padding: 2px 8px; color: #888; display: flex; align-items: center; gap: 8px; justify-content: space-between;';
+			
+			const sizeText = document.createElement( 'span' );
+			sizeText.textContent = formatFileSize( file.size || 0 );
+			sizeCell.appendChild( sizeText );
+
+			const isScript = file.type === 'script' || file.name.endsWith( '.ts' ) || file.name.endsWith( '.tsx' ) || file.name.endsWith( '.js' );
 
 			row.appendChild( nameCell );
 			row.appendChild( typeCell );
 			row.appendChild( sizeCell );
 
+			row.addEventListener( 'click', function () {
+				document.querySelectorAll( '#files-table-body tr' ).forEach( r => {
+					r.style.background = '';
+				} );
+				row.style.background = '#444';
+				selectedAsset = { type: 'file', path: file.path, name: file.name, folder: currentFolder };
+				window.selectedAsset = selectedAsset;
+			} );
+
 			row.addEventListener( 'mouseenter', function () {
-				row.style.background = '#333';
+				if ( selectedAsset === null || selectedAsset.path !== file.path ) {
+					row.style.background = '#333';
+				}
 			} );
 
 			row.addEventListener( 'mouseleave', function () {
-				row.style.background = '';
+				if ( selectedAsset === null || selectedAsset.path !== file.path ) {
+					row.style.background = '';
+				} else {
+					row.style.background = '#444';
+				}
 			} );
+			
+			if ( isScript ) {
+				row.addEventListener( 'dblclick', function ( e ) {
+					e.stopPropagation();
+					openFileInEditor( file.path );
+				} );
+			}
 
 			filesTableBody.appendChild( row );
 
 		} );
 
+	}
+
+	async function openFileInEditor( filePath ) {
+		if ( !isTauri || !invoke ) return;
+		
+		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+		if ( !projectPath ) return;
+		
+		let assetPath = filePath;
+		if ( assetPath.startsWith( '/' ) ) {
+			assetPath = assetPath.slice( 1 );
+		}
+		assetPath = assetPath.replace( /\/+/g, '/' );
+		
+		try {
+			await invoke( 'open_file_in_editor', {
+				projectPath: projectPath,
+				assetPath: assetPath
+			} );
+		} catch ( error ) {
+		}
 	}
 
 	// Get file icon based on extension
@@ -899,9 +1034,93 @@ function SidebarAssets( editor ) {
 
 	}
 
-	// Update Add button in header to also trigger addAsset
-	addBtn.onClick( function () {
-		addAsset();
+	function createScriptAsset() {
+		const fileName = prompt( 'Enter script name:', 'NewScript.ts' );
+		
+		if ( fileName && fileName.trim() !== '' ) {
+			let name = fileName.trim();
+			if ( !name.endsWith( '.ts' ) && !name.endsWith( '.js' ) ) {
+				name += '.ts';
+			}
+
+			const className = name.replace( /\.tsx?$/, '' ).replace( /[^a-zA-Z0-9_$]/g, '' );
+			const validClassName = className || 'NewScript';
+
+			const scriptTemplate = `import { registerComponent, attribute } from '@engine/core/decorators';
+import { Script } from '@engine/core/Script';
+
+@registerComponent
+export default class ${validClassName} extends Script {
+    awake() {
+    }
+
+    start() {
+    }
+
+    update() {
+    }
+}
+`;
+
+			let normalizedPath = currentFolder.path;
+			if ( normalizedPath === '/' ) {
+				normalizedPath = '';
+			} else if ( normalizedPath.endsWith( '/' ) ) {
+				normalizedPath = normalizedPath.slice( 0, -1 );
+			}
+			const filePath = normalizedPath + '/' + name;
+			
+			const fileEntry = {
+				name: name,
+				content: scriptTemplate,
+				path: filePath,
+				size: scriptTemplate.length,
+				type: 'script',
+				isBinary: false
+			};
+
+			currentFolder.files.push( fileEntry );
+			saveAssets().catch( error => {
+				console.error( '[Assets] Error saving script:', error );
+			} );
+			refreshFiles();
+		}
+	}
+
+	function createFolder() {
+		const folderName = prompt( 'Enter folder name:', 'New Folder' );
+		
+		if ( folderName && folderName.trim() !== '' ) {
+			let normalizedPath = currentFolder.path;
+			if ( normalizedPath === '/' ) {
+				normalizedPath = '';
+			} else if ( normalizedPath.endsWith( '/' ) ) {
+				normalizedPath = normalizedPath.slice( 0, -1 );
+			}
+			const folderPath = normalizedPath + '/' + folderName.trim();
+			
+			const newFolder = {
+				name: folderName.trim(),
+				path: folderPath,
+				expanded: false,
+				children: [],
+				files: []
+			};
+
+			currentFolder.children.push( newFolder );
+			saveAssets().catch( error => {
+				console.error( '[Assets] Error saving folder:', error );
+			} );
+			refreshFolderTree();
+		}
+	}
+
+	addBtn.onClick( function ( event ) {
+		const rect = addBtn.dom.getBoundingClientRect();
+		addMenu.style.left = rect.left + 'px';
+		addMenu.style.top = ( rect.bottom + 2 ) + 'px';
+		addMenu.style.display = addMenu.style.display === 'none' ? 'block' : 'none';
+		event.stopPropagation();
 	} );
 
 	// View mode handlers
@@ -956,6 +1175,104 @@ function SidebarAssets( editor ) {
 	}
 
 	// Save assets to storage
+	window.saveAssets = saveAssets;
+	
+	async function syncFilesystemWithMetadata() {
+		if ( !isTauri || !invoke ) return;
+		
+		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+		if ( !projectPath ) return;
+		
+		async function syncFolder( folder, dirPath ) {
+			try {
+				const dirListing = await invoke( 'list_assets_directory', {
+					projectPath: projectPath,
+					dirPath: dirPath
+				} );
+				
+				const existingFiles = new Set( folder.files.map( f => f.name ) );
+				const allFiles = ( dirListing.files || [] ).map( f => f.name );
+				
+				for ( const fileInfo of dirListing.files || [] ) {
+					if ( !existingFiles.has( fileInfo.name ) && fileInfo.name !== 'assets.json' ) {
+						const ext = fileInfo.name.split( '.' ).pop()?.toLowerCase() || '';
+						
+						if ( ext === 'js' || ext === 'jsx' ) {
+							const baseName = fileInfo.name.replace( /\.jsx?$/, '' );
+							const hasCorrespondingTs = allFiles.some( f => {
+								const fBase = f.replace( /\.tsx?$/, '' );
+								return fBase === baseName && ( f.endsWith( '.ts' ) || f.endsWith( '.tsx' ) );
+							} );
+							
+							if ( hasCorrespondingTs ) {
+								continue;
+							}
+						}
+						
+						const filePath = dirPath === '/' || dirPath === '' ? '/' + fileInfo.name : dirPath + '/' + fileInfo.name;
+						
+						let fileType = 'text';
+						if ( [ 'ts', 'tsx', 'js', 'jsx' ].includes( ext ) ) {
+							fileType = 'script';
+						} else if ( [ 'png', 'jpg', 'jpeg', 'gif', 'webp' ].includes( ext ) ) {
+							fileType = 'image';
+						} else if ( [ 'glb', 'gltf', 'obj', 'fbx' ].includes( ext ) ) {
+							fileType = 'model';
+						} else if ( [ 'mp3', 'wav', 'ogg' ].includes( ext ) ) {
+							fileType = 'audio';
+						} else if ( [ 'mp4', 'webm' ].includes( ext ) ) {
+							fileType = 'video';
+						}
+						
+						const fileEntry = {
+							name: fileInfo.name,
+							path: filePath,
+							size: fileInfo.size || 0,
+							type: fileType,
+							isBinary: [ 'image', 'model', 'audio', 'video' ].includes( fileType ),
+							content: ''
+						};
+						
+						folder.files.push( fileEntry );
+					}
+				}
+				
+				for ( const dirName of dirListing.directories || [] ) {
+					let subFolder = folder.children.find( c => c.name === dirName );
+					if ( !subFolder ) {
+						const subPath = dirPath === '/' || dirPath === '' ? '/' + dirName : dirPath + '/' + dirName;
+						subFolder = {
+							name: dirName,
+							path: subPath,
+							expanded: false,
+							children: [],
+							files: []
+						};
+						folder.children.push( subFolder );
+					}
+					await syncFolder( subFolder, dirPath === '/' || dirPath === '' ? dirName : dirPath + '/' + dirName );
+				}
+			} catch ( error ) {
+			}
+		}
+		
+		if ( !assetsRoot ) {
+			assetsRoot = {
+				name: '/',
+				path: '/',
+				expanded: true,
+				children: [],
+				files: []
+			};
+		}
+		
+		await syncFolder( assetsRoot, '/' );
+		window.assetsRoot = assetsRoot;
+		window.currentFolder = currentFolder || assetsRoot;
+		
+		await saveAssets();
+	}
+	
 	async function saveAssets() {
 
 		if ( isTauri && invoke ) {
@@ -968,18 +1285,29 @@ function SidebarAssets( editor ) {
 			}
 
 			function serializeFolder( folder ) {
+				const filesToSave = folder.files.filter( file => {
+					if ( file.name.endsWith( '.js' ) || file.name.endsWith( '.jsx' ) ) {
+						const baseName = file.name.replace( /\.jsx?$/, '' );
+						const hasCorrespondingTs = folder.files.some( f => {
+							const fBase = f.name.replace( /\.tsx?$/, '' );
+							return fBase === baseName && ( f.name.endsWith( '.ts' ) || f.name.endsWith( '.tsx' ) );
+						} );
+						return !hasCorrespondingTs;
+					}
+					return true;
+				} );
+				
 				return {
 					name: folder.name,
 					path: folder.path,
 					expanded: folder.expanded,
 					children: folder.children.map( serializeFolder ),
-					files: folder.files.map( file => ( {
+					files: filesToSave.map( file => ( {
 						name: file.name,
 						path: file.path,
 						size: file.size,
 						type: file.type,
 						isBinary: file.isBinary || false,
-						// Don't store content in metadata - files are stored separately
 						content: '',
 						url: null
 					} ) )
@@ -989,19 +1317,16 @@ function SidebarAssets( editor ) {
 			const serialized = serializeFolder( assetsRoot );
 			
 			try {
-				// Save metadata
 				await invoke( 'write_assets_metadata', {
 					projectPath: projectPath,
 					content: JSON.stringify( serialized, null, '\t' )
 				} );
 
-				// Save all files to the assets folder
 				async function saveFolderFiles( folder ) {
 					for ( const file of folder.files ) {
 						try {
 							let fileContent;
 							if ( file.isBinary && file.content ) {
-								// Convert base64 to Uint8Array
 								const base64Data = file.content.split( ',' )[ 1 ] || file.content;
 								const byteCharacters = atob( base64Data );
 								const byteNumbers = new Array( byteCharacters.length );
@@ -1010,40 +1335,77 @@ function SidebarAssets( editor ) {
 								}
 								fileContent = Array.from( new Uint8Array( byteNumbers ) );
 							} else {
-								// Text file - convert to bytes
 								fileContent = Array.from( new TextEncoder().encode( file.content || '' ) );
 							}
 
-							// Normalize path - remove leading slash and double slashes
 							let assetPath = file.path;
 							if ( assetPath.startsWith( '/' ) ) {
 								assetPath = assetPath.slice( 1 );
 							}
-							// Replace any double slashes with single slash
 							assetPath = assetPath.replace( /\/+/g, '/' );
-							
-							console.log( '[Assets] Saving file:', assetPath, 'Size:', fileContent.length, 'bytes' );
 							
 							await invoke( 'write_asset_file', {
 								projectPath: projectPath,
 								assetPath: assetPath,
 								content: fileContent
 							} );
-							
-							console.log( '[Assets] File saved successfully:', assetPath );
+
+							if ( ( file.type === 'script' || file.name.endsWith( '.ts' ) || file.name.endsWith( '.tsx' ) ) && !file.isBinary ) {
+								try {
+									const compiled = await ScriptCompiler.compileScript( assetPath, file.content || '' );
+									if ( compiled ) {
+										const compiledContent = Array.from( new TextEncoder().encode( compiled.content ) );
+										await invoke( 'write_asset_file', {
+											projectPath: projectPath,
+											assetPath: compiled.path,
+											content: compiledContent
+										} );
+
+										if ( window.pc && window.pc.app ) {
+											const app = window.pc.app;
+											if ( app ) {
+												const assetRegistry = app.assets;
+												const scriptName = assetPath.split( '/' ).pop();
+												const scriptAsset = assetRegistry.getByName( scriptName );
+												if ( scriptAsset ) {
+													await assetRegistry.unload( scriptAsset );
+													await assetRegistry.load( scriptAsset );
+													
+													app.scene.traverse( ( object3D ) => {
+														const entity = object3D.__entity;
+														if ( entity ) {
+															const scripts = entity.scripts;
+															scripts.forEach( script => {
+																if ( script.constructor.name === scriptName.replace( /\.(ts|js)$/, '' ) ) {
+																	entity.removeScript( script.constructor );
+																	const newScript = entity.addScriptFromAsset( scriptAsset );
+																	if ( newScript ) {
+																		newScript.start();
+																	}
+																}
+															} );
+														}
+													} );
+													
+												}
+											}
+										}
+									}
+								} catch ( compileError ) {
+									console.warn( '[Assets] Failed to compile script:', assetPath, compileError );
+								}
+							}
 						} catch ( error ) {
 							console.error( '[Assets] Failed to save file:', file.path, error );
 						}
 					}
 
-					// Recursively save files in subfolders
 					for ( const child of folder.children ) {
 						await saveFolderFiles( child );
 					}
 				}
 
 				await saveFolderFiles( assetsRoot );
-				console.log( '[Assets] Assets saved to project folder' );
 			} catch ( error ) {
 				console.error( '[Assets] Failed to save assets:', error );
 			}
@@ -1051,7 +1413,6 @@ function SidebarAssets( editor ) {
 			return;
 		}
 
-		// Fallback to IndexedDB
 		if ( ! assetsDatabase ) return;
 
 		function serializeFolder( folder ) {
@@ -1087,26 +1448,23 @@ function SidebarAssets( editor ) {
 			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 			
 			if ( ! projectPath ) {
-				console.log( '[Assets] No project path set, starting with empty assets' );
 				refreshFolderTree();
 				refreshFiles();
 				return;
 			}
 
 			try {
-				// Load metadata
 				const metadataContent = await invoke( 'read_assets_metadata', { projectPath: projectPath } );
 				const metadata = JSON.parse( metadataContent );
-				
-				console.log( '[Assets] Loaded metadata:', metadata );
 
-				// Check if metadata has actual content (not just empty object)
-				const hasContent = metadata && (
-					( metadata.children && metadata.children.length > 0 ) ||
-					( metadata.files && metadata.files.length > 0 )
-				);
-				
-				if ( hasContent ) {
+				if ( metadata && Object.keys( metadata ).length > 0 ) {
+					const hasContent = (
+						( metadata.children && metadata.children.length > 0 ) ||
+						( metadata.files && metadata.files.length > 0 ) ||
+						metadata.name
+					);
+					
+					if ( hasContent ) {
 					async function deserializeFolder( folderData ) {
 						const folder = {
 							name: folderData.name,
@@ -1121,7 +1479,20 @@ function SidebarAssets( editor ) {
 						}
 
 						if ( folderData.files ) {
-							folder.files = await Promise.all( folderData.files.map( async ( fileData ) => {
+							const allFiles = folderData.files;
+							const filesToLoad = allFiles.filter( fileData => {
+								if ( fileData.name.endsWith( '.js' ) || fileData.name.endsWith( '.jsx' ) ) {
+									const baseName = fileData.name.replace( /\.jsx?$/, '' );
+									const hasCorrespondingTs = allFiles.some( f => {
+										const fBase = f.name.replace( /\.tsx?$/, '' );
+										return fBase === baseName && ( f.name.endsWith( '.ts' ) || f.name.endsWith( '.tsx' ) );
+									} );
+									return !hasCorrespondingTs;
+								}
+								return true;
+							} );
+							
+							folder.files = await Promise.all( filesToLoad.map( async ( fileData ) => {
 								const file = {
 									name: fileData.name,
 									path: fileData.path,
@@ -1131,7 +1502,6 @@ function SidebarAssets( editor ) {
 									content: ''
 								};
 
-								// Load file content from disk
 								try {
 									const assetPath = fileData.path.startsWith( '/' ) ? fileData.path.slice( 1 ) : fileData.path;
 									const fileBytes = await invoke( 'read_asset_file', {
@@ -1140,17 +1510,14 @@ function SidebarAssets( editor ) {
 									} );
 
 									if ( file.isBinary ) {
-										// Create blob URL for binary files
 										const blob = new Blob( [ new Uint8Array( fileBytes ) ] );
 										file.url = URL.createObjectURL( blob );
-										// Store as base64 for saving later
 										const reader = new FileReader();
 										reader.onload = function( e ) {
 											file.content = e.target.result;
 										};
 										reader.readAsDataURL( blob );
 									} else {
-										// Text file
 										file.content = new TextDecoder().decode( new Uint8Array( fileBytes ) );
 									}
 								} catch ( error ) {
@@ -1164,12 +1531,22 @@ function SidebarAssets( editor ) {
 						return folder;
 					}
 
-					assetsRoot = await deserializeFolder( metadata );
-					currentFolder = assetsRoot;
-					refreshFolderTree();
-					refreshFiles();
-					console.log( '[Assets] Assets loaded from project folder' );
+						assetsRoot = await deserializeFolder( metadata );
+						currentFolder = assetsRoot;
+						window.assetsRoot = assetsRoot;
+						window.currentFolder = currentFolder;
+						
+						await syncFilesystemWithMetadata();
+						
+						refreshFolderTree();
+						refreshFiles();
+					} else {
+						await syncFilesystemWithMetadata();
+						refreshFolderTree();
+						refreshFiles();
+					}
 				} else {
+					await syncFilesystemWithMetadata();
 					refreshFolderTree();
 					refreshFiles();
 				}
@@ -1182,7 +1559,6 @@ function SidebarAssets( editor ) {
 			return;
 		}
 
-		// Fallback to IndexedDB
 		if ( ! assetsDatabase ) {
 			refreshFolderTree();
 			refreshFiles();
@@ -1251,6 +1627,7 @@ function SidebarAssets( editor ) {
 
 				assetsRoot = deserializeFolder( data );
 				currentFolder = assetsRoot;
+				window.currentFolder = currentFolder;
 				refreshFolderTree();
 				refreshFiles();
 
@@ -1273,10 +1650,8 @@ function SidebarAssets( editor ) {
 
 	}
 
-	// Store reference to loadAssets for external calls
 	let assetsLoaded = false;
 	
-	// Expose a method to reload assets (can be called after project path is set)
 	function reloadAssets() {
 		if ( ! assetsLoaded ) {
 			assetsLoaded = true;
@@ -1287,20 +1662,15 @@ function SidebarAssets( editor ) {
 		}
 	}
 	
-	// Initialize storage and load assets
 	initAssetsStorage( function () {
-		// Try to load assets immediately (might not have project path yet)
 		loadAssets().catch( error => {
 			console.error( '[Assets] Error loading assets:', error );
 		} );
 		
-		// In Tauri mode, also listen for when project path is set
 		if ( isTauri && invoke ) {
-			// Poll for project path to be set (since it's set asynchronously)
 			const checkProjectPath = setInterval( function () {
 				const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 				if ( projectPath && ! assetsLoaded ) {
-					console.log( '[Assets] Project path detected, reloading assets...' );
 					assetsLoaded = true;
 					loadAssets().catch( error => {
 						console.error( '[Assets] Error loading assets:', error );
@@ -1308,24 +1678,19 @@ function SidebarAssets( editor ) {
 					} );
 					clearInterval( checkProjectPath );
 				}
-			}, 500 ); // Check every 500ms
+			}, 500 );
 			
-			// Stop checking after 10 seconds
 			setTimeout( function () {
 				clearInterval( checkProjectPath );
 			}, 10000 );
 		}
 	} );
 	
-	// Also listen for sceneGraphChanged signal which fires after project is loaded
-	// This ensures assets are loaded after the project path is set
 	const onSceneGraphChanged = function () {
 		if ( isTauri && invoke ) {
 			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 			if ( projectPath ) {
-				// Reset assetsLoaded flag to allow reloading
 				assetsLoaded = false;
-				console.log( '[Assets] Scene loaded, reloading assets...' );
 				loadAssets().then( () => {
 					assetsLoaded = true;
 				} ).catch( error => {

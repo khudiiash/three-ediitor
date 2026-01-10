@@ -6,6 +6,11 @@ import { History as _History } from './History.js';
 import { Strings } from './Strings.js';
 import { Storage as _Storage } from './Storage.js';
 import { Selector } from './Selector.js';
+import { Input } from './Input.js';
+import { CopyObjectCommand } from './commands/CopyObjectCommand.js';
+import { CutObjectCommand } from './commands/CutObjectCommand.js';
+import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
+import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
 
 var _DEFAULT_CAMERA = new THREE.PerspectiveCamera( 50, 1, 0.01, 1000 );
 _DEFAULT_CAMERA.name = 'Camera';
@@ -101,6 +106,9 @@ function Editor() {
 	this.selector = new Selector( this );
 	this.storage = new _Storage();
 	this.strings = new Strings( this.config );
+	this.input = new Input( this );
+
+	this.setupKeyboardShortcuts();
 
 	this.loader = new Loader( this );
 
@@ -126,6 +134,9 @@ function Editor() {
 	this.helpers = {};
 
 	this.cameras = {};
+
+	this.clipboard = null;
+	this.assetClipboard = null;
 
 	this.viewportCamera = this.camera;
 	this.viewportShading = 'default';
@@ -727,7 +738,7 @@ Editor.prototype = {
 
 		//
 
-		return {
+		const result = {
 
 			metadata: {},
 			project: {
@@ -744,6 +755,23 @@ Editor.prototype = {
 			environment: environment
 
 		};
+
+		// Replace base64 image data with asset URLs in the images array
+		if ( result.scene && result.scene.images && Array.isArray( result.scene.images ) ) {
+			result.scene.images = result.scene.images.map( function( image ) {
+				if ( image && image.url && image.url.startsWith( 'data:' ) ) {
+					// This is base64 data - replace with asset URL
+					const imageUuid = image.uuid;
+					return {
+						uuid: imageUuid,
+						url: 'assets/textures/' + imageUuid + '.png'
+					};
+				}
+				return image;
+			} );
+		}
+
+		return result;
 
 	},
 
@@ -768,6 +796,160 @@ Editor.prototype = {
 	redo: function () {
 
 		this.history.redo();
+
+	},
+
+	setupKeyboardShortcuts: function () {
+
+		const input = this.input;
+		const signals = this.signals;
+
+		input.register( 'KeyZ', () => {
+			this.undo();
+		}, { ctrl: true } );
+
+		input.register( 'KeyZ', () => {
+			this.redo();
+		}, { ctrl: true, shift: true } );
+
+		input.register( 'KeyG', () => {
+			signals.transformModeChanged.dispatch( 'translate' );
+		} );
+
+		input.register( 'KeyR', () => {
+			signals.transformModeChanged.dispatch( 'rotate' );
+		} );
+
+		input.register( 'KeyS', () => {
+			signals.transformModeChanged.dispatch( 'scale' );
+		} );
+
+		input.register( 'KeyC', () => {
+			if ( window.selectedAsset ) {
+				this.assetClipboard = { type: window.selectedAsset.type, path: window.selectedAsset.path, name: window.selectedAsset.name };
+			} else if ( this.selected !== null && this.selected.parent !== null ) {
+				const cmd = new CopyObjectCommand( this, this.selected );
+				cmd.execute();
+			}
+		}, { ctrl: true } );
+
+		input.register( 'KeyX', () => {
+			if ( window.selectedAsset ) {
+				this.assetClipboard = { type: window.selectedAsset.type, path: window.selectedAsset.path, name: window.selectedAsset.name };
+				this.deleteAsset( window.selectedAsset.path );
+			} else if ( this.selected !== null && this.selected.parent !== null ) {
+				this.execute( new CutObjectCommand( this, this.selected ) );
+			}
+		}, { ctrl: true } );
+
+		input.register( 'KeyV', () => {
+			if ( this.assetClipboard && window.currentFolder ) {
+				this.pasteAsset( this.assetClipboard, window.currentFolder.path );
+			} else if ( this.clipboard !== null ) {
+				const parent = this.selected !== null && this.selected !== this.scene ? this.selected : null;
+				this.execute( new PasteObjectCommand( this, parent ) );
+			}
+		}, { ctrl: true } );
+
+		input.register( 'Delete', () => {
+			if ( window.selectedAsset ) {
+				this.deleteAsset( window.selectedAsset.path );
+			} else if ( this.selected !== null && this.selected.parent !== null ) {
+				this.execute( new RemoveObjectCommand( this, this.selected ) );
+			}
+		} );
+
+		input.register( 'Backspace', () => {
+			if ( window.selectedAsset ) {
+				this.deleteAsset( window.selectedAsset.path );
+			} else if ( this.selected !== null && this.selected.parent !== null ) {
+				this.execute( new RemoveObjectCommand( this, this.selected ) );
+			}
+		} );
+
+		input.register( 'Escape', () => {
+			if ( this.cancelTransform ) {
+				this.cancelTransform();
+			}
+		}, { ignoreInputs: false } );
+
+	},
+
+	deleteAsset: function ( assetPath ) {
+
+		if ( !assetPath ) return;
+
+		const scope = this;
+		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
+		const invoke = isTauri ? window.__TAURI__.invoke : null;
+
+		if ( !isTauri || !invoke ) return;
+
+		const projectPath = scope.storage && scope.storage.getProjectPath ? scope.storage.getProjectPath() : null;
+		if ( !projectPath ) return;
+
+		let path = assetPath;
+		if ( path.startsWith( '/' ) ) {
+			path = path.slice( 1 );
+		}
+		path = path.replace( /\/+/g, '/' );
+
+		( async function () {
+
+			try {
+				await invoke( 'delete_asset_file', {
+					projectPath: projectPath,
+					assetPath: path
+				} );
+
+				window.selectedAsset = null;
+				scope.signals.sceneGraphChanged.dispatch();
+
+			} catch ( error ) {
+				console.error( '[Editor] Failed to delete asset:', error );
+			}
+
+		} )();
+
+	},
+
+	pasteAsset: function ( clipboard, targetFolderPath ) {
+
+		if ( !clipboard || !targetFolderPath ) return;
+
+		const scope = this;
+		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
+		const invoke = isTauri ? window.__TAURI__.invoke : null;
+
+		if ( !isTauri || !invoke ) return;
+
+		const projectPath = scope.storage && scope.storage.getProjectPath ? scope.storage.getProjectPath() : null;
+		if ( !projectPath ) return;
+
+		( async function () {
+
+			try {
+				const sourcePath = clipboard.path.startsWith( '/' ) ? clipboard.path.slice( 1 ) : clipboard.path;
+				const targetPath = targetFolderPath === '/' ? clipboard.name : targetFolderPath + '/' + clipboard.name;
+
+				const sourceData = await invoke( 'read_asset_file', {
+					projectPath: projectPath,
+					assetPath: sourcePath
+				} );
+
+				await invoke( 'write_asset_file', {
+					projectPath: projectPath,
+					assetPath: targetPath,
+					content: Array.from( new Uint8Array( sourceData ) )
+				} );
+
+				scope.signals.sceneGraphChanged.dispatch();
+
+			} catch ( error ) {
+				console.error( '[Editor] Failed to paste asset:', error );
+			}
+
+		} )();
 
 	},
 

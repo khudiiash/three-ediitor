@@ -601,8 +601,14 @@ class UINumber extends UIElement {
 
 			distance += ( pointer.x - prevPointer.x ) - ( pointer.y - prevPointer.y );
 
-			let value = onMouseDownValue + ( distance / ( event.shiftKey ? 5 : 50 ) ) * scope.step;
+			const ctrlStep = scope.ctrlStep || scope.step;
+			const step = event.ctrlKey ? ctrlStep : scope.step;
+			let value = onMouseDownValue + ( distance / ( event.shiftKey ? 5 : 50 ) ) * step;
 			value = Math.min( scope.max, Math.max( scope.min, value ) );
+
+			if ( event.ctrlKey && scope.ctrlStep ) {
+				value = Math.round( value / scope.ctrlStep ) * scope.ctrlStep;
+			}
 
 			if ( currentValue !== value ) {
 
@@ -664,13 +670,25 @@ class UINumber extends UIElement {
 
 				case 'ArrowUp':
 					event.preventDefault();
-					scope.setValue( scope.getValue() + scope.nudge );
+					let newValueUp = scope.getValue();
+					if ( event.ctrlKey && scope.ctrlNudge ) {
+						newValueUp = Math.round( ( newValueUp + scope.ctrlNudge ) / scope.ctrlNudge ) * scope.ctrlNudge;
+					} else {
+						newValueUp = newValueUp + scope.nudge;
+					}
+					scope.setValue( newValueUp );
 					scope.dom.dispatchEvent( changeEvent );
 					break;
 
 				case 'ArrowDown':
 					event.preventDefault();
-					scope.setValue( scope.getValue() - scope.nudge );
+					let newValueDown = scope.getValue();
+					if ( event.ctrlKey && scope.ctrlNudge ) {
+						newValueDown = Math.round( ( newValueDown - scope.ctrlNudge ) / scope.ctrlNudge ) * scope.ctrlNudge;
+					} else {
+						newValueDown = newValueDown - scope.nudge;
+					}
+					scope.setValue( newValueDown );
 					scope.dom.dispatchEvent( changeEvent );
 					break;
 
@@ -738,6 +756,22 @@ class UINumber extends UIElement {
 
 	}
 
+	setCtrlStep( step ) {
+
+		this.ctrlStep = step;
+
+		return this;
+
+	}
+
+	setCtrlNudge( nudge ) {
+
+		this.ctrlNudge = nudge;
+
+		return this;
+
+	}
+
 	setRange( min, max ) {
 
 		this.min = min;
@@ -778,6 +812,7 @@ class UIInteger extends UIElement {
 
 		this.step = 1;
 		this.nudge = 1;
+		this.unit = '';
 
 		this.setValue( number );
 
@@ -820,8 +855,14 @@ class UIInteger extends UIElement {
 
 			distance += ( pointer.x - prevPointer.x ) - ( pointer.y - prevPointer.y );
 
-			let value = onMouseDownValue + ( distance / ( event.shiftKey ? 5 : 50 ) ) * scope.step;
+			const ctrlStep = scope.ctrlStep || scope.step;
+			const step = event.ctrlKey ? ctrlStep : scope.step;
+			let value = onMouseDownValue + ( distance / ( event.shiftKey ? 5 : 50 ) ) * step;
 			value = Math.min( scope.max, Math.max( scope.min, value ) ) | 0;
+
+			if ( event.ctrlKey && scope.ctrlStep ) {
+				value = Math.round( value / scope.ctrlStep ) * scope.ctrlStep;
+			}
 
 			if ( currentValue !== value ) {
 
@@ -883,13 +924,27 @@ class UIInteger extends UIElement {
 
 				case 'ArrowUp':
 					event.preventDefault();
-					scope.setValue( scope.getValue() + scope.nudge );
+					let newValueUp = scope.getValue();
+					if ( event.ctrlKey && scope.ctrlNudge ) {
+						newValueUp = Math.round( ( newValueUp + scope.ctrlNudge ) / scope.ctrlNudge ) * scope.ctrlNudge;
+					} else {
+						const nudge = scope.nudge;
+						newValueUp = newValueUp + nudge;
+					}
+					scope.setValue( newValueUp );
 					scope.dom.dispatchEvent( changeEvent );
 					break;
 
 				case 'ArrowDown':
 					event.preventDefault();
-					scope.setValue( scope.getValue() - scope.nudge );
+					let newValueDown = scope.getValue();
+					if ( event.ctrlKey && scope.ctrlNudge ) {
+						newValueDown = Math.round( ( newValueDown - scope.ctrlNudge ) / scope.ctrlNudge ) * scope.ctrlNudge;
+					} else {
+						const nudge = scope.nudge;
+						newValueDown = newValueDown - nudge;
+					}
+					scope.setValue( newValueDown );
 					scope.dom.dispatchEvent( changeEvent );
 					break;
 
@@ -922,6 +977,8 @@ class UIInteger extends UIElement {
 			this.value = value;
 			this.dom.value = value;
 
+			if ( this.unit !== '' ) this.dom.value += ' ' + this.unit;
+
 		}
 
 		return this;
@@ -944,10 +1001,36 @@ class UIInteger extends UIElement {
 
 	}
 
+	setCtrlStep( step ) {
+
+		this.ctrlStep = parseInt( step );
+
+		return this;
+
+	}
+
+	setCtrlNudge( nudge ) {
+
+		this.ctrlNudge = parseInt( nudge );
+
+		return this;
+
+	}
+
 	setRange( min, max ) {
 
 		this.min = min;
 		this.max = max;
+
+		return this;
+
+	}
+
+	setUnit( unit ) {
+
+		this.unit = unit;
+
+		this.setValue( this.value );
 
 		return this;
 

@@ -50,7 +50,7 @@ class CCDIKSolver {
 		/**
 		 * The IK objects.
 		 *
-		 * @type {Array<CCDIKSolver~IK>}
+		 * @type {SkinnedMesh}
 		 */
 		this.iks = iks;
 
@@ -357,7 +357,7 @@ class CCDIKHelper extends Object3D {
 		/**
 		 * The helpers sphere geometry.
 		 *
-		 * @type {SphereGeometry}
+		 * @type {SkinnedMesh}
 		 */
 		this.sphereGeometry = new SphereGeometry( sphereSize, 16, 8 );
 

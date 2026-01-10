@@ -21,32 +21,58 @@
 		<script type="importmap">
 			{
 				"imports": {
-					"three": "./js/three.module.js"
+					"three": "./js/three.module.min.js",
+					"@engine/": "./js/"
 				}
 			}
 		</script>
 		<script type="module">
 
 			import * as THREE from 'three';
-			import { APP } from './js/app.js';
+			import { pc, App, SceneLoader, Script, registerComponent, attribute } from './js/three-engine.js';
 
-			window.THREE = THREE; // Used by APP Scripts.
+			window.THREE = THREE;
+
+			if ( !window.__engineExports ) {
+				window.__engineExports = {};
+			}
+
+			window.__engineExports.Script = Script;
+			window.__engineExports.registerComponent = registerComponent;
+			window.__engineExports.attribute = attribute;
 
 			var loader = new THREE.FileLoader();
 			loader.load( 'app.json', function ( text ) {
 
-				var player = new APP.Player();
-				player.load( JSON.parse( text ) );
-				player.setSize( window.innerWidth, window.innerHeight );
-				player.play();
+				const json = JSON.parse( text );
+				const canvas = document.createElement( 'canvas' );
+				canvas.style.cssText = 'width: 100%; height: 100%; display: block;';
+				document.body.appendChild( canvas );
 
-				document.body.appendChild( player.dom );
-
-				window.addEventListener( 'resize', function () {
-
-					player.setSize( window.innerWidth, window.innerHeight );
-
+				pc.init( canvas, {
+					antialias: true,
+					alpha: false,
+					powerPreference: 'high-performance'
 				} );
+
+				const app = pc.createApp();
+				SceneLoader.loadScene( app, json );
+
+				const scene = app.scene;
+				const camera = app.camera;
+				const renderer = pc.renderer;
+
+				function onWindowResize() {
+					const width = window.innerWidth;
+					const height = window.innerHeight;
+					renderer.setSize( width, height );
+					app.onResize( width, height );
+				}
+
+				onWindowResize();
+				window.addEventListener( 'resize', onWindowResize );
+
+				pc.start();
 
 			} );
 

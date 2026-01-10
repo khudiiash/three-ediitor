@@ -1,13 +1,10 @@
-// Use Tauri v1 API
 let invoke;
 
 function initTauriAPI() {
 	if (window.__TAURI__ && window.__TAURI__.invoke) {
 		invoke = window.__TAURI__.invoke;
-		console.log('Tauri API loaded successfully');
 		return true;
 	} else {
-		console.error('Tauri API not found!', window.__TAURI__);
 		return false;
 	}
 }
@@ -16,9 +13,7 @@ let projects = [];
 let sortColumn = 'modified';
 let sortDirection = 'desc';
 
-// Initialize hub
 document.addEventListener('DOMContentLoaded', async () => {
-	// Wait a bit for Tauri to inject the API
 	let retries = 0;
 	while (!initTauriAPI() && retries < 10) {
 		await new Promise(resolve => setTimeout(resolve, 100));
@@ -27,23 +22,18 @@ document.addEventListener('DOMContentLoaded', async () => {
 	
 	if (!invoke) {
 		document.getElementById('projects-loading').textContent = 'Error: Tauri API not available';
-		console.error('Failed to load Tauri API after retries');
 		return;
 	}
 	
-	console.log('Hub initialized, loading projects...');
 	await loadProjects();
 	setupEventListeners();
 });
 
 async function loadProjects() {
 	try {
-		console.log('Calling list_projects...');
 		projects = await invoke('list_projects');
-		console.log('Projects loaded:', projects);
 		renderProjects();
 	} catch (error) {
-		console.error('Failed to load projects:', error);
 		showError('Failed to load projects: ' + error);
 	}
 }
@@ -54,13 +44,10 @@ function renderProjects() {
 	const tbody = document.getElementById('projects-tbody');
 	const loading = document.getElementById('projects-loading');
 	
-	// Ensure container exists and restore structure if needed
 	if (!container) {
-		console.error('projects-container not found');
 		return;
 	}
 	
-	// If container was replaced with innerHTML, restore the structure
 	if (!table || !tbody || !loading) {
 		container.innerHTML = `
 			<div id="projects-loading" style="display: none; padding: 20px; text-align: center; color: #858585;">Loading projects...</div>
@@ -78,20 +65,16 @@ function renderProjects() {
 				<tbody id="projects-tbody"></tbody>
 			</table>
 		`;
-		// Re-get references after restoring
 		const newTable = document.getElementById('projects-table');
 		const newTbody = document.getElementById('projects-tbody');
 		const newLoading = document.getElementById('projects-loading');
 		if (!newTable || !newTbody || !newLoading) {
-			console.error('Failed to restore project table structure');
 			return;
 		}
-		// Update references
 		const actualTable = newTable;
 		const actualTbody = newTbody;
 		const actualLoading = newLoading;
 		
-		// Re-setup sort handlers
 		setupEventListeners();
 		
 		if (projects.length === 0) {
@@ -109,7 +92,6 @@ function renderProjects() {
 		actualLoading.style.display = 'none';
 		actualTable.style.display = 'table';
 		
-		// Continue with rendering using actualTable and actualTbody
 		renderProjectsTable(actualTable, actualTbody);
 		return;
 	}
@@ -134,7 +116,6 @@ function renderProjects() {
 
 function renderProjectsTable(table, tbody) {
 	
-	// Sort projects
 	const sortedProjects = [...projects].sort((a, b) => {
 		if (sortColumn === 'modified') {
 			return sortDirection === 'asc' 
@@ -149,7 +130,6 @@ function renderProjectsTable(table, tbody) {
 	});
 
 	tbody.innerHTML = sortedProjects.map((project, index) => {
-		// Store path in a data attribute that won't be escaped
 		const rowId = `project-row-${index}`;
 		return `
 		<tr id="${rowId}" data-path="${escapeHtml(project.path)}">
@@ -169,10 +149,8 @@ function renderProjectsTable(table, tbody) {
 		`;
 	}).join('');
 
-	// Add click handlers
 	tbody.querySelectorAll('tr').forEach(row => {
 		row.addEventListener('click', (e) => {
-			// Don't open if clicking on action buttons
 			if (e.target.closest('.project-actions-btn')) {
 				const btn = e.target.closest('.project-actions-btn');
 				const path = btn.dataset.projectPath;
@@ -198,12 +176,10 @@ function setupEventListeners() {
 		createProject();
 	});
 	
-	// Search
 	document.getElementById('search-input').addEventListener('input', (e) => {
 		filterProjects(e.target.value);
 	});
 	
-	// Sort columns
 	document.querySelectorAll('.sortable').forEach(header => {
 		header.addEventListener('click', () => {
 			const column = header.dataset.sort;
@@ -262,30 +238,21 @@ async function createProject() {
 		return;
 	}
 
-	// Disable the button to prevent double-clicks
 	const submitBtn = document.querySelector('#new-project-form button[type="submit"]');
 	if (submitBtn) {
 		submitBtn.disabled = true;
 	}
 
 	try {
-		console.log('Creating project with name:', name);
 		const path = await invoke('create_project', { name });
-		console.log('Project created successfully at path:', path);
 		
-		// Reload projects list to show the new project
 		await loadProjects();
-		console.log('Projects list reloaded');
 		
-		// Hide modal and reset form
 		hideNewProjectModal();
 	} catch (error) {
-		console.error('Create project error:', error);
 		const errorStr = String(error);
 		
-		// If error is "already exists", check if project was actually created
 		if (errorStr.includes('already exists')) {
-			// Reload projects to check if it exists
 			await loadProjects();
 			const projectExists = projects.some(p => {
 				const projectName = p.name.toLowerCase();
@@ -294,16 +261,13 @@ async function createProject() {
 			});
 			
 			if (projectExists) {
-				console.log('Project already exists in list - creation may have succeeded');
 				hideNewProjectModal();
-				return; // Don't show error if project exists
+				return;
 			}
 		}
 		
-		// Show error for other cases
 		showError('Failed to create project: ' + error);
 	} finally {
-		// Re-enable the button
 		if (submitBtn) {
 			submitBtn.disabled = false;
 		}
@@ -312,36 +276,23 @@ async function createProject() {
 
 async function openProject(path) {
 	try {
-		console.log('Opening project:', path);
 		await invoke('open_project', { path });
-		console.log('Project opened successfully');
 	} catch (error) {
-		console.error('Failed to open project:', error);
 		showError('Failed to open project: ' + error);
 	}
 }
 
 async function deleteProject(path) {
-	// Show custom confirmation modal
 	const confirmed = await showDeleteConfirmModal();
 	if (!confirmed) {
 		return;
 	}
 
 	try {
-		console.log('Deleting project - raw path:', path);
-		console.log('Deleting project - path type:', typeof path);
-		console.log('Deleting project - path length:', path?.length);
-		
-		// Ensure path is a string and properly formatted
 		const cleanPath = String(path).trim();
-		console.log('Deleting project - cleaned path:', cleanPath);
-		
 		await invoke('delete_project', { path: cleanPath });
-		console.log('Project deleted successfully');
 		await loadProjects();
 	} catch (error) {
-		console.error('Failed to delete project:', error);
 		showError('Failed to delete project: ' + error);
 	}
 }
@@ -394,7 +345,6 @@ function showDeleteConfirmModal() {
 		modal.appendChild(dialog);
 		document.body.appendChild(modal);
 		
-		// Close on escape key
 		const escapeHandler = (e) => {
 			if (e.key === 'Escape') {
 				document.body.removeChild(modal);
@@ -412,12 +362,10 @@ function showProjectMenu(path, event) {
 	event.stopPropagation();
 	event.preventDefault();
 	
-	// Remove existing menu if any
 	if (currentMenu && currentMenu.parentNode) {
 		currentMenu.parentNode.removeChild(currentMenu);
 	}
 	
-	// Create a simple context menu
 	const menu = document.createElement('div');
 	menu.style.cssText = 'position: fixed; background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 120px;';
 	menu.style.left = event.clientX + 'px';
@@ -434,9 +382,7 @@ function showProjectMenu(path, event) {
 			menu.parentNode.removeChild(menu);
 		}
 		currentMenu = null;
-		// Use the path from the closure, not from event
 		const projectPath = path;
-		console.log('Delete button clicked, path from closure:', projectPath);
 		deleteProject(projectPath);
 	};
 	
@@ -444,7 +390,6 @@ function showProjectMenu(path, event) {
 	document.body.appendChild(menu);
 	currentMenu = menu;
 	
-	// Close menu when clicking outside
 	const closeMenu = (e) => {
 		if (menu.parentNode && !menu.contains(e.target)) {
 			menu.parentNode.removeChild(menu);
@@ -483,7 +428,6 @@ function formatRelativeDate(timestamp) {
 }
 
 function showError(message) {
-	// Create a custom error modal instead of using alert()
 	const modal = document.createElement('div');
 	modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
 	
@@ -514,6 +458,5 @@ function showError(message) {
 	document.body.appendChild(modal);
 }
 
-// Make functions available globally
 window.deleteProject = deleteProject;
 window.showProjectMenu = showProjectMenu;

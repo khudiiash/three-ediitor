@@ -61,8 +61,20 @@ The executable will be located at:
 │   │   ├── css/         # Stylesheets
 │   │   └── index.html   # Main HTML entry point
 │   └── main.rs          # Tauri application entry point
+├── projects/            # User projects (excluded from Git)
 ├── Cargo.toml           # Rust dependencies
 └── README.md
+```
+
+## Projects Directory
+
+The `projects/` directory is excluded from the public GitHub repository (via `.gitignore`). 
+
+**For internal company use:** You can set up a separate Git repository for projects and configure the engine to use it. See [PROJECTS_GIT_SETUP.md](PROJECTS_GIT_SETUP.md) for detailed instructions.
+
+**Quick setup:** Set the `THREE_ENGINE_PROJECTS_DIR` environment variable to point to your projects directory:
+```bash
+export THREE_ENGINE_PROJECTS_DIR=/path/to/your/projects
 ```
 
 ## Three.js Editor Source Code

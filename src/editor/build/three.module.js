@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  */
 import { Matrix3, Vector2, Color, mergeUniforms, Vector3, CubeUVReflectionMapping, Mesh, BoxGeometry, ShaderMaterial, BackSide, cloneUniforms, Euler, Matrix4, ColorManagement, SRGBTransfer, PlaneGeometry, FrontSide, getUnlitUniformColorSpace, IntType, warn, HalfFloatType, UnsignedByteType, FloatType, RGBAFormat, Plane, EquirectangularReflectionMapping, EquirectangularRefractionMapping, WebGLCubeRenderTarget, CubeReflectionMapping, CubeRefractionMapping, BufferGeometry, OrthographicCamera, PerspectiveCamera, NoToneMapping, MeshBasicMaterial, error, NoBlending, WebGLRenderTarget, BufferAttribute, LinearSRGBColorSpace, LinearFilter, warnOnce, Uint32BufferAttribute, Uint16BufferAttribute, arrayNeedsUint32, Vector4, DataArrayTexture, Float32BufferAttribute, RawShaderMaterial, CustomToneMapping, NeutralToneMapping, AgXToneMapping, ACESFilmicToneMapping, CineonToneMapping, ReinhardToneMapping, LinearToneMapping, CubeTexture, Data3DTexture, GreaterEqualCompare, LessEqualCompare, DepthTexture, Texture, GLSL3, VSMShadowMap, PCFShadowMap, AddOperation, MixOperation, MultiplyOperation, LinearTransfer, UniformsUtils, DoubleSide, NormalBlending, TangentSpaceNormalMap, ObjectSpaceNormalMap, Layers, RGFormat, Frustum, MeshDepthMaterial, MeshDistanceMaterial, PCFSoftShadowMap, DepthFormat, NearestFilter, CubeDepthTexture, UnsignedIntType, LessEqualDepth, ReverseSubtractEquation, SubtractEquation, AddEquation, OneMinusConstantAlphaFactor, ConstantAlphaFactor, OneMinusConstantColorFactor, ConstantColorFactor, OneMinusDstAlphaFactor, OneMinusDstColorFactor, OneMinusSrcAlphaFactor, OneMinusSrcColorFactor, DstAlphaFactor, DstColorFactor, SrcAlphaSaturateFactor, SrcAlphaFactor, SrcColorFactor, OneFactor, ZeroFactor, NotEqualDepth, GreaterDepth, GreaterEqualDepth, EqualDepth, LessDepth, AlwaysDepth, NeverDepth, CullFaceNone, CullFaceBack, CullFaceFront, CustomBlending, MultiplyBlending, SubtractiveBlending, AdditiveBlending, MinEquation, MaxEquation, MirroredRepeatWrapping, ClampToEdgeWrapping, RepeatWrapping, LinearMipmapLinearFilter, LinearMipmapNearestFilter, NearestMipmapLinearFilter, NearestMipmapNearestFilter, NotEqualCompare, GreaterCompare, EqualCompare, LessCompare, AlwaysCompare, NeverCompare, NoColorSpace, DepthStencilFormat, getByteLength, UnsignedInt248Type, UnsignedShortType, createElementNS, UnsignedShort4444Type, UnsignedShort5551Type, UnsignedInt5999Type, UnsignedInt101111Type, ByteType, ShortType, AlphaFormat, RGBFormat, RedFormat, RedIntegerFormat, RGIntegerFormat, RGBAIntegerFormat, RGB_S3TC_DXT1_Format, RGBA_S3TC_DXT1_Format, RGBA_S3TC_DXT3_Format, RGBA_S3TC_DXT5_Format, RGB_PVRTC_4BPPV1_Format, RGB_PVRTC_2BPPV1_Format, RGBA_PVRTC_4BPPV1_Format, RGBA_PVRTC_2BPPV1_Format, RGB_ETC1_Format, RGB_ETC2_Format, RGBA_ETC2_EAC_Format, R11_EAC_Format, SIGNED_R11_EAC_Format, RG11_EAC_Format, SIGNED_RG11_EAC_Format, RGBA_ASTC_4x4_Format, RGBA_ASTC_5x4_Format, RGBA_ASTC_5x5_Format, RGBA_ASTC_6x5_Format, RGBA_ASTC_6x6_Format, RGBA_ASTC_8x5_Format, RGBA_ASTC_8x6_Format, RGBA_ASTC_8x8_Format, RGBA_ASTC_10x5_Format, RGBA_ASTC_10x6_Format, RGBA_ASTC_10x8_Format, RGBA_ASTC_10x10_Format, RGBA_ASTC_12x10_Format, RGBA_ASTC_12x12_Format, RGBA_BPTC_Format, RGB_BPTC_SIGNED_Format, RGB_BPTC_UNSIGNED_Format, RED_RGTC1_Format, SIGNED_RED_RGTC1_Format, RED_GREEN_RGTC2_Format, SIGNED_RED_GREEN_RGTC2_Format, ExternalTexture, EventDispatcher, ArrayCamera, WebXRController, RAD2DEG, DataTexture, createCanvasElement, SRGBColorSpace, REVISION, log, WebGLCoordinateSystem, probeAsync } from './three.core.js';
-export { AdditiveAnimationBlendMode, AlwaysStencilFunc, AmbientLight, AnimationAction, AnimationClip, AnimationLoader, AnimationMixer, AnimationObjectGroup, AnimationUtils, ArcCurve, ArrowHelper, AttachedBindMode, Audio, AudioAnalyser, AudioContext, AudioListener, AudioLoader, AxesHelper, BasicDepthPacking, BasicShadowMap, BatchedMesh, Bone, BooleanKeyframeTrack, Box2, Box3, Box3Helper, BoxHelper, BufferGeometryLoader, Cache, Camera, CameraHelper, CanvasTexture, CapsuleGeometry, CatmullRomCurve3, CircleGeometry, Clock, ColorKeyframeTrack, Compatibility, CompressedArrayTexture, CompressedCubeTexture, CompressedTexture, CompressedTextureLoader, ConeGeometry, Controls, CubeCamera, CubeTextureLoader, CubicBezierCurve, CubicBezierCurve3, CubicInterpolant, CullFaceFrontBack, Curve, CurvePath, CylinderGeometry, Cylindrical, DataTextureLoader, DataUtils, DecrementStencilOp, DecrementWrapStencilOp, DefaultLoadingManager, DetachedBindMode, DirectionalLight, DirectionalLightHelper, DiscreteInterpolant, DodecahedronGeometry, DynamicCopyUsage, DynamicDrawUsage, DynamicReadUsage, EdgesGeometry, EllipseCurve, EqualStencilFunc, ExtrudeGeometry, FileLoader, Float16BufferAttribute, Fog, FogExp2, FramebufferTexture, FrustumArray, GLBufferAttribute, GLSL1, GreaterEqualStencilFunc, GreaterStencilFunc, GridHelper, Group, HemisphereLight, HemisphereLightHelper, IcosahedronGeometry, ImageBitmapLoader, ImageLoader, ImageUtils, IncrementStencilOp, IncrementWrapStencilOp, InstancedBufferAttribute, InstancedBufferGeometry, InstancedInterleavedBuffer, InstancedMesh, Int16BufferAttribute, Int32BufferAttribute, Int8BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute, Interpolant, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, InterpolationSamplingMode, InterpolationSamplingType, InvertStencilOp, KeepStencilOp, KeyframeTrack, LOD, LatheGeometry, LessEqualStencilFunc, LessStencilFunc, Light, LightProbe, Line, Line3, LineBasicMaterial, LineCurve, LineCurve3, LineDashedMaterial, LineLoop, LineSegments, LinearInterpolant, LinearMipMapLinearFilter, LinearMipMapNearestFilter, Loader, LoaderUtils, LoadingManager, LoopOnce, LoopPingPong, LoopRepeat, MOUSE, Material, MaterialBlending, MaterialLoader, MathUtils, Matrix2, MeshLambertMaterial, MeshMatcapMaterial, MeshNormalMaterial, MeshPhongMaterial, MeshPhysicalMaterial, MeshStandardMaterial, MeshToonMaterial, NearestMipMapLinearFilter, NearestMipMapNearestFilter, NeverStencilFunc, NoNormalPacking, NormalAnimationBlendMode, NormalGAPacking, NormalRGPacking, NotEqualStencilFunc, NumberKeyframeTrack, Object3D, ObjectLoader, OctahedronGeometry, Path, PlaneHelper, PointLight, PointLightHelper, Points, PointsMaterial, PolarGridHelper, PolyhedronGeometry, PositionalAudio, PropertyBinding, PropertyMixer, QuadraticBezierCurve, QuadraticBezierCurve3, Quaternion, QuaternionKeyframeTrack, QuaternionLinearInterpolant, RGBADepthPacking, RGBDepthPacking, RGBIntegerFormat, RGDepthPacking, Ray, Raycaster, RectAreaLight, RenderTarget, RenderTarget3D, ReplaceStencilOp, RingGeometry, Scene, ShadowMaterial, Shape, ShapeGeometry, ShapePath, ShapeUtils, Skeleton, SkeletonHelper, SkinnedMesh, Source, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SplineCurve, SpotLight, SpotLightHelper, Sprite, SpriteMaterial, StaticCopyUsage, StaticDrawUsage, StaticReadUsage, StereoCamera, StreamCopyUsage, StreamDrawUsage, StreamReadUsage, StringKeyframeTrack, TOUCH, TetrahedronGeometry, TextureLoader, TextureUtils, Timer, TimestampQuery, TorusGeometry, TorusKnotGeometry, Triangle, TriangleFanDrawMode, TriangleStripDrawMode, TrianglesDrawMode, TubeGeometry, UVMapping, Uint8BufferAttribute, Uint8ClampedBufferAttribute, Uniform, UniformsGroup, VectorKeyframeTrack, VideoFrameTexture, VideoTexture, WebGL3DRenderTarget, WebGLArrayRenderTarget, WebGPUCoordinateSystem, WireframeGeometry, WrapAroundEnding, ZeroCurvatureEnding, ZeroSlopeEnding, ZeroStencilOp, getConsoleFunction, setConsoleFunction } from './three.core.js';
+export { AdditiveAnimationBlendMode, AlwaysStencilFunc, AmbientLight, AnimationAction, AnimationClip, AnimationLoader, AnimationMixer, AnimationObjectGroup, AnimationUtils, ArcCurve, ArrowHelper, AttachedBindMode, Audio, AudioAnalyser, AudioContext, AudioListener, AudioLoader, AxesHelper, BasicDepthPacking, BasicShadowMap, BatchedMesh, Bone, BooleanKeyframeTrack, Box2, Box3, Box3Helper, BoxHelper, BufferGeometryLoader, Cache, Camera, CameraHelper, CanvasTexture, CapsuleGeometry, CatmullRomCurve3, CircleGeometry, Clock, ColorKeyframeTrack, CompressedArrayTexture, CompressedCubeTexture, CompressedTexture, CompressedTextureLoader, ConeGeometry, Controls, CubeCamera, CubeTextureLoader, CubicBezierCurve, CubicBezierCurve3, CubicInterpolant, CullFaceFrontBack, Curve, CurvePath, CylinderGeometry, Cylindrical, DataTextureLoader, DataUtils, DecrementStencilOp, DecrementWrapStencilOp, DefaultLoadingManager, DetachedBindMode, DirectionalLight, DirectionalLightHelper, DiscreteInterpolant, DodecahedronGeometry, DynamicCopyUsage, DynamicDrawUsage, DynamicReadUsage, EdgesGeometry, EllipseCurve, EqualStencilFunc, ExtrudeGeometry, FileLoader, Float16BufferAttribute, Fog, FogExp2, FramebufferTexture, FrustumArray, GLBufferAttribute, GLSL1, GreaterEqualStencilFunc, GreaterStencilFunc, GridHelper, Group, HemisphereLight, HemisphereLightHelper, IcosahedronGeometry, ImageBitmapLoader, ImageLoader, ImageUtils, IncrementStencilOp, IncrementWrapStencilOp, InstancedBufferAttribute, InstancedBufferGeometry, InstancedInterleavedBuffer, InstancedMesh, Int16BufferAttribute, Int32BufferAttribute, Int8BufferAttribute, InterleavedBuffer, InterleavedBufferAttribute, Interpolant, InterpolateDiscrete, InterpolateLinear, InterpolateSmooth, InterpolationSamplingMode, InterpolationSamplingType, InvertStencilOp, KeepStencilOp, KeyframeTrack, LOD, LatheGeometry, LessEqualStencilFunc, LessStencilFunc, Light, LightProbe, Line, Line3, LineBasicMaterial, LineCurve, LineCurve3, LineDashedMaterial, LineLoop, LineSegments, LinearInterpolant, LinearMipMapLinearFilter, LinearMipMapNearestFilter, Loader, LoaderUtils, LoadingManager, LoopOnce, LoopPingPong, LoopRepeat, MOUSE, Material, MaterialLoader, MathUtils, Matrix2, MeshLambertMaterial, MeshMatcapMaterial, MeshNormalMaterial, MeshPhongMaterial, MeshPhysicalMaterial, MeshStandardMaterial, MeshToonMaterial, NearestMipMapLinearFilter, NearestMipMapNearestFilter, NeverStencilFunc, NoNormalPacking, NormalAnimationBlendMode, NormalGAPacking, NormalRGPacking, NotEqualStencilFunc, NumberKeyframeTrack, Object3D, ObjectLoader, OctahedronGeometry, Path, PlaneHelper, PointLight, PointLightHelper, Points, PointsMaterial, PolarGridHelper, PolyhedronGeometry, PositionalAudio, PropertyBinding, PropertyMixer, QuadraticBezierCurve, QuadraticBezierCurve3, Quaternion, QuaternionKeyframeTrack, QuaternionLinearInterpolant, RGBADepthPacking, RGBDepthPacking, RGBIntegerFormat, RGDepthPacking, Ray, Raycaster, RectAreaLight, RenderTarget, RenderTarget3D, ReplaceStencilOp, RingGeometry, Scene, ShadowMaterial, Shape, ShapeGeometry, ShapePath, ShapeUtils, Skeleton, SkeletonHelper, SkinnedMesh, Source, Sphere, SphereGeometry, Spherical, SphericalHarmonics3, SplineCurve, SpotLight, SpotLightHelper, Sprite, SpriteMaterial, StaticCopyUsage, StaticDrawUsage, StaticReadUsage, StereoCamera, StreamCopyUsage, StreamDrawUsage, StreamReadUsage, StringKeyframeTrack, TOUCH, TetrahedronGeometry, TextureLoader, TextureUtils, Timer, TimestampQuery, TorusGeometry, TorusKnotGeometry, Triangle, TriangleFanDrawMode, TriangleStripDrawMode, TrianglesDrawMode, TubeGeometry, UVMapping, Uint8BufferAttribute, Uint8ClampedBufferAttribute, Uniform, UniformsGroup, VectorKeyframeTrack, VideoFrameTexture, VideoTexture, WebGL3DRenderTarget, WebGLArrayRenderTarget, WebGPUCoordinateSystem, WireframeGeometry, WrapAroundEnding, ZeroCurvatureEnding, ZeroSlopeEnding, ZeroStencilOp, getConsoleFunction, setConsoleFunction } from './three.core.js';
 
 function WebGLAnimation() {
 
@@ -569,7 +569,7 @@ const fragment$3 = "uniform vec3 diffuse;\nuniform float opacity;\n#include <com
 
 const vertex$2 = "#include <common>\n#include <batching_pars_vertex>\n#include <fog_pars_vertex>\n#include <morphtarget_pars_vertex>\n#include <skinning_pars_vertex>\n#include <logdepthbuf_pars_vertex>\n#include <shadowmap_pars_vertex>\nvoid main() {\n\t#include <batching_vertex>\n\t#include <beginnormal_vertex>\n\t#include <morphinstance_vertex>\n\t#include <morphnormal_vertex>\n\t#include <skinbase_vertex>\n\t#include <skinnormal_vertex>\n\t#include <defaultnormal_vertex>\n\t#include <begin_vertex>\n\t#include <morphtarget_vertex>\n\t#include <skinning_vertex>\n\t#include <project_vertex>\n\t#include <logdepthbuf_vertex>\n\t#include <worldpos_vertex>\n\t#include <shadowmap_vertex>\n\t#include <fog_vertex>\n}";
 
-const fragment$2 = "uniform vec3 color;\nuniform float opacity;\n#include <common>\n#include <fog_pars_fragment>\n#include <bsdfs>\n#include <lights_pars_begin>\n#include <logdepthbuf_pars_fragment>\n#include <shadowmap_pars_fragment>\n#include <shadowmask_pars_fragment>\nvoid main() {\n\t#include <logdepthbuf_fragment>\n\tgl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );\n\t#include <tonemapping_fragment>\n\t#include <colorspace_fragment>\n\t#include <fog_fragment>\n\t#include <premultiplied_alpha_fragment>\n}";
+const fragment$2 = "uniform vec3 color;\nuniform float opacity;\n#include <common>\n#include <fog_pars_fragment>\n#include <bsdfs>\n#include <lights_pars_begin>\n#include <logdepthbuf_pars_fragment>\n#include <shadowmap_pars_fragment>\n#include <shadowmask_pars_fragment>\nvoid main() {\n\t#include <logdepthbuf_fragment>\n\tgl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );\n\t#include <tonemapping_fragment>\n\t#include <colorspace_fragment>\n\t#include <fog_fragment>\n}";
 
 const vertex$1 = "uniform float rotation;\nuniform vec2 center;\n#include <common>\n#include <uv_pars_vertex>\n#include <fog_pars_vertex>\n#include <logdepthbuf_pars_vertex>\n#include <clipping_planes_pars_vertex>\nvoid main() {\n\t#include <uv_vertex>\n\tvec4 mvPosition = modelViewMatrix[ 3 ];\n\tvec2 scale = vec2( length( modelMatrix[ 0 ].xyz ), length( modelMatrix[ 1 ].xyz ) );\n\t#ifndef USE_SIZEATTENUATION\n\t\tbool isPerspective = isPerspectiveMatrix( projectionMatrix );\n\t\tif ( isPerspective ) scale *= - mvPosition.z;\n\t#endif\n\tvec2 alignedPosition = ( position.xy - ( center - vec2( 0.5 ) ) ) * scale;\n\tvec2 rotatedPosition;\n\trotatedPosition.x = cos( rotation ) * alignedPosition.x - sin( rotation ) * alignedPosition.y;\n\trotatedPosition.y = sin( rotation ) * alignedPosition.x + cos( rotation ) * alignedPosition.y;\n\tmvPosition.xy += rotatedPosition;\n\tgl_Position = projectionMatrix * mvPosition;\n\t#include <logdepthbuf_vertex>\n\t#include <clipping_planes_vertex>\n\t#include <fog_vertex>\n}";
 
@@ -853,6 +853,7 @@ const UniformsLib = {
 			shadowMapSize: {}
 		} },
 
+		directionalShadowMap: { value: [] },
 		directionalShadowMatrix: { value: [] },
 
 		spotLights: { value: [], properties: {
@@ -874,6 +875,7 @@ const UniformsLib = {
 		} },
 
 		spotLightMap: { value: [] },
+		spotShadowMap: { value: [] },
 		spotLightMatrix: { value: [] },
 
 		pointLights: { value: [], properties: {
@@ -893,6 +895,7 @@ const UniformsLib = {
 			shadowCameraFar: {}
 		} },
 
+		pointShadowMap: { value: [] },
 		pointShadowMatrix: { value: [] },
 
 		hemisphereLights: { value: [], properties: {
@@ -1598,7 +1601,7 @@ function WebGLBindingStates( gl, attributes ) {
 
 		let updateBuffers = false;
 
-		const state = getBindingState( object, geometry, program, material );
+		const state = getBindingState( geometry, program, material );
 
 		if ( currentState !== state ) {
 
@@ -1651,28 +1654,16 @@ function WebGLBindingStates( gl, attributes ) {
 
 	}
 
-	function getBindingState( object, geometry, program, material ) {
+	function getBindingState( geometry, program, material ) {
 
 		const wireframe = ( material.wireframe === true );
 
-		let objectMap = bindingStates[ geometry.id ];
-
-		if ( objectMap === undefined ) {
-
-			objectMap = {};
-			bindingStates[ geometry.id ] = objectMap;
-
-		}
-
-		// Each InstancedMesh requires unique binding states because it contains instanced attributes.
-		const objectId = ( object.isInstancedMesh === true ) ? object.id : 0;
-
-		let programMap = objectMap[ objectId ];
+		let programMap = bindingStates[ geometry.id ];
 
 		if ( programMap === undefined ) {
 
 			programMap = {};
-			objectMap[ objectId ] = programMap;
+			bindingStates[ geometry.id ] = programMap;
 
 		}
 
@@ -2073,27 +2064,21 @@ function WebGLBindingStates( gl, attributes ) {
 
 		for ( const geometryId in bindingStates ) {
 
-			const objectMap = bindingStates[ geometryId ];
+			const programMap = bindingStates[ geometryId ];
 
-			for ( const objectId in objectMap ) {
+			for ( const programId in programMap ) {
 
-				const programMap = objectMap[ objectId ];
+				const stateMap = programMap[ programId ];
 
-				for ( const programId in programMap ) {
+				for ( const wireframe in stateMap ) {
 
-					const stateMap = programMap[ programId ];
+					deleteVertexArrayObject( stateMap[ wireframe ].object );
 
-					for ( const wireframe in stateMap ) {
-
-						deleteVertexArrayObject( stateMap[ wireframe ].object );
-
-						delete stateMap[ wireframe ];
-
-					}
-
-					delete programMap[ programId ];
+					delete stateMap[ wireframe ];
 
 				}
+
+				delete programMap[ programId ];
 
 			}
 
@@ -2107,27 +2092,21 @@ function WebGLBindingStates( gl, attributes ) {
 
 		if ( bindingStates[ geometry.id ] === undefined ) return;
 
-		const objectMap = bindingStates[ geometry.id ];
+		const programMap = bindingStates[ geometry.id ];
 
-		for ( const objectId in objectMap ) {
+		for ( const programId in programMap ) {
 
-			const programMap = objectMap[ objectId ];
+			const stateMap = programMap[ programId ];
 
-			for ( const programId in programMap ) {
+			for ( const wireframe in stateMap ) {
 
-				const stateMap = programMap[ programId ];
+				deleteVertexArrayObject( stateMap[ wireframe ].object );
 
-				for ( const wireframe in stateMap ) {
-
-					deleteVertexArrayObject( stateMap[ wireframe ].object );
-
-					delete stateMap[ wireframe ];
-
-				}
-
-				delete programMap[ programId ];
+				delete stateMap[ wireframe ];
 
 			}
+
+			delete programMap[ programId ];
 
 		}
 
@@ -2139,72 +2118,25 @@ function WebGLBindingStates( gl, attributes ) {
 
 		for ( const geometryId in bindingStates ) {
 
-			const objectMap = bindingStates[ geometryId ];
+			const programMap = bindingStates[ geometryId ];
 
-			for ( const objectId in objectMap ) {
+			if ( programMap[ program.id ] === undefined ) continue;
 
-				const programMap = objectMap[ objectId ];
+			const stateMap = programMap[ program.id ];
 
-				if ( programMap[ program.id ] === undefined ) continue;
+			for ( const wireframe in stateMap ) {
 
-				const stateMap = programMap[ program.id ];
+				deleteVertexArrayObject( stateMap[ wireframe ].object );
 
-				for ( const wireframe in stateMap ) {
-
-					deleteVertexArrayObject( stateMap[ wireframe ].object );
-
-					delete stateMap[ wireframe ];
-
-				}
-
-				delete programMap[ program.id ];
+				delete stateMap[ wireframe ];
 
 			}
+
+			delete programMap[ program.id ];
 
 		}
 
 	}
-
-	function releaseStatesOfObject( object ) {
-
-		for ( const geometryId in bindingStates ) {
-
-			const objectMap = bindingStates[ geometryId ];
-
-			const objectId = ( object.isInstancedMesh === true ) ? object.id : 0;
-
-			const programMap = objectMap[ objectId ];
-
-			if ( programMap === undefined ) continue;
-
-			for ( const programId in programMap ) {
-
-				const stateMap = programMap[ programId ];
-
-				for ( const wireframe in stateMap ) {
-
-					deleteVertexArrayObject( stateMap[ wireframe ].object );
-
-					delete stateMap[ wireframe ];
-
-				}
-
-				delete programMap[ programId ];
-
-			}
-
-			delete objectMap[ objectId ];
-
-			if ( Object.keys( objectMap ).length === 0 ) {
-
-				delete bindingStates[ geometryId ];
-
-			}
-
-		}
-
-	}
-
 
 	function reset() {
 
@@ -2235,7 +2167,6 @@ function WebGLBindingStates( gl, attributes ) {
 		resetDefaultState: resetDefaultState,
 		dispose: dispose,
 		releaseStatesOfGeometry: releaseStatesOfGeometry,
-		releaseStatesOfObject: releaseStatesOfObject,
 		releaseStatesOfProgram: releaseStatesOfProgram,
 
 		initAttributes: initAttributes,
@@ -4570,7 +4501,7 @@ function WebGLMorphtargets( gl, capabilities, textures ) {
 
 }
 
-function WebGLObjects( gl, geometries, attributes, bindingStates, info ) {
+function WebGLObjects( gl, geometries, attributes, info ) {
 
 	let updateMap = new WeakMap();
 
@@ -4644,8 +4575,6 @@ function WebGLObjects( gl, geometries, attributes, bindingStates, info ) {
 		const instancedMesh = event.target;
 
 		instancedMesh.removeEventListener( 'dispose', onInstancedMeshDispose );
-
-		bindingStates.releaseStatesOfObject( instancedMesh );
 
 		attributes.remove( instancedMesh.instanceMatrix );
 
@@ -7969,10 +7898,6 @@ function painterSortStable( a, b ) {
 
 		return a.material.id - b.material.id;
 
-	} else if ( a.materialVariant !== b.materialVariant ) {
-
-		return a.materialVariant - b.materialVariant;
-
 	} else if ( a.z !== b.z ) {
 
 		return a.z - b.z;
@@ -8027,15 +7952,6 @@ function WebGLRenderList() {
 
 	}
 
-	function materialVariant( object ) {
-
-		let variant = 0;
-		if ( object.isInstancedMesh ) variant += 2;
-		if ( object.isSkinnedMesh ) variant += 1;
-		return variant;
-
-	}
-
 	function getNextRenderItem( object, geometry, material, groupOrder, z, group ) {
 
 		let renderItem = renderItems[ renderItemsIndex ];
@@ -8047,7 +7963,6 @@ function WebGLRenderList() {
 				object: object,
 				geometry: geometry,
 				material: material,
-				materialVariant: materialVariant( object ),
 				groupOrder: groupOrder,
 				renderOrder: object.renderOrder,
 				z: z,
@@ -8062,7 +7977,6 @@ function WebGLRenderList() {
 			renderItem.object = object;
 			renderItem.geometry = geometry;
 			renderItem.material = material;
-			renderItem.materialVariant = materialVariant( object );
 			renderItem.groupOrder = groupOrder;
 			renderItem.renderOrder = object.renderOrder;
 			renderItem.z = z;
@@ -8972,10 +8886,10 @@ function WebGLShadowMap( renderer, objects, capabilities ) {
 
 		if ( lights.length === 0 ) return;
 
-		if ( this.type === PCFSoftShadowMap ) {
+		if ( lights.type === PCFSoftShadowMap ) {
 
 			warn( 'WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead.' );
-			this.type = PCFShadowMap;
+			lights.type = PCFShadowMap;
 
 		}
 
@@ -14289,8 +14203,8 @@ class WebXRManager extends EventDispatcher {
 
 			// inherit camera layers and enable eye layers (1 = left, 2 = right)
 			cameraXR.layers.mask = camera.layers.mask | 0b110;
-			cameraL.layers.mask = cameraXR.layers.mask & -5;
-			cameraR.layers.mask = cameraXR.layers.mask & -3;
+			cameraL.layers.mask = cameraXR.layers.mask & 0b011;
+			cameraR.layers.mask = cameraXR.layers.mask & 0b101;
 
 			const parent = camera.parent;
 			const cameras = cameraXR.cameras;
@@ -15755,7 +15669,7 @@ class WebGLRenderer {
 		// public properties
 
 		/**
-		 * A canvas where the renderer draws its output. This is automatically created by the renderer
+		 * A canvas where the renderer draws its output.This is automatically created by the renderer
 		 * in the constructor (if not provided already); you just need to add it to your page like so:
 		 * ```js
 		 * document.body.appendChild( renderer.domElement );
@@ -15771,7 +15685,7 @@ class WebGLRenderer {
 		 * - `checkShaderErrors`: If it is `true`, defines whether material shader programs are
 		 * checked for errors during compilation and linkage process. It may be useful to disable
 		 * this check in production for performance gain. It is strongly recommended to keep these
-		 * checks enabled during development. If the shader does not compile and link, it will not
+		 * checks enabled during development. If the shader does not compile and link - it will not
 		 * work and associated material will not render.
 		 * - `onShaderError(gl, program, glVertexShader,glFragmentShader)`: A callback function that
 		 * can be used for custom error reporting. The callback receives the WebGL context, an instance
@@ -16052,7 +15966,7 @@ class WebGLRenderer {
 			attributes = new WebGLAttributes( _gl );
 			bindingStates = new WebGLBindingStates( _gl, attributes );
 			geometries = new WebGLGeometries( _gl, attributes, info, bindingStates );
-			objects = new WebGLObjects( _gl, geometries, attributes, bindingStates, info );
+			objects = new WebGLObjects( _gl, geometries, attributes, info );
 			morphtargets = new WebGLMorphtargets( _gl, capabilities, textures );
 			clipping = new WebGLClipping( properties );
 			programCache = new WebGLPrograms( _this, cubemaps, cubeuvmaps, extensions, capabilities, bindingStates, clipping );
@@ -17816,9 +17730,12 @@ class WebGLRenderer {
 				uniforms.pointLightShadows.value = lights.state.pointShadow;
 				uniforms.hemisphereLights.value = lights.state.hemi;
 
+				uniforms.directionalShadowMap.value = lights.state.directionalShadowMap;
 				uniforms.directionalShadowMatrix.value = lights.state.directionalShadowMatrix;
+				uniforms.spotShadowMap.value = lights.state.spotShadowMap;
 				uniforms.spotLightMatrix.value = lights.state.spotLightMatrix;
 				uniforms.spotLightMap.value = lights.state.spotLightMap;
+				uniforms.pointShadowMap.value = lights.state.pointShadowMap;
 				uniforms.pointShadowMatrix.value = lights.state.pointShadowMatrix;
 				// TODO (abelnation): add area lights shadow info to uniforms
 
@@ -18198,6 +18115,16 @@ class WebGLRenderer {
 
 				materialProperties.receiveShadow = object.receiveShadow;
 				p_uniforms.setValue( _gl, 'receiveShadow', object.receiveShadow );
+
+			}
+
+			// https://github.com/mrdoob/three.js/pull/24467#issuecomment-1209031512
+
+			if ( material.isMeshGouraudMaterial && material.envMap !== null ) {
+
+				m_uniforms.envMap.value = envMap;
+
+				m_uniforms.flipEnvMap.value = ( envMap.isCubeTexture && envMap.isRenderTargetTexture === false ) ? -1 : 1;
 
 			}
 
@@ -18594,10 +18521,6 @@ class WebGLRenderer {
 					const textureFormat = texture.format;
 					const textureType = texture.type;
 
-					// when using MRT, select the correct color buffer for the subsequent read command
-
-					if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
-
 					if ( ! capabilities.textureFormatReadable( textureFormat ) ) {
 
 						error( 'WebGLRenderer.readRenderTargetPixels: renderTarget is not in RGBA or implementation defined format.' );
@@ -18615,6 +18538,10 @@ class WebGLRenderer {
 					// the following if statement ensures valid read requests (no out-of-bounds pixels, see #8604)
 
 					if ( ( x >= 0 && x <= ( renderTarget.width - width ) ) && ( y >= 0 && y <= ( renderTarget.height - height ) ) ) {
+
+						// when using MRT, select the correct color buffer for the subsequent read command
+
+						if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
 
 						_gl.readPixels( x, y, width, height, utils.convert( textureFormat ), utils.convert( textureType ), buffer );
 
@@ -18676,11 +18603,6 @@ class WebGLRenderer {
 					const textureFormat = texture.format;
 					const textureType = texture.type;
 
-					// when using MRT, select the correct color buffer for the subsequent read command
-
-					if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
-
-
 					if ( ! capabilities.textureFormatReadable( textureFormat ) ) {
 
 						throw new Error( 'THREE.WebGLRenderer.readRenderTargetPixelsAsync: renderTarget is not in RGBA or implementation defined format.' );
@@ -18696,6 +18618,10 @@ class WebGLRenderer {
 					const glBuffer = _gl.createBuffer();
 					_gl.bindBuffer( _gl.PIXEL_PACK_BUFFER, glBuffer );
 					_gl.bufferData( _gl.PIXEL_PACK_BUFFER, buffer.byteLength, _gl.STREAM_READ );
+
+					// when using MRT, select the correct color buffer for the subsequent read command
+
+					if ( renderTarget.textures.length > 1 ) _gl.readBuffer( _gl.COLOR_ATTACHMENT0 + textureIndex );
 
 					_gl.readPixels( x, y, width, height, utils.convert( textureFormat ), utils.convert( textureType ), 0 );
 
@@ -18766,9 +18692,27 @@ class WebGLRenderer {
 		 * @param {?(Box2|Box3)} [srcRegion=null] - A bounding box which describes the source region. Can be two or three-dimensional.
 		 * @param {?(Vector2|Vector3)} [dstPosition=null] - A vector that represents the origin of the destination region. Can be two or three-dimensional.
 		 * @param {number} [srcLevel=0] - The source mipmap level to copy.
-		 * @param {?number} [dstLevel=0] - The destination mipmap level.
+		 * @param {?number} [dstLevel=null] - The destination mipmap level.
 		 */
-		this.copyTextureToTexture = function ( srcTexture, dstTexture, srcRegion = null, dstPosition = null, srcLevel = 0, dstLevel = 0 ) {
+		this.copyTextureToTexture = function ( srcTexture, dstTexture, srcRegion = null, dstPosition = null, srcLevel = 0, dstLevel = null ) {
+
+			// support the previous signature with just a single dst mipmap level
+			if ( dstLevel === null ) {
+
+				if ( srcLevel !== 0 ) {
+
+					// @deprecated, r171
+					warnOnce( 'WebGLRenderer: copyTextureToTexture function signature has changed to support src and dst mipmap levels.' );
+					dstLevel = srcLevel;
+					srcLevel = 0;
+
+				} else {
+
+					dstLevel = 0;
+
+				}
+
+			}
 
 			// gather the necessary dimensions to copy
 			let width, height, depth, minX, minY, minZ;

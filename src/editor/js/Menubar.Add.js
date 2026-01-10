@@ -46,17 +46,68 @@ function MenubarAdd( editor ) {
 		meshSubmenu.setTop( top - parseFloat( paddingTop ) + 'px' );
 		meshSubmenu.setStyle( 'max-height', [ `calc( 100vh - ${top}px )` ] );
 		meshSubmenu.setDisplay( 'block' );
+		
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'none';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'none';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'none';
 
 	} );
-	meshSubmenuTitle.onMouseOut( function () {
+	meshSubmenuTitle.onMouseOut( function ( event ) {
 
-		meshSubmenu.setDisplay( 'none' );
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( meshSubmenu.dom.contains( relatedTarget ) || meshSubmenuTitle.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+
+		const elementAtPoint = document.elementFromPoint( event.clientX, event.clientY );
+		if ( elementAtPoint && ( elementAtPoint.id === 'resizer-left' || elementAtPoint.id === 'resizer' || elementAtPoint.id === 'resizer-bottom' ) ) {
+			return;
+		}
+
+		setTimeout( function () {
+
+			const activeElement = document.elementFromPoint( event.clientX, event.clientY );
+			if ( activeElement && ( activeElement.id === 'resizer-left' || activeElement.id === 'resizer' || activeElement.id === 'resizer-bottom' ) ) {
+				return;
+			}
+			if ( ! meshSubmenu.dom.contains( activeElement ) && ! meshSubmenuTitle.dom.contains( activeElement ) ) {
+				meshSubmenu.setDisplay( 'none' );
+				const leftResizer = document.getElementById( 'resizer-left' );
+				const rightResizer = document.getElementById( 'resizer' );
+				const bottomResizer = document.getElementById( 'resizer-bottom' );
+				if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+				if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+				if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+			}
+
+		}, 100 );
 
 	} );
 	options.add( meshSubmenuTitle );
 
 	const meshSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
 	meshSubmenuTitle.add( meshSubmenu );
+	
+	meshSubmenu.onMouseOver( function () {
+		meshSubmenu.setDisplay( 'block' );
+	} );
+	meshSubmenu.onMouseOut( function ( event ) {
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( meshSubmenuTitle.dom.contains( relatedTarget ) || meshSubmenu.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+		
+		meshSubmenu.setDisplay( 'none' );
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+	} );
 
 	// Mesh / Box
 
@@ -334,17 +385,68 @@ function MenubarAdd( editor ) {
 		lightSubmenu.setTop( top - parseFloat( paddingTop ) + 'px' );
 		lightSubmenu.setStyle( 'max-height', [ `calc( 100vh - ${top}px )` ] );
 		lightSubmenu.setDisplay( 'block' );
+		
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'none';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'none';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'none';
 
 	} );
-	lightSubmenuTitle.onMouseOut( function () {
+	lightSubmenuTitle.onMouseOut( function ( event ) {
 
-		lightSubmenu.setDisplay( 'none' );
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( lightSubmenu.dom.contains( relatedTarget ) || lightSubmenuTitle.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+
+		const elementAtPoint = document.elementFromPoint( event.clientX, event.clientY );
+		if ( elementAtPoint && ( elementAtPoint.id === 'resizer-left' || elementAtPoint.id === 'resizer' || elementAtPoint.id === 'resizer-bottom' ) ) {
+			return;
+		}
+
+		setTimeout( function () {
+
+			const activeElement = document.elementFromPoint( event.clientX, event.clientY );
+			if ( activeElement && ( activeElement.id === 'resizer-left' || activeElement.id === 'resizer' || activeElement.id === 'resizer-bottom' ) ) {
+				return;
+			}
+			if ( ! lightSubmenu.dom.contains( activeElement ) && ! lightSubmenuTitle.dom.contains( activeElement ) ) {
+				lightSubmenu.setDisplay( 'none' );
+				const leftResizer = document.getElementById( 'resizer-left' );
+				const rightResizer = document.getElementById( 'resizer' );
+				const bottomResizer = document.getElementById( 'resizer-bottom' );
+				if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+				if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+				if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+			}
+
+		}, 100 );
 
 	} );
 	options.add( lightSubmenuTitle );
 
 	const lightSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
 	lightSubmenuTitle.add( lightSubmenu );
+	
+	lightSubmenu.onMouseOver( function () {
+		lightSubmenu.setDisplay( 'block' );
+	} );
+	lightSubmenu.onMouseOut( function ( event ) {
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( lightSubmenuTitle.dom.contains( relatedTarget ) || lightSubmenu.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+		
+		lightSubmenu.setDisplay( 'none' );
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+	} );
 
 	// Light / Ambient
 
@@ -460,17 +562,68 @@ function MenubarAdd( editor ) {
 		cameraSubmenu.setTop( top - parseFloat( paddingTop ) + 'px' );
 		cameraSubmenu.setStyle( 'max-height', [ `calc( 100vh - ${top}px )` ] );
 		cameraSubmenu.setDisplay( 'block' );
+		
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'none';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'none';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'none';
 
 	} );
-	cameraSubmenuTitle.onMouseOut( function () {
+	cameraSubmenuTitle.onMouseOut( function ( event ) {
 
-		cameraSubmenu.setDisplay( 'none' );
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( cameraSubmenu.dom.contains( relatedTarget ) || cameraSubmenuTitle.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+
+		const elementAtPoint = document.elementFromPoint( event.clientX, event.clientY );
+		if ( elementAtPoint && ( elementAtPoint.id === 'resizer-left' || elementAtPoint.id === 'resizer' || elementAtPoint.id === 'resizer-bottom' ) ) {
+			return;
+		}
+
+		setTimeout( function () {
+
+			const activeElement = document.elementFromPoint( event.clientX, event.clientY );
+			if ( activeElement && ( activeElement.id === 'resizer-left' || activeElement.id === 'resizer' || activeElement.id === 'resizer-bottom' ) ) {
+				return;
+			}
+			if ( ! cameraSubmenu.dom.contains( activeElement ) && ! cameraSubmenuTitle.dom.contains( activeElement ) ) {
+				cameraSubmenu.setDisplay( 'none' );
+				const leftResizer = document.getElementById( 'resizer-left' );
+				const rightResizer = document.getElementById( 'resizer' );
+				const bottomResizer = document.getElementById( 'resizer-bottom' );
+				if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+				if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+				if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+			}
+
+		}, 100 );
 
 	} );
 	options.add( cameraSubmenuTitle );
 
 	const cameraSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
 	cameraSubmenuTitle.add( cameraSubmenu );
+	
+	cameraSubmenu.onMouseOver( function () {
+		cameraSubmenu.setDisplay( 'block' );
+	} );
+	cameraSubmenu.onMouseOut( function ( event ) {
+		const relatedTarget = event.relatedTarget || event.toElement;
+		if ( relatedTarget && ( cameraSubmenuTitle.dom.contains( relatedTarget ) || cameraSubmenu.dom.contains( relatedTarget ) ) ) {
+			return;
+		}
+		
+		cameraSubmenu.setDisplay( 'none' );
+		const leftResizer = document.getElementById( 'resizer-left' );
+		const rightResizer = document.getElementById( 'resizer' );
+		const bottomResizer = document.getElementById( 'resizer-bottom' );
+		if ( leftResizer ) leftResizer.style.pointerEvents = 'auto';
+		if ( rightResizer ) rightResizer.style.pointerEvents = 'auto';
+		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
+	} );
 
 	// Camera / Orthographic
 

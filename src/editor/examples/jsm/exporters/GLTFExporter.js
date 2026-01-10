@@ -1852,12 +1852,12 @@ class GLTFWriter {
 				! ( array instanceof Uint8Array ) ) {
 
 				console.warn( 'GLTFExporter: Attribute "skinIndex" converted to type UNSIGNED_SHORT.' );
-				modifiedAttribute = GLTFExporter.Utils.toTypedBufferAttribute( attribute, Uint16Array );
+				modifiedAttribute = new BufferAttribute( new Uint16Array( array ), attribute.itemSize, attribute.normalized );
 
 			} else if ( ( array instanceof Uint32Array || array instanceof Int32Array ) && ! attributeName.startsWith( '_' ) ) {
 
 				console.warn( `GLTFExporter: Attribute "${ attributeName }" converted to type FLOAT.` );
-				modifiedAttribute = GLTFExporter.Utils.toTypedBufferAttribute( attribute, Float32Array );
+				modifiedAttribute = GLTFExporter.Utils.toFloat32BufferAttribute( attribute );
 
 			}
 
@@ -3538,9 +3538,9 @@ GLTFExporter.Utils = {
 
 	},
 
-	toTypedBufferAttribute: function ( srcAttribute, TypedArray ) {
+	toFloat32BufferAttribute: function ( srcAttribute ) {
 
-		const dstAttribute = new BufferAttribute( new TypedArray( srcAttribute.count * srcAttribute.itemSize ), srcAttribute.itemSize, false );
+		const dstAttribute = new BufferAttribute( new Float32Array( srcAttribute.count * srcAttribute.itemSize ), srcAttribute.itemSize, false );
 
 		if ( ! srcAttribute.normalized && ! srcAttribute.isInterleavedBufferAttribute ) {
 

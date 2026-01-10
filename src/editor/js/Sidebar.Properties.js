@@ -2,11 +2,8 @@ import { UITabbedPanel, UIPanel } from './libs/ui.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
 import { SidebarObject } from './Sidebar.Object.js';
-import { SidebarGeometry } from './Sidebar.Geometry.js';
-import { SidebarMaterial } from './Sidebar.Material.js';
 import { SidebarScript } from './Sidebar.Script.js';
 import { SidebarProject } from './Sidebar.Project.js';
-import { SidebarSceneSettings } from './Sidebar.Scene.Settings.js';
 import { SidebarSettings } from './Sidebar.Settings.js';
 
 function SidebarProperties( editor ) {
@@ -16,34 +13,17 @@ function SidebarProperties( editor ) {
 	const container = new UITabbedPanel();
 	container.setId( 'properties' );
 
-	// Inspector tab with collapsible sections
 	const inspectorPanel = new UIPanel();
 	inspectorPanel.setBorderTop( '0' );
 	inspectorPanel.setPaddingTop( '4px' );
 
-	const objectPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/object' ) || 'Object' );
-	const objectContent = new SidebarObject( editor );
-	objectPanel.add( objectContent );
-	objectPanel.collapse(); // Collapse by default
-
-	const geometryPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/geometry' ) || 'Geometry' );
-	const geometryContent = new SidebarGeometry( editor );
-	geometryPanel.add( geometryContent );
-	geometryPanel.collapse(); // Collapse by default
-
-	const materialPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/material' ) || 'Material' );
-	const materialContent = new SidebarMaterial( editor );
-	materialPanel.add( materialContent );
-	materialPanel.collapse(); // Collapse by default
-
-	const scriptPanel = new UICollapsiblePanel( strings.getKey( 'sidebar/properties/script' ) || 'Script' );
+	const objectPanels = new SidebarObject( editor );
+	const scriptPanel = new UICollapsiblePanel( 'Script' );
 	const scriptContent = new SidebarScript( editor );
 	scriptPanel.add( scriptContent );
-	scriptPanel.collapse(); // Collapse by default
+	scriptPanel.collapse();
 
-	inspectorPanel.add( objectPanel );
-	inspectorPanel.add( geometryPanel );
-	inspectorPanel.add( materialPanel );
+	inspectorPanel.add( objectPanels );
 	inspectorPanel.add( scriptPanel );
 
 	// Project tab
@@ -70,20 +50,12 @@ function SidebarProperties( editor ) {
 	function togglePanels( object ) {
 
 		if ( object === null ) {
-
-			// When nothing selected, show scene settings tab
-			objectPanel.setHidden( true );
-			geometryPanel.setHidden( true );
-			materialPanel.setHidden( true );
+			objectPanels.setDisplay( 'none' );
 			scriptPanel.setHidden( true );
 			return;
-
 		}
 
-		// Show object panels when object is selected
-		objectPanel.setHidden( false );
-		geometryPanel.setHidden( ! object.geometry );
-		materialPanel.setHidden( ! object.material );
+		objectPanels.setDisplay( 'block' );
 		scriptPanel.setHidden( object === editor.camera );
 
 	}

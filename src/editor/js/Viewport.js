@@ -97,6 +97,8 @@ function Viewport( editor ) {
 	let objectPositionOnDown = null;
 	let objectRotationOnDown = null;
 	let objectScaleOnDown = null;
+	let isTransformInProgress = false;
+	let transformObject = null;
 
 	// TransformControls requires domElement in constructor, but renderer doesn't exist yet
 	// Use container.dom as placeholder - will be reconnected when renderer is created
@@ -106,7 +108,47 @@ function Viewport( editor ) {
 		if ( editor.viewportShading !== 'realistic' ) render();
 
 	} );
+	let isCtrlPressed = false;
+
+	window.addEventListener( 'keydown', function ( event ) {
+		if ( event.key === 'Control' || event.key === 'Meta' ) {
+			isCtrlPressed = true;
+		}
+	} );
+
+	window.addEventListener( 'keyup', function ( event ) {
+		if ( event.key === 'Control' || event.key === 'Meta' ) {
+			isCtrlPressed = false;
+		}
+	} );
+
+	window.addEventListener( 'blur', function () {
+		isCtrlPressed = false;
+	} );
+
 	transformControls.addEventListener( 'objectChange', function () {
+
+		const object = transformControls.object;
+		if ( !object ) return;
+
+		if ( isCtrlPressed ) {
+			const mode = transformControls.getMode();
+
+			if ( mode === 'translate' ) {
+				object.position.x = Math.round( object.position.x );
+				object.position.y = Math.round( object.position.y );
+				object.position.z = Math.round( object.position.z );
+			} else if ( mode === 'rotate' ) {
+				const snapAngle = 45 * Math.PI / 180;
+				object.rotation.x = Math.round( object.rotation.x / snapAngle ) * snapAngle;
+				object.rotation.y = Math.round( object.rotation.y / snapAngle ) * snapAngle;
+				object.rotation.z = Math.round( object.rotation.z / snapAngle ) * snapAngle;
+			} else if ( mode === 'scale' ) {
+				object.scale.x = Math.round( object.scale.x );
+				object.scale.y = Math.round( object.scale.y );
+				object.scale.z = Math.round( object.scale.z );
+			}
+		}
 
 		signals.objectChanged.dispatch( transformControls.object );
 
@@ -118,6 +160,9 @@ function Viewport( editor ) {
 		objectPositionOnDown = object.position.clone();
 		objectRotationOnDown = object.rotation.clone();
 		objectScaleOnDown = object.scale.clone();
+
+		isTransformInProgress = true;
+		transformObject = object;
 
 		controls.enabled = false;
 
@@ -164,9 +209,72 @@ function Viewport( editor ) {
 
 		}
 
+		isTransformInProgress = false;
+		transformObject = null;
 		controls.enabled = true;
 
 	} );
+
+	function cancelTransform() {
+
+		if ( !isTransformInProgress || !transformObject ) return;
+
+		const mode = transformControls.getMode();
+
+		switch ( mode ) {
+
+			case 'translate':
+
+				if ( objectPositionOnDown !== null ) {
+
+					transformObject.position.copy( objectPositionOnDown );
+					transformObject.updateMatrixWorld( true );
+					signals.objectChanged.dispatch( transformObject );
+
+				}
+
+				break;
+
+			case 'rotate':
+
+				if ( objectRotationOnDown !== null ) {
+
+					transformObject.rotation.copy( objectRotationOnDown );
+					transformObject.updateMatrixWorld( true );
+					signals.objectChanged.dispatch( transformObject );
+
+				}
+
+				break;
+
+			case 'scale':
+
+				if ( objectScaleOnDown !== null ) {
+
+					transformObject.scale.copy( objectScaleOnDown );
+					transformObject.updateMatrixWorld( true );
+					signals.objectChanged.dispatch( transformObject );
+
+				}
+
+				break;
+
+		}
+
+		isTransformInProgress = false;
+		transformObject = null;
+		controls.enabled = true;
+
+		transformControls.detach();
+		if ( editor.selected !== null ) {
+			transformControls.attach( editor.selected );
+		}
+
+		render();
+
+	}
+
+	editor.cancelTransform = cancelTransform;
 
 	// TransformControls helper - getHelper() was added in r169
 	// If it doesn't exist, the helper is part of the controls object itself
@@ -200,14 +308,17 @@ function Viewport( editor ) {
 
 				camera.aspect = aspect;
 
-			} else {
+		} else {
 
-				camera.left = - aspect;
-				camera.right = aspect;
+			const orthoHeight = Math.abs( camera.top - camera.bottom ) / 2;
+			const orthoWidth = orthoHeight * aspect;
+			camera.left = - orthoWidth;
+			camera.right = orthoWidth;
+			camera.aspect = aspect;
 
-			}
+		}
 
-			camera.updateProjectionMatrix();
+		camera.updateProjectionMatrix();
 
 			const cameraHelper = editor.helpers[ camera.id ];
 			if ( cameraHelper ) cameraHelper.update();
@@ -342,6 +453,7 @@ function Viewport( editor ) {
 		render();
 
 	} );
+
 
 	signals.snapChanged.add( function ( dist ) {
 

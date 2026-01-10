@@ -449,7 +449,7 @@ select {
 
 		#menubar .menu .options {
 			position: fixed;
-			z-index: 1; /* higher than resizer */
+			z-index: 1002;
 			display: none;
 			padding: 5px 0;
 			background: #eee;

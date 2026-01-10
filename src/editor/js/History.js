@@ -36,17 +36,31 @@ class History {
 		const lastCmd = this.undos[ this.undos.length - 1 ];
 		const timeDifference = Date.now() - this.lastCmdTime;
 
-		const isUpdatableCmd = lastCmd &&
-			lastCmd.updatable &&
-			cmd.updatable &&
-			lastCmd.object === cmd.object &&
-			lastCmd.type === cmd.type &&
-			lastCmd.script === cmd.script &&
-			lastCmd.attributeName === cmd.attributeName;
+		let isUpdatableCmd = false;
+
+		if ( lastCmd && lastCmd.updatable && cmd.updatable && lastCmd.object === cmd.object && lastCmd.type === cmd.type ) {
+
+			if ( cmd.type === 'SetScriptAttributeCommand' ) {
+
+				isUpdatableCmd = lastCmd.scriptIndex === cmd.scriptIndex && lastCmd.attributeName === cmd.attributeName;
+
+			} else if ( cmd.type === 'SetScriptValueCommand' ) {
+
+				isUpdatableCmd = lastCmd.script === cmd.script && lastCmd.attributeName === cmd.attributeName;
+
+			} else if ( lastCmd.attributeName !== undefined && cmd.attributeName !== undefined ) {
+
+				isUpdatableCmd = lastCmd.attributeName === cmd.attributeName;
+
+			} else {
+
+				isUpdatableCmd = true;
+
+			}
+
+		}
 
 		if ( isUpdatableCmd && cmd.type === 'SetScriptValueCommand' ) {
-
-			// When the cmd.type is "SetScriptValueCommand" the timeDifference is ignored
 
 			lastCmd.update( cmd );
 			cmd = lastCmd;

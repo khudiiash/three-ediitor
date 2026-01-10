@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 
-import { UIPanel, UIRow, UIInput, UIButton, UIColor, UICheckbox, UIInteger, UITextArea, UIText, UINumber } from './libs/ui.js';
+import { UIPanel, UIRow, UIInput, UIButton, UIColor, UICheckbox, UIInteger, UITextArea, UIText, UINumber, UISelect } from './libs/ui.js';
 import { UIBoolean } from './libs/ui.three.js';
+import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
 import { SetValueCommand } from './commands/SetValueCommand.js';
 import { SetPositionCommand } from './commands/SetPositionCommand.js';
@@ -9,8 +10,14 @@ import { SetRotationCommand } from './commands/SetRotationCommand.js';
 import { SetScaleCommand } from './commands/SetScaleCommand.js';
 import { SetColorCommand } from './commands/SetColorCommand.js';
 import { SetShadowValueCommand } from './commands/SetShadowValueCommand.js';
+import { SetShadowCameraCommand } from './commands/SetShadowCameraCommand.js';
+import { SetShadowMapSizeCommand } from './commands/SetShadowMapSizeCommand.js';
+import { SetCameraTypeCommand } from './commands/SetCameraTypeCommand.js';
+import { SetOrthographicCameraSizeCommand } from './commands/SetOrthographicCameraSizeCommand.js';
 
 import { SidebarObjectAnimation } from './Sidebar.Object.Animation.js';
+import { SidebarGeometry } from './Sidebar.Geometry.js';
+import { SidebarMaterial } from './Sidebar.Material.js';
 
 function SidebarObject( editor ) {
 
@@ -18,454 +25,347 @@ function SidebarObject( editor ) {
 
 	const signals = editor.signals;
 
-	const container = new UIPanel();
-	container.setBorderTop( '0' );
-	container.setPaddingTop( '20px' );
-	container.setDisplay( 'none' );
+	const entityPanel = new UICollapsiblePanel( 'Entity' );
+	const meshPanel = new UICollapsiblePanel( 'Mesh' );
+	const lightPanel = new UICollapsiblePanel( 'Light' );
+	const cameraPanel = new UICollapsiblePanel( 'Camera' );
 
-	// Actions
+	const geometryPanel = new UICollapsiblePanel( 'Geometry' );
+	const materialPanel = new UICollapsiblePanel( 'Material' );
 
-	/*
-	let objectActions = new UI.Select().setPosition( 'absolute' ).setRight( '8px' ).setFontSize( '11px' );
-	objectActions.setOptions( {
+	const geometryContent = new SidebarGeometry( editor );
+	const materialContent = new SidebarMaterial( editor );
 
-		'Actions': 'Actions',
-		'Reset Position': 'Reset Position',
-		'Reset Rotation': 'Reset Rotation',
-		'Reset Scale': 'Reset Scale'
+	geometryPanel.add( geometryContent );
+	materialPanel.add( materialContent );
 
-	} );
-	objectActions.onClick( function ( event ) {
+	geometryPanel.collapse();
+	materialPanel.collapse();
 
-		event.stopPropagation(); // Avoid panel collapsing
+	meshPanel.add( geometryPanel );
+	meshPanel.add( materialPanel );
 
-	} );
-	objectActions.onChange( function ( event ) {
+	entityPanel.collapse();
+	meshPanel.collapse();
+	lightPanel.collapse();
+	cameraPanel.collapse();
 
-		let object = editor.selected;
-
-		switch ( this.getValue() ) {
-
-			case 'Reset Position':
-				editor.execute( new SetPositionCommand( editor, object, new Vector3( 0, 0, 0 ) ) );
-				break;
-
-			case 'Reset Rotation':
-				editor.execute( new SetRotationCommand( editor, object, new Euler( 0, 0, 0 ) ) );
-				break;
-
-			case 'Reset Scale':
-				editor.execute( new SetScaleCommand( editor, object, new Vector3( 1, 1, 1 ) ) );
-				break;
-
-		}
-
-		this.setValue( 'Actions' );
-
-	} );
-	container.addStatic( objectActions );
-	*/
-
-	// type
+	const panelsContainer = new UIPanel();
+	panelsContainer.add( entityPanel );
+	panelsContainer.add( meshPanel );
+	panelsContainer.add( lightPanel );
+	panelsContainer.add( cameraPanel );
 
 	const objectTypeRow = new UIRow();
 	const objectType = new UIText();
-
-	objectTypeRow.add( new UIText( strings.getKey( 'sidebar/object/type' ) ).setClass( 'Label' ) );
+	objectTypeRow.add( new UIText( strings.getKey( 'sidebar/object/type' ) || 'Type' ).setClass( 'Label' ) );
 	objectTypeRow.add( objectType );
-
-	container.add( objectTypeRow );
-
-
-	// name
+	entityPanel.add( objectTypeRow );
 
 	const objectNameRow = new UIRow();
 	const objectName = new UIInput().setWidth( '150px' ).setFontSize( '12px' ).onChange( function () {
-
 		editor.execute( new SetValueCommand( editor, editor.selected, 'name', objectName.getValue() ) );
-
 	} );
-
-	objectNameRow.add( new UIText( strings.getKey( 'sidebar/object/name' ) ).setClass( 'Label' ) );
+	objectNameRow.add( new UIText( strings.getKey( 'sidebar/object/name' ) || 'Name' ).setClass( 'Label' ) );
 	objectNameRow.add( objectName );
-
-	container.add( objectNameRow );
-
-	// position
+	entityPanel.add( objectNameRow );
 
 	const objectPositionRow = new UIRow();
-	const objectPositionX = new UINumber().setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-	const objectPositionY = new UINumber().setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-	const objectPositionZ = new UINumber().setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-
-	objectPositionRow.add( new UIText( strings.getKey( 'sidebar/object/position' ) ).setClass( 'Label' ) );
+	const objectPositionX = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
+	const objectPositionY = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
+	const objectPositionZ = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
+	objectPositionRow.add( new UIText( strings.getKey( 'sidebar/object/position' ) || 'Position' ).setClass( 'Label' ) );
 	objectPositionRow.add( objectPositionX, objectPositionY, objectPositionZ );
-
-	container.add( objectPositionRow );
-
-	// rotation
+	entityPanel.add( objectPositionRow );
 
 	const objectRotationRow = new UIRow();
-	const objectRotationX = new UINumber().setStep( 10 ).setNudge( 0.1 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
-	const objectRotationY = new UINumber().setStep( 10 ).setNudge( 0.1 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
-	const objectRotationZ = new UINumber().setStep( 10 ).setNudge( 0.1 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
-
-	objectRotationRow.add( new UIText( strings.getKey( 'sidebar/object/rotation' ) ).setClass( 'Label' ) );
+	const objectRotationX = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
+	const objectRotationY = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
+	const objectRotationZ = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
+	objectRotationRow.add( new UIText( strings.getKey( 'sidebar/object/rotation' ) || 'Rotation' ).setClass( 'Label' ) );
 	objectRotationRow.add( objectRotationX, objectRotationY, objectRotationZ );
+	entityPanel.add( objectRotationRow );
 
-	container.add( objectRotationRow );
-
-	// scale
-
+	let scaleLocked = true;
 	const objectScaleRow = new UIRow();
-	const objectScaleX = new UINumber( 1 ).setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-	const objectScaleY = new UINumber( 1 ).setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-	const objectScaleZ = new UINumber( 1 ).setPrecision( 3 ).setWidth( '50px' ).onChange( update );
-
-	objectScaleRow.add( new UIText( strings.getKey( 'sidebar/object/scale' ) ).setClass( 'Label' ) );
+	const scaleLockCheckbox = new UICheckbox( true ).onChange( function () {
+		scaleLocked = this.getValue();
+	} );
+	const objectScaleX = new UINumber( 1 ).setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( function () {
+		if ( scaleLocked ) {
+			const value = this.getValue();
+			objectScaleY.setValue( value );
+			objectScaleZ.setValue( value );
+		}
+		update();
+	} );
+	const objectScaleY = new UINumber( 1 ).setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( function () {
+		if ( scaleLocked ) {
+			const value = this.getValue();
+			objectScaleX.setValue( value );
+			objectScaleZ.setValue( value );
+		}
+		update();
+	} );
+	const objectScaleZ = new UINumber( 1 ).setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( function () {
+		if ( scaleLocked ) {
+			const value = this.getValue();
+			objectScaleX.setValue( value );
+			objectScaleY.setValue( value );
+		}
+		update();
+	} );
+	objectScaleRow.add( new UIText( strings.getKey( 'sidebar/object/scale' ) || 'Scale' ).setClass( 'Label' ) );
+	objectScaleRow.add( scaleLockCheckbox );
 	objectScaleRow.add( objectScaleX, objectScaleY, objectScaleZ );
+	entityPanel.add( objectScaleRow );
 
-	container.add( objectScaleRow );
-
-	// fov
+	const objectCameraTypeRow = new UIRow();
+	const objectCameraType = new UISelect().setOptions( {
+		'PerspectiveCamera': 'Perspective',
+		'OrthographicCamera': 'Orthographic'
+	} ).onChange( function () {
+		const newType = this.getValue();
+		const object = editor.selected;
+		if ( object && ( object.isPerspectiveCamera || object.isOrthographicCamera ) ) {
+			const currentType = object.isPerspectiveCamera ? 'PerspectiveCamera' : 'OrthographicCamera';
+			if ( currentType !== newType ) {
+				editor.execute( new SetCameraTypeCommand( editor, object, newType ) );
+			}
+		}
+	} );
+	const cameraTypeLabel = strings.getKey( 'sidebar/object/cameraType' );
+	objectCameraTypeRow.add( new UIText( ( cameraTypeLabel && cameraTypeLabel !== '???' ) ? cameraTypeLabel : 'Type' ).setClass( 'Label' ) );
+	objectCameraTypeRow.add( objectCameraType );
+	cameraPanel.add( objectCameraTypeRow );
 
 	const objectFovRow = new UIRow();
 	const objectFov = new UINumber().onChange( update );
-
-	objectFovRow.add( new UIText( strings.getKey( 'sidebar/object/fov' ) ).setClass( 'Label' ) );
+	objectFovRow.add( new UIText( strings.getKey( 'sidebar/object/fov' ) || 'FOV' ).setClass( 'Label' ) );
 	objectFovRow.add( objectFov );
-
-	container.add( objectFovRow );
-
-	// left
+	cameraPanel.add( objectFovRow );
 
 	const objectLeftRow = new UIRow();
 	const objectLeft = new UINumber().onChange( update );
-
 	objectLeftRow.add( new UIText( strings.getKey( 'sidebar/object/left' ) ).setClass( 'Label' ) );
 	objectLeftRow.add( objectLeft );
-
-	container.add( objectLeftRow );
-
-	// right
+	cameraPanel.add( objectLeftRow );
+	objectLeftRow.setDisplay( 'none' );
 
 	const objectRightRow = new UIRow();
 	const objectRight = new UINumber().onChange( update );
-
 	objectRightRow.add( new UIText( strings.getKey( 'sidebar/object/right' ) ).setClass( 'Label' ) );
 	objectRightRow.add( objectRight );
-
-	container.add( objectRightRow );
-
-	// top
+	cameraPanel.add( objectRightRow );
+	objectRightRow.setDisplay( 'none' );
 
 	const objectTopRow = new UIRow();
 	const objectTop = new UINumber().onChange( update );
-
 	objectTopRow.add( new UIText( strings.getKey( 'sidebar/object/top' ) ).setClass( 'Label' ) );
 	objectTopRow.add( objectTop );
-
-	container.add( objectTopRow );
-
-	// bottom
+	cameraPanel.add( objectTopRow );
+	objectTopRow.setDisplay( 'none' );
 
 	const objectBottomRow = new UIRow();
 	const objectBottom = new UINumber().onChange( update );
-
 	objectBottomRow.add( new UIText( strings.getKey( 'sidebar/object/bottom' ) ).setClass( 'Label' ) );
 	objectBottomRow.add( objectBottom );
+	cameraPanel.add( objectBottomRow );
+	objectBottomRow.setDisplay( 'none' );
 
-	container.add( objectBottomRow );
+	let cameraSizeUpdateTimeout = null;
+	function updateCameraSize() {
+		if ( cameraSizeUpdateTimeout !== null ) {
+			clearTimeout( cameraSizeUpdateTimeout );
+		}
+		cameraSizeUpdateTimeout = setTimeout( function () {
+			const object = editor.selected;
+			if ( object && object.isOrthographicCamera ) {
+				const orthoHeight = objectOrthoHeight.getValue();
+				editor.execute( new SetOrthographicCameraSizeCommand( editor, object, orthoHeight ) );
+			}
+		}, 150 );
+	}
 
-	// near
+	const objectOrthoHeightRow = new UIRow();
+	const objectOrthoHeight = new UINumber().setPrecision( 2 ).setWidth( '50px' ).onChange( updateCameraSize );
+	const orthoHeightLabel = strings.getKey( 'sidebar/object/orthoHeight' );
+	objectOrthoHeightRow.add( new UIText( ( orthoHeightLabel && orthoHeightLabel !== '???' ) ? orthoHeightLabel : 'Ortho Height' ).setClass( 'Label' ) );
+	objectOrthoHeightRow.add( objectOrthoHeight );
+	cameraPanel.add( objectOrthoHeightRow );
 
 	const objectNearRow = new UIRow();
 	const objectNear = new UINumber().onChange( update );
-
-	objectNearRow.add( new UIText( strings.getKey( 'sidebar/object/near' ) ).setClass( 'Label' ) );
+	objectNearRow.add( new UIText( strings.getKey( 'sidebar/object/near' ) || 'Near' ).setClass( 'Label' ) );
 	objectNearRow.add( objectNear );
-
-	container.add( objectNearRow );
-
-	// far
+	cameraPanel.add( objectNearRow );
 
 	const objectFarRow = new UIRow();
 	const objectFar = new UINumber().onChange( update );
-
-	objectFarRow.add( new UIText( strings.getKey( 'sidebar/object/far' ) ).setClass( 'Label' ) );
+	objectFarRow.add( new UIText( strings.getKey( 'sidebar/object/far' ) || 'Far' ).setClass( 'Label' ) );
 	objectFarRow.add( objectFar );
-
-	container.add( objectFarRow );
-
-	// intensity
+	cameraPanel.add( objectFarRow );
 
 	const objectIntensityRow = new UIRow();
 	const objectIntensity = new UINumber().onChange( update );
-
-	objectIntensityRow.add( new UIText( strings.getKey( 'sidebar/object/intensity' ) ).setClass( 'Label' ) );
+	objectIntensityRow.add( new UIText( strings.getKey( 'sidebar/object/intensity' ) || 'Intensity' ).setClass( 'Label' ) );
 	objectIntensityRow.add( objectIntensity );
-
-	container.add( objectIntensityRow );
-
-	// color
+	lightPanel.add( objectIntensityRow );
 
 	const objectColorRow = new UIRow();
 	const objectColor = new UIColor().onInput( update );
-
-	objectColorRow.add( new UIText( strings.getKey( 'sidebar/object/color' ) ).setClass( 'Label' ) );
+	objectColorRow.add( new UIText( strings.getKey( 'sidebar/object/color' ) || 'Color' ).setClass( 'Label' ) );
 	objectColorRow.add( objectColor );
-
-	container.add( objectColorRow );
-
-	// ground color
+	lightPanel.add( objectColorRow );
 
 	const objectGroundColorRow = new UIRow();
 	const objectGroundColor = new UIColor().onInput( update );
-
-	objectGroundColorRow.add( new UIText( strings.getKey( 'sidebar/object/groundcolor' ) ).setClass( 'Label' ) );
+	objectGroundColorRow.add( new UIText( strings.getKey( 'sidebar/object/groundcolor' ) || 'Ground Color' ).setClass( 'Label' ) );
 	objectGroundColorRow.add( objectGroundColor );
-
-	container.add( objectGroundColorRow );
-
-	// distance
+	lightPanel.add( objectGroundColorRow );
 
 	const objectDistanceRow = new UIRow();
 	const objectDistance = new UINumber().setRange( 0, Infinity ).onChange( update );
-
-	objectDistanceRow.add( new UIText( strings.getKey( 'sidebar/object/distance' ) ).setClass( 'Label' ) );
+	objectDistanceRow.add( new UIText( strings.getKey( 'sidebar/object/distance' ) || 'Distance' ).setClass( 'Label' ) );
 	objectDistanceRow.add( objectDistance );
-
-	container.add( objectDistanceRow );
-
-	// angle
+	lightPanel.add( objectDistanceRow );
 
 	const objectAngleRow = new UIRow();
 	const objectAngle = new UINumber().setPrecision( 3 ).setRange( 0, Math.PI / 2 ).onChange( update );
-
-	objectAngleRow.add( new UIText( strings.getKey( 'sidebar/object/angle' ) ).setClass( 'Label' ) );
+	objectAngleRow.add( new UIText( strings.getKey( 'sidebar/object/angle' ) || 'Angle' ).setClass( 'Label' ) );
 	objectAngleRow.add( objectAngle );
-
-	container.add( objectAngleRow );
-
-	// penumbra
+	lightPanel.add( objectAngleRow );
 
 	const objectPenumbraRow = new UIRow();
 	const objectPenumbra = new UINumber().setRange( 0, 1 ).onChange( update );
-
-	objectPenumbraRow.add( new UIText( strings.getKey( 'sidebar/object/penumbra' ) ).setClass( 'Label' ) );
+	objectPenumbraRow.add( new UIText( strings.getKey( 'sidebar/object/penumbra' ) || 'Penumbra' ).setClass( 'Label' ) );
 	objectPenumbraRow.add( objectPenumbra );
-
-	container.add( objectPenumbraRow );
-
-	// decay
+	lightPanel.add( objectPenumbraRow );
 
 	const objectDecayRow = new UIRow();
 	const objectDecay = new UINumber().setRange( 0, Infinity ).onChange( update );
-
-	objectDecayRow.add( new UIText( strings.getKey( 'sidebar/object/decay' ) ).setClass( 'Label' ) );
+	objectDecayRow.add( new UIText( strings.getKey( 'sidebar/object/decay' ) || 'Decay' ).setClass( 'Label' ) );
 	objectDecayRow.add( objectDecay );
-
-	container.add( objectDecayRow );
-
-	// shadow
+	lightPanel.add( objectDecayRow );
 
 	const objectShadowRow = new UIRow();
-
-	objectShadowRow.add( new UIText( strings.getKey( 'sidebar/object/shadow' ) ).setClass( 'Label' ) );
-
-	const objectCastShadow = new UIBoolean( false, strings.getKey( 'sidebar/object/cast' ) ).onChange( update );
+	objectShadowRow.add( new UIText( strings.getKey( 'sidebar/object/shadow' ) || 'Shadow' ).setClass( 'Label' ) );
+	const objectCastShadow = new UIBoolean( false, strings.getKey( 'sidebar/object/cast' ) || 'Cast' ).onChange( update );
 	objectShadowRow.add( objectCastShadow );
-
-	const objectReceiveShadow = new UIBoolean( false, strings.getKey( 'sidebar/object/receive' ) ).onChange( update );
+	const objectReceiveShadow = new UIBoolean( false, strings.getKey( 'sidebar/object/receive' ) || 'Receive' ).onChange( update );
 	objectShadowRow.add( objectReceiveShadow );
-
-	container.add( objectShadowRow );
-
-	// shadow intensity
+	meshPanel.add( objectShadowRow );
 
 	const objectShadowIntensityRow = new UIRow();
-
-	objectShadowIntensityRow.add( new UIText( strings.getKey( 'sidebar/object/shadowIntensity' ) ).setClass( 'Label' ) );
-
+	objectShadowIntensityRow.add( new UIText( strings.getKey( 'sidebar/object/shadowIntensity' ) || 'Shadow Intensity' ).setClass( 'Label' ) );
 	const objectShadowIntensity = new UINumber( 0 ).setRange( 0, 1 ).onChange( update );
 	objectShadowIntensityRow.add( objectShadowIntensity );
-
-	container.add( objectShadowIntensityRow );
-
-	// shadow bias
+	meshPanel.add( objectShadowIntensityRow );
 
 	const objectShadowBiasRow = new UIRow();
-
-	objectShadowBiasRow.add( new UIText( strings.getKey( 'sidebar/object/shadowBias' ) ).setClass( 'Label' ) );
-
+	objectShadowBiasRow.add( new UIText( strings.getKey( 'sidebar/object/shadowBias' ) || 'Shadow Bias' ).setClass( 'Label' ) );
 	const objectShadowBias = new UINumber( 0 ).setPrecision( 5 ).setStep( 0.0001 ).setNudge( 0.00001 ).onChange( update );
 	objectShadowBiasRow.add( objectShadowBias );
-
-	container.add( objectShadowBiasRow );
-
-	// shadow normal offset
+	meshPanel.add( objectShadowBiasRow );
 
 	const objectShadowNormalBiasRow = new UIRow();
-
-	objectShadowNormalBiasRow.add( new UIText( strings.getKey( 'sidebar/object/shadowNormalBias' ) ).setClass( 'Label' ) );
-
+	objectShadowNormalBiasRow.add( new UIText( strings.getKey( 'sidebar/object/shadowNormalBias' ) || 'Shadow Normal Bias' ).setClass( 'Label' ) );
 	const objectShadowNormalBias = new UINumber( 0 ).onChange( update );
 	objectShadowNormalBiasRow.add( objectShadowNormalBias );
-
-	container.add( objectShadowNormalBiasRow );
-
-	// shadow radius
+	meshPanel.add( objectShadowNormalBiasRow );
 
 	const objectShadowRadiusRow = new UIRow();
-
-	objectShadowRadiusRow.add( new UIText( strings.getKey( 'sidebar/object/shadowRadius' ) ).setClass( 'Label' ) );
-
+	objectShadowRadiusRow.add( new UIText( strings.getKey( 'sidebar/object/shadowRadius' ) || 'Shadow Radius' ).setClass( 'Label' ) );
 	const objectShadowRadius = new UINumber( 1 ).onChange( update );
 	objectShadowRadiusRow.add( objectShadowRadius );
-
-	container.add( objectShadowRadiusRow );
-
-	// shadow map size (for lights)
+	meshPanel.add( objectShadowRadiusRow );
 
 	const objectShadowMapSizeRow = new UIRow();
 	const objectShadowMapSize = new UINumber( 512 ).setWidth( '50px' ).setRange( 256, 4096 ).setStep( 256 ).onChange( update );
-
 	objectShadowMapSizeRow.add( new UIText( 'Map Size' ).setClass( 'Label' ) );
 	objectShadowMapSizeRow.add( objectShadowMapSize );
-
-	container.add( objectShadowMapSizeRow );
-
-	// shadow camera near
+	lightPanel.add( objectShadowMapSizeRow );
 
 	const objectShadowCameraNearRow = new UIRow();
 	const objectShadowCameraNear = new UINumber( 0.5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 100 ).onChange( update );
-
 	objectShadowCameraNearRow.add( new UIText( 'Camera Near' ).setClass( 'Label' ) );
 	objectShadowCameraNearRow.add( objectShadowCameraNear );
-
-	container.add( objectShadowCameraNearRow );
-
-	// shadow camera far
+	lightPanel.add( objectShadowCameraNearRow );
 
 	const objectShadowCameraFarRow = new UIRow();
 	const objectShadowCameraFar = new UINumber( 500 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 1, 10000 ).onChange( update );
-
 	objectShadowCameraFarRow.add( new UIText( 'Camera Far' ).setClass( 'Label' ) );
 	objectShadowCameraFarRow.add( objectShadowCameraFar );
-
-	container.add( objectShadowCameraFarRow );
-
-	// shadow camera area (directional lights) - single control for left/right/top/bottom
+	lightPanel.add( objectShadowCameraFarRow );
 
 	const objectShadowCameraAreaRow = new UIRow();
 	const objectShadowCameraArea = new UINumber( 5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 1000 ).onChange( update );
-
 	objectShadowCameraAreaRow.add( new UIText( 'Shadow Area' ).setClass( 'Label' ) );
 	objectShadowCameraAreaRow.add( objectShadowCameraArea );
-
-	container.add( objectShadowCameraAreaRow );
-
-	// shadow camera fov (spot lights)
+	lightPanel.add( objectShadowCameraAreaRow );
 
 	const objectShadowCameraFovRow = new UIRow();
 	const objectShadowCameraFov = new UINumber( 50 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 10, 179 ).onChange( update );
-
 	objectShadowCameraFovRow.add( new UIText( 'Camera FOV' ).setClass( 'Label' ) );
 	objectShadowCameraFovRow.add( objectShadowCameraFov );
-
-	container.add( objectShadowCameraFovRow );
-
-	// visible
+	lightPanel.add( objectShadowCameraFovRow );
 
 	const objectVisibleRow = new UIRow();
 	const objectVisible = new UICheckbox().onChange( update );
-
 	objectVisibleRow.add( new UIText( strings.getKey( 'sidebar/object/visible' ) ).setClass( 'Label' ) );
 	objectVisibleRow.add( objectVisible );
-
-	container.add( objectVisibleRow );
-
-	// frustumCulled
+	entityPanel.add( objectVisibleRow );
 
 	const objectFrustumCulledRow = new UIRow();
 	const objectFrustumCulled = new UICheckbox().onChange( update );
-
-	objectFrustumCulledRow.add( new UIText( strings.getKey( 'sidebar/object/frustumcull' ) ).setClass( 'Label' ) );
+	objectFrustumCulledRow.add( new UIText( strings.getKey( 'sidebar/object/frustumcull' ) || 'Frustum Culled' ).setClass( 'Label' ) );
 	objectFrustumCulledRow.add( objectFrustumCulled );
-
-	container.add( objectFrustumCulledRow );
-
-	// renderOrder
+	meshPanel.add( objectFrustumCulledRow );
 
 	const objectRenderOrderRow = new UIRow();
 	const objectRenderOrder = new UIInteger().setWidth( '50px' ).onChange( update );
-
-	objectRenderOrderRow.add( new UIText( strings.getKey( 'sidebar/object/renderorder' ) ).setClass( 'Label' ) );
+	objectRenderOrderRow.add( new UIText( strings.getKey( 'sidebar/object/renderorder' ) || 'Render Order' ).setClass( 'Label' ) );
 	objectRenderOrderRow.add( objectRenderOrder );
-
-	container.add( objectRenderOrderRow );
-
-	// user data
-
-	const objectUserDataRow = new UIRow();
-	const objectUserData = new UITextArea().setWidth( '150px' ).setHeight( '40px' ).setFontSize( '12px' ).onChange( update );
-	objectUserData.onKeyUp( function () {
-
-		try {
-
-			JSON.parse( objectUserData.getValue() );
-
-			objectUserData.dom.classList.add( 'success' );
-			objectUserData.dom.classList.remove( 'fail' );
-
-		} catch ( error ) {
-
-			objectUserData.dom.classList.remove( 'success' );
-			objectUserData.dom.classList.add( 'fail' );
-
-		}
-
-	} );
-
-	objectUserDataRow.add( new UIText( strings.getKey( 'sidebar/object/userdata' ) ).setClass( 'Label' ) );
-	objectUserDataRow.add( objectUserData );
-
-	container.add( objectUserDataRow );
-
-	// Export JSON
+	meshPanel.add( objectRenderOrderRow );
 
 	const exportJson = new UIButton( strings.getKey( 'sidebar/object/export' ) );
 	exportJson.setMarginLeft( '120px' );
 	exportJson.onClick( function () {
-
 		const object = editor.selected;
-
 		let output = object.toJSON();
-
 		try {
-
 			output = JSON.stringify( output, null, '\t' );
 			output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
-
 		} catch ( error ) {
-
 			output = JSON.stringify( output );
-
 		}
-
-
 		editor.utils.save( new Blob( [ output ] ), `${ objectName.getValue() || 'object' }.json` );
-
 	} );
-	container.add( exportJson );
+	entityPanel.add( exportJson );
 
-	// Animations
-
-	container.add( new SidebarObjectAnimation( editor ) );
+	entityPanel.add( new SidebarObjectAnimation( editor ) );
 
 	//
 
+	let updateTimeout = null;
+
 	function update() {
+
+		if ( updateTimeout !== null ) {
+
+			clearTimeout( updateTimeout );
+
+		}
+
+		updateTimeout = setTimeout( function () {
+
+			updateImmediate();
+
+		}, 150 );
+
+	}
+
+	function updateImmediate() {
 
 		const object = editor.selected;
 
@@ -654,9 +554,7 @@ function SidebarObject( editor ) {
 					const mapSize = objectShadowMapSize.getValue();
 					if ( object.shadow.mapSize.width !== mapSize || object.shadow.mapSize.height !== mapSize ) {
 
-						object.shadow.mapSize.width = mapSize;
-						object.shadow.mapSize.height = mapSize;
-						editor.signals.objectChanged.dispatch( object );
+						editor.execute( new SetShadowMapSizeCommand( editor, object, mapSize ) );
 
 					}
 
@@ -667,17 +565,13 @@ function SidebarObject( editor ) {
 
 					if ( object.shadow.camera.near !== undefined && Math.abs( object.shadow.camera.near - objectShadowCameraNear.getValue() ) >= 0.01 ) {
 
-						object.shadow.camera.near = objectShadowCameraNear.getValue();
-						object.shadow.camera.updateProjectionMatrix();
-						editor.signals.objectChanged.dispatch( object );
+						editor.execute( new SetShadowCameraCommand( editor, object, 'near', objectShadowCameraNear.getValue() ) );
 
 					}
 
 					if ( object.shadow.camera.far !== undefined && Math.abs( object.shadow.camera.far - objectShadowCameraFar.getValue() ) >= 0.01 ) {
 
-						object.shadow.camera.far = objectShadowCameraFar.getValue();
-						object.shadow.camera.updateProjectionMatrix();
-						editor.signals.objectChanged.dispatch( object );
+						editor.execute( new SetShadowCameraCommand( editor, object, 'far', objectShadowCameraFar.getValue() ) );
 
 					}
 
@@ -689,12 +583,7 @@ function SidebarObject( editor ) {
 
 						if ( Math.abs( currentArea - area ) >= 0.01 ) {
 
-							object.shadow.camera.left = - area;
-							object.shadow.camera.right = area;
-							object.shadow.camera.top = area;
-							object.shadow.camera.bottom = - area;
-							object.shadow.camera.updateProjectionMatrix();
-							editor.signals.objectChanged.dispatch( object );
+							editor.execute( new SetShadowCameraCommand( editor, object, 'area', area ) );
 
 						}
 
@@ -703,28 +592,11 @@ function SidebarObject( editor ) {
 					// Spot light camera properties
 					if ( object.shadow.camera.fov !== undefined && Math.abs( object.shadow.camera.fov - objectShadowCameraFov.getValue() ) >= 0.01 ) {
 
-						object.shadow.camera.fov = objectShadowCameraFov.getValue();
-						object.shadow.camera.updateProjectionMatrix();
-						editor.signals.objectChanged.dispatch( object );
+						editor.execute( new SetShadowCameraCommand( editor, object, 'fov', objectShadowCameraFov.getValue() ) );
 
 					}
 
 				}
-
-			}
-
-			try {
-
-				const userData = JSON.parse( objectUserData.getValue() );
-				if ( JSON.stringify( object.userData ) != JSON.stringify( userData ) ) {
-
-					editor.execute( new SetValueCommand( editor, object, 'userData', userData ) );
-
-				}
-
-			} catch ( exception ) {
-
-				console.warn( exception );
 
 			}
 
@@ -734,12 +606,22 @@ function SidebarObject( editor ) {
 
 	function updateRows( object ) {
 
+		const isMesh = object.isMesh;
+		const isLight = object.isLight;
+		const isCamera = object.isCamera || object.isPerspectiveCamera || object.isOrthographicCamera;
+
+		meshPanel.setHidden( ! isMesh );
+		lightPanel.setHidden( ! isLight );
+		cameraPanel.setHidden( ! isCamera );
+
+		if ( isMesh ) {
+			geometryPanel.setHidden( ! object.geometry );
+			materialPanel.setHidden( ! object.material );
+		}
+
 		const properties = {
 			'fov': objectFovRow,
-			'left': objectLeftRow,
-			'right': objectRightRow,
-			'top': objectTopRow,
-			'bottom': objectBottomRow,
+			'orthoHeight': objectOrthoHeightRow,
 			'near': objectNearRow,
 			'far': objectFarRow,
 			'intensity': objectIntensityRow,
@@ -751,100 +633,76 @@ function SidebarObject( editor ) {
 			'decay': objectDecayRow,
 			'castShadow': objectShadowRow,
 			'receiveShadow': objectReceiveShadow,
-			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow, objectShadowMapSizeRow, objectShadowCameraNearRow, objectShadowCameraFarRow, objectShadowCameraAreaRow, objectShadowCameraFovRow ]
+			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow ]
 		};
 
+		objectLeftRow.setDisplay( 'none' );
+		objectRightRow.setDisplay( 'none' );
+		objectTopRow.setDisplay( 'none' );
+		objectBottomRow.setDisplay( 'none' );
+
 		for ( const property in properties ) {
-
 			const uiElement = properties[ property ];
-
 			if ( Array.isArray( uiElement ) === true ) {
-
 				for ( let i = 0; i < uiElement.length; i ++ ) {
-
 					uiElement[ i ].setDisplay( object[ property ] !== undefined ? '' : 'none' );
-
 				}
-
 			} else {
-
 				uiElement.setDisplay( object[ property ] !== undefined ? '' : 'none' );
-
 			}
-
 		}
 
-		//
+		if ( isCamera ) {
+			if ( object.isPerspectiveCamera ) {
+				objectFovRow.setDisplay( '' );
+				objectOrthoHeightRow.setDisplay( 'none' );
+			} else if ( object.isOrthographicCamera ) {
+				objectFovRow.setDisplay( 'none' );
+				objectOrthoHeightRow.setDisplay( '' );
+			}
+		}
 
-		if ( object.isLight ) {
-
+		if ( isLight ) {
 			objectReceiveShadow.setDisplay( 'none' );
-			// Show shadow camera properties for lights
 			if ( object.shadow !== undefined && object.shadow.camera !== undefined ) {
-
 				objectShadowMapSizeRow.setDisplay( '' );
 				objectShadowCameraNearRow.setDisplay( '' );
 				objectShadowCameraFarRow.setDisplay( '' );
-
-				// Show directional light camera properties
 				if ( object.isDirectionalLight && object.shadow.camera.left !== undefined ) {
-
 					objectShadowCameraAreaRow.setDisplay( '' );
 					objectShadowCameraFovRow.setDisplay( 'none' );
-
 				} else if ( object.isSpotLight && object.shadow.camera.fov !== undefined ) {
-
 					objectShadowCameraAreaRow.setDisplay( 'none' );
 					objectShadowCameraFovRow.setDisplay( '' );
-
 				} else {
-
 					objectShadowCameraAreaRow.setDisplay( 'none' );
 					objectShadowCameraFovRow.setDisplay( 'none' );
-
 				}
-
 			} else {
-
 				objectShadowMapSizeRow.setDisplay( 'none' );
 				objectShadowCameraNearRow.setDisplay( 'none' );
 				objectShadowCameraFarRow.setDisplay( 'none' );
 				objectShadowCameraAreaRow.setDisplay( 'none' );
 				objectShadowCameraFovRow.setDisplay( 'none' );
-
 			}
-
 		} else {
-
-			// Hide shadow camera properties for non-lights
 			objectShadowMapSizeRow.setDisplay( 'none' );
 			objectShadowCameraNearRow.setDisplay( 'none' );
 			objectShadowCameraFarRow.setDisplay( 'none' );
 			objectShadowCameraAreaRow.setDisplay( 'none' );
 			objectShadowCameraFovRow.setDisplay( 'none' );
-
 		}
 
 		if ( object.isAmbientLight || object.isHemisphereLight ) {
-
 			objectShadowRow.setDisplay( 'none' );
-
 		}
 
-	}
-
-	function updateTransformRows( object ) {
-
-		if ( object.isLight ) {
-
+		if ( isLight ) {
 			objectRotationRow.setDisplay( 'none' );
 			objectScaleRow.setDisplay( 'none' );
-
 		} else {
-
 			objectRotationRow.setDisplay( '' );
 			objectScaleRow.setDisplay( '' );
-
 		}
 
 	}
@@ -855,14 +713,14 @@ function SidebarObject( editor ) {
 
 		if ( object !== null ) {
 
-			container.setDisplay( 'block' );
+			panelsContainer.setDisplay( 'block' );
 
 			updateRows( object );
 			updateUI( object );
 
 		} else {
 
-			container.setDisplay( 'none' );
+			panelsContainer.setDisplay( 'none' );
 
 		}
 
@@ -902,6 +760,11 @@ function SidebarObject( editor ) {
 		objectScaleY.setValue( object.scale.y );
 		objectScaleZ.setValue( object.scale.z );
 
+		if ( object.isPerspectiveCamera || object.isOrthographicCamera ) {
+			const cameraType = object.isPerspectiveCamera ? 'PerspectiveCamera' : 'OrthographicCamera';
+			objectCameraType.setValue( cameraType );
+		}
+
 		if ( object.fov !== undefined ) {
 
 			objectFov.setValue( object.fov );
@@ -929,6 +792,13 @@ function SidebarObject( editor ) {
 		if ( object.bottom !== undefined ) {
 
 			objectBottom.setValue( object.bottom );
+
+		}
+
+		if ( object.isOrthographicCamera ) {
+
+			const orthoHeight = Math.abs( object.top - object.bottom ) / 2;
+			objectOrthoHeight.setValue( orthoHeight );
 
 		}
 
@@ -1052,24 +922,9 @@ function SidebarObject( editor ) {
 		objectFrustumCulled.setValue( object.frustumCulled );
 		objectRenderOrder.setValue( object.renderOrder );
 
-		try {
-
-			objectUserData.setValue( JSON.stringify( object.userData, null, '  ' ) );
-
-		} catch ( error ) {
-
-			console.log( error );
-
-		}
-
-		objectUserData.setBorderColor( 'transparent' );
-		objectUserData.setBackgroundColor( '' );
-
-		updateTransformRows( object );
-
 	}
 
-	return container;
+	return panelsContainer;
 
 }
 
