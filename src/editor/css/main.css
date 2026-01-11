@@ -563,7 +563,32 @@ select {
 }
 
 #sidebar-right .Panel {
-	padding: 5px;
+	font-size: 11px;
+	margin-bottom: 4px;
+}
+
+#sidebar-right .Panel > .Row:first-child {
+	margin-top: 0;
+}
+
+.CollapsiblePanelHeader {
+	font-size: 12px;
+	font-weight: 600;
+	color: #bbb;
+	padding: 8px 8px;
+	margin: 0;
+	background: rgba(0, 0, 0, 0.1);
+	border-radius: 3px;
+	cursor: pointer;
+	user-select: none;
+}
+
+.CollapsiblePanelHeader:hover {
+	background: rgba(0, 0, 0, 0.15);
+}
+
+.CollapsiblePanelContent {
+	padding: 8px 4px;
 }
 
 #sidebar-bottom {
@@ -756,27 +781,147 @@ select {
 		margin-bottom: 0;
 	}
 
+	/* Clean two-column inspector layout with perfect alignment */
 	#sidebar .Row,
 	#sidebar-left .Row,
 	#sidebar-right .Row,
 	#sidebar-bottom .Row {
 		display: flex;
 		align-items: center;
-		min-height: 24px;
-		margin-bottom: 10px;
+		min-height: 26px;
+		margin-bottom: 2px;
+		padding: 2px 0;
 	}
 
-	#sidebar .Row .Label,
-	#sidebar-left .Row .Label,
-	#sidebar-right .Row .Label,
-	#sidebar-bottom .Row .Label {
+	/* Main label - fixed width */
+	#sidebar .Row .Label:first-child,
+	#sidebar-left .Row .Label:first-child,
+	#sidebar-right .Row .Label:first-child,
+	#sidebar-bottom .Row .Label:first-child {
 		width: 120px;
+		flex-shrink: 0;
+		font-size: 11px;
+		color: #aaa;
+		text-align: left;
+		padding: 0;
+		margin: 0;
 	}
 
-#tabs {
-	background-color: #ddd;
-	border-top: 1px solid #ccc;
-}
+	/* Sub-labels (Min/Max, X/Y/Z) */
+	#sidebar .Row .Label:not(:first-child),
+	#sidebar-left .Row .Label:not(:first-child),
+	#sidebar-right .Row .Label:not(:first-child),
+	#sidebar-bottom .Row .Label:not(:first-child) {
+		font-size: 9px;
+		text-align: center;
+		color: #777;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.3px;
+		flex-shrink: 0;
+		width: 32px;
+		margin-right: 4px;
+	}
+
+	#sidebar .Row input.Number,
+	#sidebar-left .Row input.Number,
+	#sidebar-right .Row input.Number,
+	#sidebar-bottom .Row input.Number {
+		width: 65px;
+		flex-shrink: 0;
+		font-size: 11px;
+		text-align: left;
+		padding: 4px 8px;
+		background: rgba(0, 0, 0, 0.15);
+		border: 1px solid transparent;
+		border-radius: 3px;
+		margin: 0 6px 0 0;
+		transition: all 0.15s ease;
+		box-sizing: border-box;
+	}
+	
+	/* First input after label - no left margin */
+	#sidebar .Row .Label:first-child + input.Number,
+	#sidebar-left .Row .Label:first-child + input.Number,
+	#sidebar-right .Row .Label:first-child + input.Number,
+	#sidebar-bottom .Row .Label:first-child + input.Number {
+		margin-left: 0;
+	}
+	
+	#sidebar .Row input.Number:hover,
+	#sidebar-left .Row input.Number:hover,
+	#sidebar-right .Row input.Number:hover,
+	#sidebar-bottom .Row input.Number:hover {
+		background: rgba(0, 0, 0, 0.2);
+		border-color: rgba(0, 136, 255, 0.3);
+	}
+	
+	#sidebar .Row input.Number:focus,
+	#sidebar-left .Row input.Number:focus,
+	#sidebar-right .Row input.Number:focus,
+	#sidebar-bottom .Row input.Number:focus {
+		background: rgba(0, 0, 0, 0.25);
+		border-color: rgba(0, 136, 255, 0.6);
+		outline: none;
+	}
+	
+	#sidebar .Row input[type="checkbox"],
+	#sidebar-left .Row input[type="checkbox"],
+	#sidebar-right .Row input[type="checkbox"],
+	#sidebar-bottom .Row input[type="checkbox"] {
+		margin: 0 0 0 7px;
+		width: 18px;
+		height: 18px;
+		flex-shrink: 0;
+		cursor: pointer;
+	}
+	
+	#sidebar .Row select,
+	#sidebar-left .Row select,
+	#sidebar-right .Row select,
+	#sidebar-bottom .Row select {
+		font-size: 11px;
+		padding: 4px 8px;
+		background: rgba(0, 0, 0, 0.15);
+		border: 1px solid transparent;
+		border-radius: 3px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		min-width: 120px;
+		margin: 0 0 0 0;
+	}
+	
+	
+	#sidebar .Row select:hover,
+	#sidebar-left .Row select:hover,
+	#sidebar-right .Row select:hover,
+	#sidebar-bottom .Row select:hover {
+		background: rgba(0, 0, 0, 0.2);
+		border-color: rgba(0, 136, 255, 0.3);
+	}
+	
+	#sidebar .Row input[type="color"],
+	#sidebar-left .Row input[type="color"],
+	#sidebar-right .Row input[type="color"],
+	#sidebar-bottom .Row input[type="color"] {
+		width: 70px;
+		height: 26px;
+		flex-shrink: 0;
+		padding: 2px;
+		border: 1px solid rgba(0, 0, 0, 0.2);
+		border-radius: 3px;
+		cursor: pointer;
+		transition: all 0.15s ease;
+		margin: 0 0 0 10px;
+	}
+	
+	/* First color input after label - no left margin */
+	#sidebar .Row .Label:first-child + input[type="color"],
+	#sidebar-left .Row .Label:first-child + input[type="color"],
+	#sidebar-right .Row .Label:first-child + input[type="color"],
+	#sidebar-bottom .Row .Label:first-child + input[type="color"] {
+		margin-left: 5px;
+	}
 
 	#tabs span {
 		color: #aaa;
@@ -885,6 +1030,19 @@ select {
 
 	.Outliner .option.active {
 		background-color: rgba(0,0,0,0.04);
+	}
+	
+	.Outliner .option.system-entity {
+		opacity: 0.7;
+		cursor: not-allowed;
+	}
+	
+	.Outliner .option.system-entity .system-entity-name {
+		color: #999;
+	}
+	
+	.Outliner .option.system-entity .system-entity-type {
+		opacity: 0.6;
 	}
 
 
@@ -1067,6 +1225,19 @@ select {
 
 		.Outliner .option.active {
 			background-color: rgba(21,60,94,1);
+		}
+		
+		.Outliner .option.system-entity {
+			opacity: 0.7;
+			cursor: not-allowed;
+		}
+		
+		.Outliner .option.system-entity .system-entity-name {
+			color: #666;
+		}
+		
+		.Outliner .option.system-entity .system-entity-type {
+			opacity: 0.6;
 		}
 
 	.TabbedPanel .Tabs {

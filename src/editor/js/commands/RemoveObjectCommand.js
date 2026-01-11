@@ -35,6 +35,10 @@ class RemoveObjectCommand extends Command {
 
 	execute() {
 
+		if ( this.object && ( this.object.type === 'BatchedRenderer' || this.object.name === 'BatchedRenderer' ) ) {
+			return;
+		}
+
 		this.editor.removeObject( this.object );
 		this.editor.deselect();
 

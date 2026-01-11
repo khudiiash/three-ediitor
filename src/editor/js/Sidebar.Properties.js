@@ -22,6 +22,11 @@ function SidebarProperties( editor ) {
 	const scriptContent = new SidebarScript( editor );
 	scriptPanel.add( scriptContent );
 	scriptPanel.collapse();
+	
+	if ( scriptPanel.dom && scriptPanel.dom.style ) {
+		scriptPanel.dom.style.paddingLeft = '0px';
+		scriptPanel.dom.style.marginLeft = '0px';
+	}
 
 	inspectorPanel.add( objectPanels );
 	inspectorPanel.add( scriptPanel );

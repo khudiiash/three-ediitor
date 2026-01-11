@@ -478,6 +478,7 @@ function MenubarAdd( editor ) {
 		const light = new THREE.DirectionalLight( color, intensity );
 		light.name = 'DirectionalLight';
 		light.target.name = 'DirectionalLight Target';
+		light.target.userData.skipSerialization = true;
 
 		light.position.set( 5, 10, 7.5 );
 
@@ -542,6 +543,7 @@ function MenubarAdd( editor ) {
 		const light = new THREE.SpotLight( color, intensity, distance, angle, penumbra );
 		light.name = 'SpotLight';
 		light.target.name = 'SpotLight Target';
+		light.target.userData.skipSerialization = true;
 
 		light.position.set( 5, 10, 7.5 );
 
@@ -655,6 +657,55 @@ function MenubarAdd( editor ) {
 
 	} );
 	cameraSubmenu.add( option );
+
+	// Particle System
+
+	option = new UIRow();
+	option.setClass( 'option' );
+	option.setTextContent( 'Particle System' );
+	option.onClick( function () {
+
+		const object = new THREE.Object3D();
+		object.type = 'ParticleSystem';
+		object.name = 'ParticleSystem';
+		object.userData.isParticleSystem = true;
+		object.userData.particleSystem = {
+			duration: 1,
+			looping: true,
+			maxParticle: 1000,
+			emissionRate: 10,
+			startLifeMin: 0.1,
+			startLifeMax: 0.2,
+			startSpeedMin: 1,
+			startSpeedMax: 1,
+			startRotationMin: 0,
+			startRotationMax: 0,
+			startSizeMin: 0.1,
+			startSizeMax: 0.3,
+			endSizeMin: 0.1,
+			endSizeMax: 0.3,
+			startColorR: 1, startColorG: 1, startColorB: 1, startColorA: 1,
+			endColorR: 1, endColorG: 1, endColorB: 1, endColorA: 1,
+			materialColor: 0xffffff,
+			worldSpace: true,
+			renderMode: 0,
+			emitterShape: 'point',
+			emitterSizeX: 1,
+			emitterSizeY: 1,
+			emitterSizeZ: 1,
+			directionX: 0,
+			directionY: 1,
+			directionZ: 0,
+			spreadAngle: 0,
+			gravityX: 0,
+			gravityY: -9.81,
+			gravityZ: 0
+		};
+
+		editor.execute( new AddObjectCommand( editor, object ) );
+
+	} );
+	options.add( option );
 
 	return container;
 

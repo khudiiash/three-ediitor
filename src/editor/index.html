@@ -20,6 +20,8 @@
 					"three/examples/": "./examples/",
 					"three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js",
 					"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js",
+					"quarks.core": "https://cdn.jsdelivr.net/npm/quarks.core@0.16.0/dist/quarks.core.esm.js",
+					"three.quarks": "https://cdn.jsdelivr.net/npm/three.quarks@0.16.0/dist/three.quarks.esm.js",
 					"@engine/": "../engine/dist/"
 				}
 			}
@@ -168,6 +170,11 @@
 					if ( editor.storage.setProjectPath ) {
 						editor.storage.setProjectPath( projectPath );
 					}
+					
+					// Load project config
+					if ( editor.config && editor.config.loadProjectConfig ) {
+						editor.config.loadProjectConfig();
+					}
 
 					// Load the scene from the project directory
 					// Note: We use editor.storage.get() which handles path conversion
@@ -202,7 +209,7 @@
 								
 								try {
 									
-									if ( state !== undefined ) {
+									if ( state !== undefined && state.scene ) {
 										
 										// Clear any existing scene before loading
 										editor.clear();
@@ -234,10 +241,24 @@
 									
 								} catch ( error ) {
 									
+									if ( error && typeof error === 'object' && error.type === 'error' && error.target && error.target.tagName === 'IMG' ) {
+										console.warn( '[Editor] Image loading error (non-critical):', error.target.src || error.target );
+									} else if ( error && typeof error === 'object' && error.type === 'error' ) {
+										console.warn( '[Editor] Resource loading error (non-critical):', error.target || error );
+									} else {
+										console.error( '[Editor] Error loading scene:', error );
+									}
+									
 									editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
 									shouldHideOverlay = true;
 									loadingOverlay.style.display = 'none';
-									reject( error );
+									
+									if ( error && typeof error === 'object' && error.type === 'error' ) {
+										resolve();
+									} else {
+										console.error( '[Editor] Critical error loading scene, not clearing scene to prevent data loss' );
+										resolve();
+									}
 									
 								}
 								

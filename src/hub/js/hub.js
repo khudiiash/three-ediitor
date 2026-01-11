@@ -368,7 +368,7 @@ function showProjectMenu(path, event) {
 	
 	const menu = document.createElement('div');
 	menu.style.cssText = 'position: fixed; background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 120px;';
-	menu.style.left = event.clientX + 'px';
+	menu.style.left = (event.clientX - 120) + 'px';
 	menu.style.top = event.clientY + 'px';
 	
 	const deleteBtn = document.createElement('button');

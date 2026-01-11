@@ -29,12 +29,12 @@ function SidebarProjectVideo( editor ) {
 
 	resolutionRow.add( new UIText( strings.getKey( 'sidebar/project/resolution' ) ).setClass( 'Label' ) );
 
-	const videoWidth = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '28px' ).setStep( 2 ).onChange( toDiv2 );
+	const videoWidth = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' ).setStep( 2 ).onChange( toDiv2 );
 	resolutionRow.add( videoWidth );
 
 	resolutionRow.add( new UIText( '×' ).setTextAlign( 'center' ).setFontSize( '12px' ).setWidth( '12px' ) );
 
-	const videoHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '28px' ).setStep( 2 ).onChange( toDiv2 );
+	const videoHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' ).setStep( 2 ).onChange( toDiv2 );
 	resolutionRow.add( videoHeight );
 
 	const videoFPS = new UIInteger( 30 ).setTextAlign( 'center' ).setWidth( '20px' );

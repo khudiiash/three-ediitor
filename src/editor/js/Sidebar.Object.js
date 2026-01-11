@@ -29,6 +29,7 @@ function SidebarObject( editor ) {
 	const meshPanel = new UICollapsiblePanel( 'Mesh' );
 	const lightPanel = new UICollapsiblePanel( 'Light' );
 	const cameraPanel = new UICollapsiblePanel( 'Camera' );
+	const particlePanel = new UICollapsiblePanel( 'Particles' );
 
 	const geometryPanel = new UICollapsiblePanel( 'Geometry' );
 	const materialPanel = new UICollapsiblePanel( 'Material' );
@@ -49,12 +50,14 @@ function SidebarObject( editor ) {
 	meshPanel.collapse();
 	lightPanel.collapse();
 	cameraPanel.collapse();
+	particlePanel.collapse();
 
 	const panelsContainer = new UIPanel();
 	panelsContainer.add( entityPanel );
 	panelsContainer.add( meshPanel );
 	panelsContainer.add( lightPanel );
 	panelsContainer.add( cameraPanel );
+	panelsContainer.add( particlePanel );
 
 	const objectTypeRow = new UIRow();
 	const objectType = new UIText();
@@ -64,6 +67,9 @@ function SidebarObject( editor ) {
 
 	const objectNameRow = new UIRow();
 	const objectName = new UIInput().setWidth( '150px' ).setFontSize( '12px' ).onChange( function () {
+		if ( editor.selected && ( editor.selected.type === 'BatchedRenderer' || editor.selected.name === 'BatchedRenderer' ) ) {
+			return;
+		}
 		editor.execute( new SetValueCommand( editor, editor.selected, 'name', objectName.getValue() ) );
 	} );
 	objectNameRow.add( new UIText( strings.getKey( 'sidebar/object/name' ) || 'Name' ).setClass( 'Label' ) );
@@ -71,17 +77,23 @@ function SidebarObject( editor ) {
 	entityPanel.add( objectNameRow );
 
 	const objectPositionRow = new UIRow();
-	const objectPositionX = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
-	const objectPositionY = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
-	const objectPositionZ = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( update );
+	const objectPositionX = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( updateTransformImmediate );
+	const objectPositionY = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( updateTransformImmediate );
+	const objectPositionZ = new UINumber().setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( updateTransformImmediate );
+	objectPositionX.dom.addEventListener( 'blur', update );
+	objectPositionY.dom.addEventListener( 'blur', update );
+	objectPositionZ.dom.addEventListener( 'blur', update );
 	objectPositionRow.add( new UIText( strings.getKey( 'sidebar/object/position' ) || 'Position' ).setClass( 'Label' ) );
 	objectPositionRow.add( objectPositionX, objectPositionY, objectPositionZ );
 	entityPanel.add( objectPositionRow );
 
 	const objectRotationRow = new UIRow();
-	const objectRotationX = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
-	const objectRotationY = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
-	const objectRotationZ = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( update );
+	const objectRotationX = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( updateTransformImmediate );
+	const objectRotationY = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( updateTransformImmediate );
+	const objectRotationZ = new UIInteger().setStep( 1 ).setNudge( 1 ).setCtrlStep( 45 ).setCtrlNudge( 45 ).setUnit( '°' ).setWidth( '50px' ).onChange( updateTransformImmediate );
+	objectRotationX.dom.addEventListener( 'blur', update );
+	objectRotationY.dom.addEventListener( 'blur', update );
+	objectRotationZ.dom.addEventListener( 'blur', update );
 	objectRotationRow.add( new UIText( strings.getKey( 'sidebar/object/rotation' ) || 'Rotation' ).setClass( 'Label' ) );
 	objectRotationRow.add( objectRotationX, objectRotationY, objectRotationZ );
 	entityPanel.add( objectRotationRow );
@@ -97,7 +109,7 @@ function SidebarObject( editor ) {
 			objectScaleY.setValue( value );
 			objectScaleZ.setValue( value );
 		}
-		update();
+		updateTransformImmediate();
 	} );
 	const objectScaleY = new UINumber( 1 ).setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( function () {
 		if ( scaleLocked ) {
@@ -105,7 +117,7 @@ function SidebarObject( editor ) {
 			objectScaleX.setValue( value );
 			objectScaleZ.setValue( value );
 		}
-		update();
+		updateTransformImmediate();
 	} );
 	const objectScaleZ = new UINumber( 1 ).setPrecision( 2 ).setWidth( '50px' ).setCtrlStep( 1 ).setCtrlNudge( 1 ).onChange( function () {
 		if ( scaleLocked ) {
@@ -113,8 +125,11 @@ function SidebarObject( editor ) {
 			objectScaleX.setValue( value );
 			objectScaleY.setValue( value );
 		}
-		update();
+		updateTransformImmediate();
 	} );
+	objectScaleX.dom.addEventListener( 'blur', update );
+	objectScaleY.dom.addEventListener( 'blur', update );
+	objectScaleZ.dom.addEventListener( 'blur', update );
 	objectScaleRow.add( new UIText( strings.getKey( 'sidebar/object/scale' ) || 'Scale' ).setClass( 'Label' ) );
 	objectScaleRow.add( scaleLockCheckbox );
 	objectScaleRow.add( objectScaleX, objectScaleY, objectScaleZ );
@@ -206,6 +221,308 @@ function SidebarObject( editor ) {
 	objectFarRow.add( objectFar );
 	cameraPanel.add( objectFarRow );
 
+	const particleDurationRow = new UIRow();
+	const particleDuration = new UINumber( 1 ).setRange( 0, Infinity ).onChange( update );
+	particleDurationRow.add( new UIText( 'Duration' ).setClass( 'Label' ) );
+	particleDurationRow.add( particleDuration );
+	particlePanel.add( particleDurationRow );
+
+	const particleLoopingRow = new UIRow();
+	const particleLooping = new UICheckbox( true ).onChange( update );
+	particleLoopingRow.add( new UIText( 'Looping' ).setClass( 'Label' ) );
+	particleLoopingRow.add( particleLooping );
+	particlePanel.add( particleLoopingRow );
+
+	const particlePrewarmRow = new UIRow();
+	const particlePrewarm = new UICheckbox( false ).onChange( update );
+	particlePrewarmRow.add( new UIText( 'Prewarm' ).setClass( 'Label' ) );
+	particlePrewarmRow.add( particlePrewarm );
+	particlePanel.add( particlePrewarmRow );
+
+	const particleAutoDestroyRow = new UIRow();
+	const particleAutoDestroy = new UICheckbox( false ).onChange( update );
+	particleAutoDestroyRow.add( new UIText( 'Auto Destroy' ).setClass( 'Label' ) );
+	particleAutoDestroyRow.add( particleAutoDestroy );
+	particlePanel.add( particleAutoDestroyRow );
+
+	const particleMaxParticleRow = new UIRow();
+	const particleMaxParticle = new UINumber( 1000 ).setRange( 1, 100000 ).onChange( update );
+	particleMaxParticleRow.add( new UIText( 'Max Particles' ).setClass( 'Label' ) );
+	particleMaxParticleRow.add( particleMaxParticle );
+	particlePanel.add( particleMaxParticleRow );
+
+	const particleEmissionRateRow = new UIRow();
+	const particleEmissionRate = new UINumber( 10 ).setRange( 0, Infinity ).onChange( update );
+	particleEmissionRateRow.add( new UIText( 'Emission Over Time' ).setClass( 'Label' ) );
+	particleEmissionRateRow.add( particleEmissionRate );
+	particlePanel.add( particleEmissionRateRow );
+
+	const particleEmissionOverDistanceRow = new UIRow();
+	const particleEmissionOverDistance = new UINumber( 0 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	particleEmissionOverDistanceRow.add( new UIText( 'Emission Over Distance' ).setClass( 'Label' ) );
+	particleEmissionOverDistanceRow.add( particleEmissionOverDistance );
+	particlePanel.add( particleEmissionOverDistanceRow );
+
+	const particleStartLifeRow = new UIRow();
+	const particleStartLifeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 3 ).onChange( update );
+	const particleStartLifeMax = new UINumber( 0.2 ).setRange( 0, Infinity ).setPrecision( 3 ).onChange( update );
+	particleStartLifeRow.add( new UIText( 'Start Life' ).setClass( 'Label' ) );
+	particleStartLifeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
+	particleStartLifeRow.add( particleStartLifeMin.setWidth( '60px' ) );
+	particleStartLifeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
+	particleStartLifeRow.add( particleStartLifeMax.setWidth( '60px' ) );
+	particlePanel.add( particleStartLifeRow );
+
+	const particleStartSpeedRow = new UIRow();
+	const particleStartSpeedMin = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const particleStartSpeedMax = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	particleStartSpeedRow.add( new UIText( 'Start Speed' ).setClass( 'Label' ) );
+	particleStartSpeedRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
+	particleStartSpeedRow.add( particleStartSpeedMin.setWidth( '60px' ) );
+	particleStartSpeedRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
+	particleStartSpeedRow.add( particleStartSpeedMax.setWidth( '60px' ) );
+	particlePanel.add( particleStartSpeedRow );
+
+	const particleStartRotationRow = new UIRow();
+	const particleStartRotationMin = new UINumber( 0 ).setRange( -360, 360 ).setPrecision( 1 ).onChange( update );
+	const particleStartRotationMax = new UINumber( 0 ).setRange( -360, 360 ).setPrecision( 1 ).onChange( update );
+	particleStartRotationRow.add( new UIText( 'Start Rotation' ).setClass( 'Label' ) );
+	particleStartRotationRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
+	particleStartRotationRow.add( particleStartRotationMin.setWidth( '60px' ) );
+	particleStartRotationRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
+	particleStartRotationRow.add( particleStartRotationMax.setWidth( '60px' ) );
+	particlePanel.add( particleStartRotationRow );
+
+	const particleStartSizeRow = new UIRow();
+	const particleStartSizeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const particleStartSizeMax = new UINumber( 0.3 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	particleStartSizeRow.add( new UIText( 'Start Size' ).setClass( 'Label' ) );
+	particleStartSizeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
+	particleStartSizeRow.add( particleStartSizeMin.setWidth( '60px' ) );
+	particleStartSizeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
+	particleStartSizeRow.add( particleStartSizeMax.setWidth( '60px' ) );
+	particlePanel.add( particleStartSizeRow );
+
+	const particleStartColorRow = new UIRow();
+	const particleStartColor = new UIColor().onInput( update );
+	particleStartColorRow.add( new UIText( 'Start Color' ).setClass( 'Label' ) );
+	particleStartColorRow.add( particleStartColor );
+	particlePanel.add( particleStartColorRow );
+
+	const particleEndColorRow = new UIRow();
+	const particleEndColor = new UIColor().onInput( update );
+	particleEndColorRow.add( new UIText( 'End Color' ).setClass( 'Label' ) );
+	particleEndColorRow.add( particleEndColor );
+	particlePanel.add( particleEndColorRow );
+
+	const particleEndSizeRow = new UIRow();
+	const particleEndSizeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const particleEndSizeMax = new UINumber( 0.3 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	particleEndSizeRow.add( new UIText( 'End Size' ).setClass( 'Label' ) );
+	particleEndSizeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
+	particleEndSizeRow.add( particleEndSizeMin.setWidth( '60px' ) );
+	particleEndSizeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
+	particleEndSizeRow.add( particleEndSizeMax.setWidth( '60px' ) );
+	particlePanel.add( particleEndSizeRow );
+
+	const particleMaterialColorRow = new UIRow();
+	const particleMaterialColor = new UIColor().onInput( update );
+	particleMaterialColorRow.add( new UIText( 'Material Color' ).setClass( 'Label' ) );
+	particleMaterialColorRow.add( particleMaterialColor );
+	particlePanel.add( particleMaterialColorRow );
+
+	const particleWorldSpaceRow = new UIRow();
+	const particleWorldSpace = new UICheckbox( false ).onChange( update );
+	particleWorldSpaceRow.add( new UIText( 'World Space' ).setClass( 'Label' ) );
+	particleWorldSpaceRow.add( particleWorldSpace );
+	particlePanel.add( particleWorldSpaceRow );
+
+	const particleRenderModeRow = new UIRow();
+	const particleRenderMode = new UISelect().setOptions( {
+		'0': 'Billboard',
+		'1': 'Stretched Billboard',
+		'2': 'Mesh',
+		'3': 'Trail',
+		'4': 'Horizontal Billboard',
+		'5': 'Vertical Billboard'
+	} ).onChange( update );
+	particleRenderModeRow.add( new UIText( 'Render Mode' ).setClass( 'Label' ) );
+	particleRenderModeRow.add( particleRenderMode );
+	particlePanel.add( particleRenderModeRow );
+
+	const particleUTileCountRow = new UIRow();
+	const particleUTileCount = new UINumber( 1 ).setRange( 1, 100 ).onChange( update );
+	particleUTileCountRow.add( new UIText( 'U Tile Count' ).setClass( 'Label' ) );
+	particleUTileCountRow.add( particleUTileCount );
+	particlePanel.add( particleUTileCountRow );
+
+	const particleVTileCountRow = new UIRow();
+	const particleVTileCount = new UINumber( 1 ).setRange( 1, 100 ).onChange( update );
+	particleVTileCountRow.add( new UIText( 'V Tile Count' ).setClass( 'Label' ) );
+	particleVTileCountRow.add( particleVTileCount );
+	particlePanel.add( particleVTileCountRow );
+
+	const particleStartTileIndexRow = new UIRow();
+	const particleStartTileIndex = new UINumber( 0 ).setRange( 0, 10000 ).onChange( update );
+	particleStartTileIndexRow.add( new UIText( 'Start Tile Index' ).setClass( 'Label' ) );
+	particleStartTileIndexRow.add( particleStartTileIndex );
+	particlePanel.add( particleStartTileIndexRow );
+
+	const particleEmitterShapeRow = new UIRow();
+	const particleEmitterShape = new UISelect().setOptions( {
+		'point': 'Point',
+		'box': 'Box',
+		'sphere': 'Sphere',
+		'cone': 'Cone'
+	} ).onChange( update );
+	particleEmitterShapeRow.add( new UIText( 'Emitter Shape' ).setClass( 'Label' ) );
+	particleEmitterShapeRow.add( particleEmitterShape );
+	particlePanel.add( particleEmitterShapeRow );
+
+	const particleEmitterSizeRow = new UIRow();
+	const particleEmitterSizeX = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const particleEmitterSizeY = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const particleEmitterSizeZ = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	particleEmitterSizeRow.add( new UIText( 'Emitter Size' ).setClass( 'Label' ) );
+	particleEmitterSizeRow.add( new UIText( 'X' ).setClass( 'Label vector-label' ) );
+	particleEmitterSizeRow.add( particleEmitterSizeX.setWidth( '50px' ) );
+	particleEmitterSizeRow.add( new UIText( 'Y' ).setClass( 'Label vector-label' ) );
+	particleEmitterSizeRow.add( particleEmitterSizeY.setWidth( '50px' ) );
+	particleEmitterSizeRow.add( new UIText( 'Z' ).setClass( 'Label vector-label' ) );
+	particleEmitterSizeRow.add( particleEmitterSizeZ.setWidth( '50px' ) );
+	particlePanel.add( particleEmitterSizeRow );
+
+	const particleDirectionRow = new UIRow();
+	const particleDirectionX = new UINumber( 0 ).setRange( -1, 1 ).setPrecision( 2 ).onChange( update );
+	const particleDirectionY = new UINumber( 1 ).setRange( -1, 1 ).setPrecision( 2 ).onChange( update );
+	const particleDirectionZ = new UINumber( 0 ).setRange( -1, 1 ).setPrecision( 2 ).onChange( update );
+	particleDirectionRow.add( new UIText( 'Direction' ).setClass( 'Label' ) );
+	particleDirectionRow.add( new UIText( 'X' ).setClass( 'Label vector-label' ) );
+	particleDirectionRow.add( particleDirectionX.setWidth( '50px' ) );
+	particleDirectionRow.add( new UIText( 'Y' ).setClass( 'Label vector-label' ) );
+	particleDirectionRow.add( particleDirectionY.setWidth( '50px' ) );
+	particleDirectionRow.add( new UIText( 'Z' ).setClass( 'Label vector-label' ) );
+	particleDirectionRow.add( particleDirectionZ.setWidth( '50px' ) );
+	particlePanel.add( particleDirectionRow );
+
+	const particleSpreadAngleRow = new UIRow();
+	const particleSpreadAngle = new UINumber( 0 ).setRange( 0, 180 ).setPrecision( 1 ).onChange( update );
+	particleSpreadAngleRow.add( new UIText( 'Spread Angle' ).setClass( 'Label' ) );
+	particleSpreadAngleRow.add( particleSpreadAngle );
+	particlePanel.add( particleSpreadAngleRow );
+
+	const behaviorsContainer = new UIPanel();
+	behaviorsContainer.setClass( 'Panel' );
+	
+	const behaviorsHeaderRow = new UIRow();
+	behaviorsHeaderRow.add( new UIText( 'Behaviors' ).setClass( 'Label' ) );
+	const addBehaviorButton = new UIButton( '+' ).setWidth( '30px' ).setHeight( '24px' );
+	addBehaviorButton.onClick( function() {
+		const behaviorTypes = {
+			'ColorOverLife': 'Color Over Life',
+			'ColorBySpeed': 'Color By Speed',
+			'SizeOverLife': 'Size Over Life',
+			'SizeBySpeed': 'Size By Speed',
+			'RotationOverLife': 'Rotation Over Life',
+			'Rotation3DOverLife': 'Rotation 3D Over Life',
+			'RotationBySpeed': 'Rotation By Speed',
+			'FrameOverLife': 'Frame Over Life',
+			'WidthOverLength': 'Width Over Length',
+			'Gravity': 'Gravity',
+			'ApplyForce': 'Apply Force',
+			'TurbulenceField': 'Turbulence Field'
+		};
+		
+		const behaviorSelect = new UISelect().setOptions( behaviorTypes );
+		const selectRow = new UIRow();
+		selectRow.add( behaviorSelect );
+		behaviorsContainer.add( selectRow );
+		
+		behaviorSelect.onChange( function() {
+			const behaviorType = this.getValue();
+			const object = editor.selected;
+			if ( object && object.userData && object.userData.isParticleSystem ) {
+				if ( !object.userData.particleSystem.behaviors ) {
+					object.userData.particleSystem.behaviors = [];
+				}
+				const behavior = { type: behaviorType, enabled: true };
+				object.userData.particleSystem.behaviors.push( behavior );
+				createBehaviorUI( behavior, behaviorsContainer, selectRow );
+				selectRow.remove( behaviorSelect );
+				update();
+			}
+		} );
+	} );
+	behaviorsHeaderRow.add( addBehaviorButton );
+	behaviorsContainer.add( behaviorsHeaderRow );
+	
+	function createBehaviorUI( behavior, container, insertBefore ) {
+		const behaviorRow = new UIRow();
+		behaviorRow.dom.style.marginBottom = '4px';
+		behaviorRow.dom.style.padding = '4px';
+		behaviorRow.dom.style.backgroundColor = 'rgba(0,0,0,0.1)';
+		behaviorRow.dom.style.borderRadius = '2px';
+		
+		const behaviorName = new UIText( behavior.type );
+		behaviorName.setWidth( '140px' );
+		behaviorRow.add( behaviorName );
+		
+		const removeButton = new UIButton( '×' ).setWidth( '24px' ).setHeight( '24px' );
+		removeButton.onClick( function() {
+			const object = editor.selected;
+			if ( object && object.userData && object.userData.isParticleSystem ) {
+				const behaviors = object.userData.particleSystem.behaviors;
+				if ( behaviors ) {
+					const index = behaviors.indexOf( behavior );
+					if ( index !== -1 ) {
+						behaviors.splice( index, 1 );
+					}
+				}
+				container.remove( behaviorRow );
+				update();
+			}
+		} );
+		behaviorRow.add( removeButton );
+		
+		if ( behavior.type === 'Gravity' ) {
+			if ( !behavior.gravityX ) behavior.gravityX = 0;
+			if ( !behavior.gravityY ) behavior.gravityY = -9.81;
+			if ( !behavior.gravityZ ) behavior.gravityZ = 0;
+			
+			const gravityX = new UINumber( behavior.gravityX ).setRange( -10, 10 ).setPrecision( 2 ).setWidth( '50px' );
+			const gravityY = new UINumber( behavior.gravityY ).setRange( -10, 10 ).setPrecision( 2 ).setWidth( '50px' );
+			const gravityZ = new UINumber( behavior.gravityZ ).setRange( -10, 10 ).setPrecision( 2 ).setWidth( '50px' );
+			
+			gravityX.onChange( function() {
+				behavior.gravityX = this.getValue();
+				update();
+			} );
+			gravityY.onChange( function() {
+				behavior.gravityY = this.getValue();
+				update();
+			} );
+			gravityZ.onChange( function() {
+				behavior.gravityZ = this.getValue();
+				update();
+			} );
+			
+			behaviorRow.add( new UIText( 'X' ).setClass( 'Label vector-label' ) );
+			behaviorRow.add( gravityX );
+			behaviorRow.add( new UIText( 'Y' ).setClass( 'Label vector-label' ) );
+			behaviorRow.add( gravityY );
+			behaviorRow.add( new UIText( 'Z' ).setClass( 'Label vector-label' ) );
+			behaviorRow.add( gravityZ );
+		}
+		
+		if ( insertBefore ) {
+			container.dom.insertBefore( behaviorRow.dom, insertBefore.dom );
+		} else {
+			container.add( behaviorRow );
+		}
+	}
+	
+	particlePanel.add( behaviorsContainer );
+
 	const objectIntensityRow = new UIRow();
 	const objectIntensity = new UINumber().onChange( update );
 	objectIntensityRow.add( new UIText( strings.getKey( 'sidebar/object/intensity' ) || 'Intensity' ).setClass( 'Label' ) );
@@ -247,6 +564,30 @@ function SidebarObject( editor ) {
 	objectDecayRow.add( new UIText( strings.getKey( 'sidebar/object/decay' ) || 'Decay' ).setClass( 'Label' ) );
 	objectDecayRow.add( objectDecay );
 	lightPanel.add( objectDecayRow );
+
+	const lightCastShadowRow = new UIRow();
+	const lightCastShadow = new UICheckbox( false ).onChange( update );
+	lightCastShadowRow.add( new UIText( 'Cast Shadow' ).setClass( 'Label' ) );
+	lightCastShadowRow.add( lightCastShadow );
+	lightPanel.add( lightCastShadowRow );
+
+	const objectWidthRow = new UIRow();
+	const objectWidth = new UINumber().setRange( 0, Infinity ).onChange( update );
+	objectWidthRow.add( new UIText( 'Width' ).setClass( 'Label' ) );
+	objectWidthRow.add( objectWidth );
+	lightPanel.add( objectWidthRow );
+
+	const objectHeightRow = new UIRow();
+	const objectHeight = new UINumber().setRange( 0, Infinity ).onChange( update );
+	objectHeightRow.add( new UIText( 'Height' ).setClass( 'Label' ) );
+	objectHeightRow.add( objectHeight );
+	lightPanel.add( objectHeightRow );
+
+	const objectPowerRow = new UIRow();
+	const objectPower = new UINumber().setRange( 0, Infinity ).onChange( update );
+	objectPowerRow.add( new UIText( 'Power' ).setClass( 'Label' ) );
+	objectPowerRow.add( objectPower );
+	lightPanel.add( objectPowerRow );
 
 	const objectShadowRow = new UIRow();
 	objectShadowRow.add( new UIText( strings.getKey( 'sidebar/object/shadow' ) || 'Shadow' ).setClass( 'Label' ) );
@@ -348,6 +689,27 @@ function SidebarObject( editor ) {
 	//
 
 	let updateTimeout = null;
+
+	function updateTransformImmediate() {
+
+		const object = editor.selected;
+
+		if ( object !== null ) {
+
+			const newPosition = new THREE.Vector3( objectPositionX.getValue(), objectPositionY.getValue(), objectPositionZ.getValue() );
+			object.position.copy( newPosition );
+
+			const newRotation = new THREE.Euler( objectRotationX.getValue() * THREE.MathUtils.DEG2RAD, objectRotationY.getValue() * THREE.MathUtils.DEG2RAD, objectRotationZ.getValue() * THREE.MathUtils.DEG2RAD );
+			object.rotation.copy( newRotation );
+
+			const newScale = new THREE.Vector3( objectScaleX.getValue(), objectScaleY.getValue(), objectScaleZ.getValue() );
+			object.scale.copy( newScale );
+
+			signals.objectChanged.dispatch( object );
+
+		}
+
+	}
 
 	function update() {
 
@@ -491,6 +853,31 @@ function SidebarObject( editor ) {
 
 			}
 
+			if ( ( object.isDirectionalLight || object.isSpotLight || object.isPointLight ) && 
+				object.castShadow !== undefined && object.castShadow !== lightCastShadow.getValue() ) {
+
+				editor.execute( new SetValueCommand( editor, object, 'castShadow', lightCastShadow.getValue() ) );
+
+			}
+
+			if ( object.width !== undefined && Math.abs( object.width - objectWidth.getValue() ) >= 0.01 ) {
+
+				editor.execute( new SetValueCommand( editor, object, 'width', objectWidth.getValue() ) );
+
+			}
+
+			if ( object.height !== undefined && Math.abs( object.height - objectHeight.getValue() ) >= 0.01 ) {
+
+				editor.execute( new SetValueCommand( editor, object, 'height', objectHeight.getValue() ) );
+
+			}
+
+			if ( object.power !== undefined && Math.abs( object.power - objectPower.getValue() ) >= 0.01 ) {
+
+				editor.execute( new SetValueCommand( editor, object, 'power', objectPower.getValue() ) );
+
+			}
+
 			if ( object.visible !== objectVisible.getValue() ) {
 
 				editor.execute( new SetValueCommand( editor, object, 'visible', objectVisible.getValue() ) );
@@ -506,6 +893,200 @@ function SidebarObject( editor ) {
 			if ( object.renderOrder !== objectRenderOrder.getValue() ) {
 
 				editor.execute( new SetValueCommand( editor, object, 'renderOrder', objectRenderOrder.getValue() ) );
+
+			}
+
+			if ( object.userData && object.userData.isParticleSystem ) {
+
+				if ( !object.userData.particleSystem ) {
+					object.userData.particleSystem = {};
+				}
+
+				const particleData = object.userData.particleSystem;
+				let changed = false;
+
+				if ( particleData.duration === undefined || Math.abs( particleData.duration - particleDuration.getValue() ) >= 0.01 ) {
+					particleData.duration = particleDuration.getValue();
+					changed = true;
+				}
+
+				if ( particleData.looping === undefined || particleData.looping !== particleLooping.getValue() ) {
+					particleData.looping = particleLooping.getValue();
+					changed = true;
+				}
+
+				if ( particleData.prewarm === undefined || particleData.prewarm !== particlePrewarm.getValue() ) {
+					particleData.prewarm = particlePrewarm.getValue();
+					changed = true;
+				}
+
+				if ( particleData.autoDestroy === undefined || particleData.autoDestroy !== particleAutoDestroy.getValue() ) {
+					particleData.autoDestroy = particleAutoDestroy.getValue();
+					changed = true;
+				}
+
+				if ( particleData.maxParticle === undefined || particleData.maxParticle !== particleMaxParticle.getValue() ) {
+					particleData.maxParticle = particleMaxParticle.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emissionRate === undefined || Math.abs( particleData.emissionRate - particleEmissionRate.getValue() ) >= 0.01 ) {
+					particleData.emissionRate = particleEmissionRate.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emissionOverDistance === undefined || Math.abs( particleData.emissionOverDistance - particleEmissionOverDistance.getValue() ) >= 0.01 ) {
+					particleData.emissionOverDistance = particleEmissionOverDistance.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startLifeMin === undefined || Math.abs( particleData.startLifeMin - particleStartLifeMin.getValue() ) >= 0.01 ) {
+					particleData.startLifeMin = particleStartLifeMin.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startLifeMax === undefined || Math.abs( particleData.startLifeMax - particleStartLifeMax.getValue() ) >= 0.01 ) {
+					particleData.startLifeMax = particleStartLifeMax.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startSpeedMin === undefined || Math.abs( particleData.startSpeedMin - particleStartSpeedMin.getValue() ) >= 0.01 ) {
+					particleData.startSpeedMin = particleStartSpeedMin.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startSpeedMax === undefined || Math.abs( particleData.startSpeedMax - particleStartSpeedMax.getValue() ) >= 0.01 ) {
+					particleData.startSpeedMax = particleStartSpeedMax.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startRotationMin === undefined || Math.abs( particleData.startRotationMin - particleStartRotationMin.getValue() ) >= 0.01 ) {
+					particleData.startRotationMin = particleStartRotationMin.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startRotationMax === undefined || Math.abs( particleData.startRotationMax - particleStartRotationMax.getValue() ) >= 0.01 ) {
+					particleData.startRotationMax = particleStartRotationMax.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startSizeMin === undefined || Math.abs( particleData.startSizeMin - particleStartSizeMin.getValue() ) >= 0.01 ) {
+					particleData.startSizeMin = particleStartSizeMin.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startSizeMax === undefined || Math.abs( particleData.startSizeMax - particleStartSizeMax.getValue() ) >= 0.01 ) {
+					particleData.startSizeMax = particleStartSizeMax.getValue();
+					changed = true;
+				}
+
+				const startColor = new THREE.Color( particleStartColor.getHexValue() );
+				if ( particleData.startColorR === undefined || Math.abs( particleData.startColorR - startColor.r ) >= 0.01 ||
+					particleData.startColorG === undefined || Math.abs( particleData.startColorG - startColor.g ) >= 0.01 ||
+					particleData.startColorB === undefined || Math.abs( particleData.startColorB - startColor.b ) >= 0.01 ) {
+					particleData.startColorR = startColor.r;
+					particleData.startColorG = startColor.g;
+					particleData.startColorB = startColor.b;
+					particleData.startColorA = particleData.startColorA !== undefined ? particleData.startColorA : 1;
+					changed = true;
+				}
+
+				const materialColor = new THREE.Color( particleMaterialColor.getHexValue() );
+				if ( particleData.materialColor === undefined || particleData.materialColor !== materialColor.getHex() ) {
+					particleData.materialColor = materialColor.getHex();
+					changed = true;
+				}
+
+				const endColor = new THREE.Color( particleEndColor.getHexValue() );
+				if ( particleData.endColorR === undefined || Math.abs( particleData.endColorR - endColor.r ) >= 0.01 ||
+					particleData.endColorG === undefined || Math.abs( particleData.endColorG - endColor.g ) >= 0.01 ||
+					particleData.endColorB === undefined || Math.abs( particleData.endColorB - endColor.b ) >= 0.01 ) {
+					particleData.endColorR = endColor.r;
+					particleData.endColorG = endColor.g;
+					particleData.endColorB = endColor.b;
+					particleData.endColorA = particleData.endColorA !== undefined ? particleData.endColorA : 1;
+					changed = true;
+				}
+
+				if ( particleData.endSizeMin === undefined || Math.abs( particleData.endSizeMin - particleEndSizeMin.getValue() ) >= 0.01 ) {
+					particleData.endSizeMin = particleEndSizeMin.getValue();
+					changed = true;
+				}
+
+				if ( particleData.endSizeMax === undefined || Math.abs( particleData.endSizeMax - particleEndSizeMax.getValue() ) >= 0.01 ) {
+					particleData.endSizeMax = particleEndSizeMax.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emitterShape === undefined || particleData.emitterShape !== particleEmitterShape.getValue() ) {
+					particleData.emitterShape = particleEmitterShape.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emitterSizeX === undefined || Math.abs( particleData.emitterSizeX - particleEmitterSizeX.getValue() ) >= 0.01 ) {
+					particleData.emitterSizeX = particleEmitterSizeX.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emitterSizeY === undefined || Math.abs( particleData.emitterSizeY - particleEmitterSizeY.getValue() ) >= 0.01 ) {
+					particleData.emitterSizeY = particleEmitterSizeY.getValue();
+					changed = true;
+				}
+
+				if ( particleData.emitterSizeZ === undefined || Math.abs( particleData.emitterSizeZ - particleEmitterSizeZ.getValue() ) >= 0.01 ) {
+					particleData.emitterSizeZ = particleEmitterSizeZ.getValue();
+					changed = true;
+				}
+
+				if ( particleData.directionX === undefined || Math.abs( particleData.directionX - particleDirectionX.getValue() ) >= 0.01 ) {
+					particleData.directionX = particleDirectionX.getValue();
+					changed = true;
+				}
+
+				if ( particleData.directionY === undefined || Math.abs( particleData.directionY - particleDirectionY.getValue() ) >= 0.01 ) {
+					particleData.directionY = particleDirectionY.getValue();
+					changed = true;
+				}
+
+				if ( particleData.directionZ === undefined || Math.abs( particleData.directionZ - particleDirectionZ.getValue() ) >= 0.01 ) {
+					particleData.directionZ = particleDirectionZ.getValue();
+					changed = true;
+				}
+
+				if ( particleData.spreadAngle === undefined || Math.abs( particleData.spreadAngle - particleSpreadAngle.getValue() ) >= 0.01 ) {
+					particleData.spreadAngle = particleSpreadAngle.getValue();
+					changed = true;
+				}
+
+				if ( particleData.worldSpace === undefined || particleData.worldSpace !== particleWorldSpace.getValue() ) {
+					particleData.worldSpace = particleWorldSpace.getValue();
+					changed = true;
+				}
+
+				const renderMode = parseInt( particleRenderMode.getValue() );
+				if ( particleData.renderMode === undefined || particleData.renderMode !== renderMode ) {
+					particleData.renderMode = renderMode;
+					changed = true;
+				}
+
+				if ( particleData.uTileCount === undefined || particleData.uTileCount !== particleUTileCount.getValue() ) {
+					particleData.uTileCount = particleUTileCount.getValue();
+					changed = true;
+				}
+
+				if ( particleData.vTileCount === undefined || particleData.vTileCount !== particleVTileCount.getValue() ) {
+					particleData.vTileCount = particleVTileCount.getValue();
+					changed = true;
+				}
+
+				if ( particleData.startTileIndex === undefined || particleData.startTileIndex !== particleStartTileIndex.getValue() ) {
+					particleData.startTileIndex = particleStartTileIndex.getValue();
+					changed = true;
+				}
+
+				if ( changed ) {
+					editor.signals.objectChanged.dispatch( object );
+				}
 
 			}
 
@@ -609,10 +1190,12 @@ function SidebarObject( editor ) {
 		const isMesh = object.isMesh;
 		const isLight = object.isLight;
 		const isCamera = object.isCamera || object.isPerspectiveCamera || object.isOrthographicCamera;
+		const isParticleSystem = object.userData && object.userData.isParticleSystem;
 
 		meshPanel.setHidden( ! isMesh );
 		lightPanel.setHidden( ! isLight );
 		cameraPanel.setHidden( ! isCamera );
+		particlePanel.setHidden( ! isParticleSystem );
 
 		if ( isMesh ) {
 			geometryPanel.setHidden( ! object.geometry );
@@ -633,7 +1216,10 @@ function SidebarObject( editor ) {
 			'decay': objectDecayRow,
 			'castShadow': objectShadowRow,
 			'receiveShadow': objectReceiveShadow,
-			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow ]
+			'shadow': [ objectShadowIntensityRow, objectShadowBiasRow, objectShadowNormalBiasRow, objectShadowRadiusRow ],
+			'width': objectWidthRow,
+			'height': objectHeightRow,
+			'power': objectPowerRow
 		};
 
 		objectLeftRow.setDisplay( 'none' );
@@ -664,6 +1250,13 @@ function SidebarObject( editor ) {
 
 		if ( isLight ) {
 			objectReceiveShadow.setDisplay( 'none' );
+			
+			if ( object.isDirectionalLight || object.isSpotLight || object.isPointLight ) {
+				lightCastShadowRow.setDisplay( '' );
+			} else {
+				lightCastShadowRow.setDisplay( 'none' );
+			}
+			
 			if ( object.shadow !== undefined && object.shadow.camera !== undefined ) {
 				objectShadowMapSizeRow.setDisplay( '' );
 				objectShadowCameraNearRow.setDisplay( '' );
@@ -686,15 +1279,12 @@ function SidebarObject( editor ) {
 				objectShadowCameraFovRow.setDisplay( 'none' );
 			}
 		} else {
+			lightCastShadowRow.setDisplay( 'none' );
 			objectShadowMapSizeRow.setDisplay( 'none' );
 			objectShadowCameraNearRow.setDisplay( 'none' );
 			objectShadowCameraFarRow.setDisplay( 'none' );
 			objectShadowCameraAreaRow.setDisplay( 'none' );
 			objectShadowCameraFovRow.setDisplay( 'none' );
-		}
-
-		if ( object.isAmbientLight || object.isHemisphereLight ) {
-			objectShadowRow.setDisplay( 'none' );
 		}
 
 		if ( isLight ) {
@@ -744,9 +1334,59 @@ function SidebarObject( editor ) {
 
 	function updateUI( object ) {
 
-		objectType.setValue( object.type );
-
-		objectName.setValue( object.name );
+		const isBatchedRenderer = object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer';
+		
+		if ( isBatchedRenderer ) {
+			objectType.setValue( 'BatchedRenderer (System)' );
+			objectName.setValue( object.name );
+			objectName.dom.disabled = true;
+			objectName.dom.style.opacity = '0.6';
+			objectName.dom.style.cursor = 'not-allowed';
+			
+			let infoRow = entityPanel.dom.querySelector( '.system-entity-info' );
+			if ( !infoRow ) {
+				infoRow = document.createElement( 'div' );
+				infoRow.className = 'system-entity-info';
+				infoRow.style.marginTop = '10px';
+				infoRow.style.padding = '8px';
+				infoRow.style.backgroundColor = '#2a2a2a';
+				infoRow.style.border = '1px solid #444';
+				infoRow.style.borderRadius = '4px';
+				
+				const infoText = document.createElement( 'div' );
+				infoText.style.fontSize = '11px';
+				infoText.style.color = '#aaa';
+				infoText.style.lineHeight = '1.4';
+				infoText.textContent = 'This is a system-level entity required for particle system rendering. It cannot be removed or modified as it is automatically managed by the editor.';
+				infoRow.appendChild( infoText );
+				entityPanel.dom.appendChild( infoRow );
+			}
+			infoRow.style.display = 'block';
+			
+			objectPositionRow.setDisplay( 'none' );
+			objectRotationRow.setDisplay( 'none' );
+			objectScaleRow.setDisplay( 'none' );
+		} else {
+			objectName.dom.disabled = false;
+			objectName.dom.style.opacity = '1';
+			objectName.dom.style.cursor = '';
+			
+			const existingInfo = entityPanel.dom.querySelector( '.system-entity-info' );
+			if ( existingInfo ) {
+				existingInfo.remove();
+			}
+			
+			objectPositionRow.setDisplay( '' );
+			objectRotationRow.setDisplay( '' );
+			objectScaleRow.setDisplay( '' );
+			
+			let typeValue = object.type;
+			if ( object.type === 'ParticleSystem' || ( object.userData && object.userData.isParticleSystem ) ) {
+				typeValue = 'Particles';
+			}
+			objectType.setValue( typeValue );
+			objectName.setValue( object.name );
+		}
 
 		objectPositionX.setValue( object.position.x );
 		objectPositionY.setValue( object.position.y );
@@ -856,6 +1496,30 @@ function SidebarObject( editor ) {
 
 		}
 
+		if ( ( object.isDirectionalLight || object.isSpotLight || object.isPointLight ) && object.castShadow !== undefined ) {
+
+			lightCastShadow.setValue( object.castShadow );
+
+		}
+
+		if ( object.width !== undefined ) {
+
+			objectWidth.setValue( object.width );
+
+		}
+
+		if ( object.height !== undefined ) {
+
+			objectHeight.setValue( object.height );
+
+		}
+
+		if ( object.power !== undefined ) {
+
+			objectPower.setValue( object.power );
+
+		}
+
 		if ( object.castShadow !== undefined ) {
 
 			objectCastShadow.setValue( object.castShadow );
@@ -921,6 +1585,155 @@ function SidebarObject( editor ) {
 		objectVisible.setValue( object.visible );
 		objectFrustumCulled.setValue( object.frustumCulled );
 		objectRenderOrder.setValue( object.renderOrder );
+
+		if ( object.userData && object.userData.isParticleSystem ) {
+
+			const particleData = object.userData.particleSystem || {};
+
+			if ( particleData.duration !== undefined ) {
+				particleDuration.setValue( particleData.duration );
+			}
+
+			if ( particleData.looping !== undefined ) {
+				particleLooping.setValue( particleData.looping );
+			}
+
+			if ( particleData.prewarm !== undefined ) {
+				particlePrewarm.setValue( particleData.prewarm );
+			}
+
+			if ( particleData.autoDestroy !== undefined ) {
+				particleAutoDestroy.setValue( particleData.autoDestroy );
+			}
+
+			if ( particleData.maxParticle !== undefined ) {
+				particleMaxParticle.setValue( particleData.maxParticle );
+			}
+
+			if ( particleData.emissionRate !== undefined ) {
+				particleEmissionRate.setValue( particleData.emissionRate );
+			}
+
+			if ( particleData.emissionOverDistance !== undefined ) {
+				particleEmissionOverDistance.setValue( particleData.emissionOverDistance );
+			}
+
+			if ( particleData.startLifeMin !== undefined ) {
+				particleStartLifeMin.setValue( particleData.startLifeMin );
+			}
+
+			if ( particleData.startLifeMax !== undefined ) {
+				particleStartLifeMax.setValue( particleData.startLifeMax );
+			}
+
+			if ( particleData.startSpeedMin !== undefined ) {
+				particleStartSpeedMin.setValue( particleData.startSpeedMin );
+			}
+
+			if ( particleData.startSpeedMax !== undefined ) {
+				particleStartSpeedMax.setValue( particleData.startSpeedMax );
+			}
+
+			if ( particleData.startRotationMin !== undefined ) {
+				particleStartRotationMin.setValue( particleData.startRotationMin );
+			}
+
+			if ( particleData.startRotationMax !== undefined ) {
+				particleStartRotationMax.setValue( particleData.startRotationMax );
+			}
+
+			if ( particleData.startSizeMin !== undefined ) {
+				particleStartSizeMin.setValue( particleData.startSizeMin );
+			}
+
+			if ( particleData.startSizeMax !== undefined ) {
+				particleStartSizeMax.setValue( particleData.startSizeMax );
+			}
+
+			if ( particleData.startColorR !== undefined && particleData.startColorG !== undefined && particleData.startColorB !== undefined ) {
+				const color = new THREE.Color( particleData.startColorR, particleData.startColorG, particleData.startColorB );
+				particleStartColor.setHexValue( color.getHexString() );
+			}
+
+			if ( particleData.materialColor !== undefined ) {
+				const color = new THREE.Color( particleData.materialColor );
+				particleMaterialColor.setHexValue( color.getHexString() );
+			}
+
+			if ( particleData.endColorR !== undefined && particleData.endColorG !== undefined && particleData.endColorB !== undefined ) {
+				const color = new THREE.Color( particleData.endColorR, particleData.endColorG, particleData.endColorB );
+				particleEndColor.setHexValue( color.getHexString() );
+			}
+
+			if ( particleData.endSizeMin !== undefined ) {
+				particleEndSizeMin.setValue( particleData.endSizeMin );
+			}
+
+			if ( particleData.endSizeMax !== undefined ) {
+				particleEndSizeMax.setValue( particleData.endSizeMax );
+			}
+
+			if ( particleData.emitterShape !== undefined ) {
+				particleEmitterShape.setValue( particleData.emitterShape );
+			}
+
+			if ( particleData.emitterSizeX !== undefined ) {
+				particleEmitterSizeX.setValue( particleData.emitterSizeX );
+			}
+
+			if ( particleData.emitterSizeY !== undefined ) {
+				particleEmitterSizeY.setValue( particleData.emitterSizeY );
+			}
+
+			if ( particleData.emitterSizeZ !== undefined ) {
+				particleEmitterSizeZ.setValue( particleData.emitterSizeZ );
+			}
+
+			if ( particleData.directionX !== undefined ) {
+				particleDirectionX.setValue( particleData.directionX );
+			}
+
+			if ( particleData.directionY !== undefined ) {
+				particleDirectionY.setValue( particleData.directionY );
+			}
+
+			if ( particleData.directionZ !== undefined ) {
+				particleDirectionZ.setValue( particleData.directionZ );
+			}
+
+			if ( particleData.spreadAngle !== undefined ) {
+				particleSpreadAngle.setValue( particleData.spreadAngle );
+			}
+
+			if ( particleData.worldSpace !== undefined ) {
+				particleWorldSpace.setValue( particleData.worldSpace );
+			}
+
+			if ( particleData.renderMode !== undefined ) {
+				particleRenderMode.setValue( String( particleData.renderMode ) );
+			}
+
+			if ( particleData.uTileCount !== undefined ) {
+				particleUTileCount.setValue( particleData.uTileCount );
+			}
+
+			if ( particleData.vTileCount !== undefined ) {
+				particleVTileCount.setValue( particleData.vTileCount );
+			}
+
+			if ( particleData.startTileIndex !== undefined ) {
+				particleStartTileIndex.setValue( particleData.startTileIndex );
+			}
+
+			behaviorsContainer.clear();
+			behaviorsContainer.add( behaviorsHeaderRow );
+			if ( particleData.behaviors && Array.isArray( particleData.behaviors ) ) {
+				particleData.behaviors.forEach( function( behavior ) {
+					createBehaviorUI( behavior, behaviorsContainer, null );
+				} );
+			}
+
+		}
 
 	}
 

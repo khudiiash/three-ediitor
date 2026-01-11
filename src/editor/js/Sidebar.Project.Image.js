@@ -54,12 +54,12 @@ function SidebarProjectImage( editor ) {
 
 	resolutionRow.add( new UIText( strings.getKey( 'sidebar/project/resolution' ) ).setClass( 'Label' ) );
 
-	const imageWidth = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '28px' );
+	const imageWidth = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' );
 	resolutionRow.add( imageWidth );
 
 	resolutionRow.add( new UIText( '×' ).setTextAlign( 'center' ).setFontSize( '12px' ).setWidth( '12px' ) );
 
-	const imageHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '28px' );
+	const imageHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' );
 	resolutionRow.add( imageHeight );
 
 	// Render

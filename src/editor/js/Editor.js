@@ -101,7 +101,7 @@ function Editor() {
 
 	};
 
-	this.config = new Config();
+	this.config = new Config( this.storage );
 	this.history = new _History( this );
 	this.selector = new Selector( this );
 	this.storage = new _Storage();
@@ -209,6 +209,10 @@ Editor.prototype = {
 
 	nameObject: function ( object, name ) {
 
+		if ( object && ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) ) {
+			return;
+		}
+
 		object.name = name;
 		this.signals.sceneGraphChanged.dispatch();
 
@@ -216,7 +220,11 @@ Editor.prototype = {
 
 	removeObject: function ( object ) {
 
-		if ( object.parent === null ) return; // avoid deleting the camera or scene
+		if ( object.parent === null ) return;
+		
+		if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) {
+			return;
+		}
 
 		var scope = this;
 
@@ -583,7 +591,10 @@ Editor.prototype = {
 
 		}
 
-		this.select( this.scene.getObjectById( id ) );
+		const object = this.scene.getObjectById( id );
+		if ( object ) {
+			this.select( object );
+		}
 
 	},
 
@@ -671,38 +682,126 @@ Editor.prototype = {
 
 	fromJSON: async function ( json ) {
 
-		var loader = new THREE.ObjectLoader();
-		var camera = await loader.parseAsync( json.camera );
+		try {
+			const manager = new THREE.LoadingManager();
+			
+			manager.onError = function ( url ) {
+				console.warn( '[Editor] Failed to load resource:', url );
+			};
+			
+			var loader = new THREE.ObjectLoader( manager );
+			var camera = await loader.parseAsync( json.camera );
 
-		const existingUuid = this.camera.uuid;
-		const incomingUuid = camera.uuid;
+			const existingUuid = this.camera.uuid;
+			const incomingUuid = camera.uuid;
 
-		// copy all properties, including uuid
-		this.camera.copy( camera );
-		this.camera.uuid = incomingUuid;
+			// copy all properties, including uuid
+			this.camera.copy( camera );
+			this.camera.uuid = incomingUuid;
 
-		delete this.cameras[ existingUuid ]; // remove old entry [existingUuid, this.camera]
-		this.cameras[ incomingUuid ] = this.camera; // add new entry [incomingUuid, this.camera]
+			delete this.cameras[ existingUuid ]; // remove old entry [existingUuid, this.camera]
+			this.cameras[ incomingUuid ] = this.camera; // add new entry [incomingUuid, this.camera]
 
-		if ( json.controls !== undefined ) {
+			if ( json.controls !== undefined ) {
 
-			this.controls.fromJSON( json.controls );
+				this.controls.fromJSON( json.controls );
 
-		}
+			}
 
-		this.signals.cameraResetted.dispatch();
+			this.signals.cameraResetted.dispatch();
 
-		this.history.fromJSON( json.history );
-		this.scripts = json.scripts;
+			this.history.fromJSON( json.history );
+			this.scripts = json.scripts || {};
 
-		this.setScene( await loader.parseAsync( json.scene ) );
+			function removeParticleObjectsFromJSON( obj ) {
+				if ( Array.isArray( obj ) ) {
+					return obj.filter( function ( item ) {
+						if ( item && typeof item === 'object' ) {
+							if ( item.userData && item.userData.isParticleSystem ) {
+								removeParticleObjectsFromJSON( item );
+								return true;
+							}
+							if ( item.type === 'BatchedRenderer' ||
+								 item.type === 'ParticleEmitter' ||
+								 ( item.type === 'ParticleSystem' && !( item.userData && item.userData.isParticleSystem ) ) ||
+								 item.type === 'VFXBatch' ) {
+								return false;
+							}
+							removeParticleObjectsFromJSON( item );
+						}
+						return true;
+					} );
+				} else if ( obj && typeof obj === 'object' ) {
+					if ( obj.children && Array.isArray( obj.children ) ) {
+						obj.children = obj.children.filter( function ( child ) {
+							if ( child && typeof child === 'object' ) {
+								if ( child.userData && child.userData.isParticleSystem ) {
+									removeParticleObjectsFromJSON( child );
+									return true;
+								}
+								if ( child.type === 'BatchedRenderer' ||
+									 child.type === 'ParticleEmitter' ||
+									 ( child.type === 'ParticleSystem' && !( child.userData && child.userData.isParticleSystem ) ) ||
+									 child.type === 'VFXBatch' ) {
+									return false;
+								}
+								removeParticleObjectsFromJSON( child );
+							}
+							return true;
+						} );
+					}
+					for ( const key in obj ) {
+						if ( obj[ key ] && typeof obj[ key ] === 'object' ) {
+							removeParticleObjectsFromJSON( obj[ key ] );
+						}
+					}
+				}
+				return obj;
+			}
 
-		if ( json.environment === 'Room' ||
-			 json.environment === 'ModelViewer' /* DEPRECATED */ ) {
+			const cleanedSceneJSON = JSON.parse( JSON.stringify( json.scene ) );
+			removeParticleObjectsFromJSON( cleanedSceneJSON );
 
-			this.signals.sceneEnvironmentChanged.dispatch( json.environment );
-			this.signals.refreshSidebarEnvironment.dispatch();
+			const scene = await loader.parseAsync( cleanedSceneJSON );
+			
+			let particleSystemCount = 0;
+			scene.traverse( function ( object ) {
+				if ( object.userData && object.userData.isParticleSystem ) {
+					particleSystemCount++;
+					if ( !object.userData.particleSystem ) {
+						console.warn( '[Editor] Particle system object found but particleSystem data is missing:', object.name, object.uuid );
+					} else {
+						console.log( '[Editor] Particle system object loaded:', object.name, object.uuid, 'with data:', object.userData.particleSystem );
+					}
+				}
+			} );
+			
+			if ( particleSystemCount > 0 ) {
+				console.log( '[Editor] Found', particleSystemCount, 'particle system(s) in loaded scene' );
+			}
+			
+			this.setScene( scene );
 
+			if ( json.environment === 'Room' ||
+				 json.environment === 'ModelViewer' /* DEPRECATED */ ) {
+
+				this.signals.sceneEnvironmentChanged.dispatch( json.environment );
+				this.signals.refreshSidebarEnvironment.dispatch();
+
+			}
+		} catch ( error ) {
+			if ( error && typeof error === 'object' && error.type === 'error' && error.target && error.target.tagName === 'IMG' ) {
+				console.warn( '[Editor] Image loading error (non-critical):', error.target.src || error.target );
+			} else if ( error && error instanceof Error ) {
+				console.error( '[Editor] Error loading scene from JSON:', error );
+				console.error( '[Editor] Error stack:', error.stack );
+				throw error;
+			} else if ( error && typeof error === 'object' && error.type === 'error' ) {
+				console.warn( '[Editor] Resource loading error (non-critical):', error.target || error );
+			} else {
+				console.error( '[Editor] Error loading scene from JSON:', error );
+				throw error;
+			}
 		}
 
 	},
@@ -711,8 +810,62 @@ Editor.prototype = {
 
 		// scripts clean up
 
+		if ( !this.scene ) {
+			return {
+				metadata: {},
+				project: {
+					shadows: this.config.getKey( 'project/renderer/shadows' ),
+					shadowType: this.config.getKey( 'project/renderer/shadowType' ),
+					toneMapping: this.config.getKey( 'project/renderer/toneMapping' ),
+					toneMappingExposure: this.config.getKey( 'project/renderer/toneMappingExposure' )
+				},
+				camera: this.viewportCamera.toJSON(),
+				controls: this.controls.toJSON(),
+				scene: new THREE.Scene().toJSON(),
+				scripts: {},
+				history: this.history.toJSON(),
+				environment: null
+			};
+		}
+
+		if ( !this.scene || typeof this.scene !== 'object' || typeof this.scene.traverse !== 'function' ) {
+			return {
+				metadata: {},
+				project: {
+					shadows: this.config.getKey( 'project/renderer/shadows' ),
+					shadowType: this.config.getKey( 'project/renderer/shadowType' ),
+					toneMapping: this.config.getKey( 'project/renderer/toneMapping' ),
+					toneMappingExposure: this.config.getKey( 'project/renderer/toneMappingExposure' )
+				},
+				camera: this.viewportCamera.toJSON(),
+				controls: this.controls.toJSON(),
+				scene: new THREE.Scene().toJSON(),
+				scripts: {},
+				history: this.history.toJSON(),
+				environment: null
+			};
+		}
+
 		var scene = this.scene;
 		var scripts = this.scripts;
+
+		if ( !scene || typeof scene !== 'object' || typeof scene.traverse !== 'function' ) {
+			return {
+				metadata: {},
+				project: {
+					shadows: this.config.getKey( 'project/renderer/shadows' ),
+					shadowType: this.config.getKey( 'project/renderer/shadowType' ),
+					toneMapping: this.config.getKey( 'project/renderer/toneMapping' ),
+					toneMappingExposure: this.config.getKey( 'project/renderer/toneMappingExposure' )
+				},
+				camera: this.viewportCamera.toJSON(),
+				controls: this.controls.toJSON(),
+				scene: new THREE.Scene().toJSON(),
+				scripts: {},
+				history: this.history.toJSON(),
+				environment: null
+			};
+		}
 
 		for ( var key in scripts ) {
 
@@ -726,14 +879,51 @@ Editor.prototype = {
 
 		}
 
-		// honor neutral environment
-
 		let environment = null;
 
-		if ( this.scene.environment !== null && this.scene.environment.isRenderTargetTexture === true ) {
+		if ( this.scene && this.scene.environment !== null && this.scene.environment.isRenderTargetTexture === true ) {
 
 			environment = 'Room';
 
+		}
+
+		const objectsToRestore = [];
+		try {
+			const sceneToTraverse = this.scene;
+			if ( !sceneToTraverse || typeof sceneToTraverse !== 'object' || typeof sceneToTraverse.traverse !== 'function' ) {
+				console.warn( 'Scene is invalid for traversal, skipping' );
+			} else {
+				const objectsToRemove = [];
+				sceneToTraverse.traverse( function ( object ) {
+					if ( !object ) return;
+					if ( object.userData && object.userData.skipSerialization === true ) {
+						const parent = object.parent;
+						if ( parent ) {
+							objectsToRemove.push( { object: object, parent: parent } );
+						}
+					}
+					if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) {
+						const parent = object.parent;
+						if ( parent ) {
+							objectsToRemove.push( { object: object, parent: parent } );
+						}
+					}
+				} );
+				for ( let i = 0; i < objectsToRemove.length; i++ ) {
+					const item = objectsToRemove[ i ];
+					if ( item.object && item.parent && item.parent.children ) {
+						item.parent.remove( item.object );
+						objectsToRestore.push( item );
+					}
+				}
+			}
+		} catch ( error ) {
+			console.error( 'Error during scene traversal:', error );
+			console.error( 'Scene value:', this.scene );
+			console.error( 'Scene type:', typeof this.scene );
+			if ( this.scene ) {
+				console.error( 'Scene traverse type:', typeof this.scene.traverse );
+			}
 		}
 
 		//
@@ -749,12 +939,18 @@ Editor.prototype = {
 			},
 			camera: this.viewportCamera.toJSON(),
 			controls: this.controls.toJSON(),
-			scene: this.scene.toJSON(),
+			scene: ( this.scene && typeof this.scene.toJSON === 'function' ) ? this.scene.toJSON() : new THREE.Scene().toJSON(),
 			scripts: this.scripts,
 			history: this.history.toJSON(),
 			environment: environment
 
 		};
+
+		// Restore objects that were temporarily removed
+		for ( let i = 0; i < objectsToRestore.length; i++ ) {
+			const item = objectsToRestore[ i ];
+			item.parent.add( item.object );
+		}
 
 		// Replace base64 image data with asset URLs in the images array
 		if ( result.scene && result.scene.images && Array.isArray( result.scene.images ) ) {
@@ -822,6 +1018,12 @@ Editor.prototype = {
 
 		input.register( 'KeyS', () => {
 			signals.transformModeChanged.dispatch( 'scale' );
+		} );
+
+		input.register( 'KeyF', () => {
+			if ( this.selected !== null ) {
+				this.focus( this.selected );
+			}
 		} );
 
 		input.register( 'KeyC', () => {

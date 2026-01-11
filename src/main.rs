@@ -67,8 +67,18 @@ fn read_scene_file(project_path: String) -> Result<String, String> {
     
     let path = PathBuf::from(&project_path).join("scene.json");
     
+    if !path.exists() {
+        return Err("File not found".to_string());
+    }
+    
     match fs::read_to_string(&path) {
-        Ok(content) => Ok(content),
+        Ok(content) => {
+            if content.trim().is_empty() {
+                Err("File is empty".to_string())
+            } else {
+                Ok(content)
+            }
+        },
         Err(e) => {
             if e.kind() == std::io::ErrorKind::NotFound {
                 Err("File not found".to_string())
@@ -110,6 +120,9 @@ fn write_scene_file(project_path: String, content: String) -> Result<(), String>
     
     let path = PathBuf::from(&project_path).join("scene.json");
     
+    eprintln!("[write_scene_file] Writing scene.json to: {:?}", path);
+    eprintln!("[write_scene_file] Project path received: {}", project_path);
+    
     fs::write(&path, content)
         .map_err(|e| format!("Failed to write file: {}", e))?;
     
@@ -129,6 +142,80 @@ fn write_scene_file(project_path: String, content: String) -> Result<(), String>
             }
         }
     }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn read_editor_config() -> Result<String, String> {
+    use std::fs;
+    use tauri::api::path::app_data_dir;
+    use tauri::Config;
+    
+    let config_dir = app_data_dir(&Config::default())
+        .ok_or("Failed to get app data directory")?;
+    let config_path = config_dir.join("editor.json");
+    
+    match fs::read_to_string(&config_path) {
+        Ok(content) => Ok(content),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Ok("{}".to_string())
+            } else {
+                Err(format!("Failed to read editor config: {}", e))
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn write_editor_config(content: String) -> Result<(), String> {
+    use std::fs;
+    use tauri::api::path::app_data_dir;
+    use tauri::Config;
+    
+    let config_dir = app_data_dir(&Config::default())
+        .ok_or("Failed to get app data directory")?;
+    
+    if !config_dir.exists() {
+        fs::create_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    
+    let config_path = config_dir.join("editor.json");
+    fs::write(&config_path, content)
+        .map_err(|e| format!("Failed to write editor config: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn read_project_config(project_path: String) -> Result<String, String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let config_path = PathBuf::from(&project_path).join("project.json");
+    
+    match fs::read_to_string(&config_path) {
+        Ok(content) => Ok(content),
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Ok("{}".to_string())
+            } else {
+                Err(format!("Failed to read project config: {}", e))
+            }
+        }
+    }
+}
+
+#[tauri::command]
+fn write_project_config(project_path: String, content: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let config_path = PathBuf::from(&project_path).join("project.json");
+    fs::write(&config_path, content)
+        .map_err(|e| format!("Failed to write project config: {}", e))?;
     
     Ok(())
 }
@@ -564,7 +651,11 @@ fn main() {
             write_assets_metadata,
             open_file_in_editor,
             list_assets_directory,
-            write_build_file
+            write_build_file,
+            read_editor_config,
+            write_editor_config,
+            read_project_config,
+            write_project_config
         ])
         .on_window_event(move |event| {
             match event.event() {

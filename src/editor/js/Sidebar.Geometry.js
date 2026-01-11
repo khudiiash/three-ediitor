@@ -273,9 +273,19 @@ function SidebarGeometry( editor ) {
 
 				} else {
 
-					const { GeometryParametersPanel } = await import( `./Sidebar.Geometry.${ geometry.type }.js` );
+					try {
 
-					parameters.add( new GeometryParametersPanel( editor, object ) );
+						const { GeometryParametersPanel } = await import( `./Sidebar.Geometry.${ geometry.type }.js` );
+
+						parameters.add( new GeometryParametersPanel( editor, object ) );
+
+					} catch ( error ) {
+
+						console.warn( `Sidebar panel for geometry type "${ geometry.type }" not found. Using BufferGeometry panel instead.` );
+
+						parameters.add( new SidebarGeometryModifiers( editor, object ) );
+
+					}
 
 				}
 

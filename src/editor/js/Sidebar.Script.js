@@ -12,7 +12,7 @@ function SidebarScript( editor ) {
 
 	const container = new UIPanel();
 	container.setBorderTop( '0' );
-	container.setPaddingTop( '20px' );
+	container.setPaddingTop( '4px' );
 	container.setDisplay( 'none' );
 
 	const scriptsContainer = new UIPanel();
@@ -193,8 +193,9 @@ export default class ${validClassName} extends Script {
 
 		const object = editor.selected;
 
+		scriptsContainer.clear();
+
 		if ( object === null ) {
-			scriptsContainer.clear();
 			scriptsContainer.setDisplay( 'none' );
 			return;
 		}
@@ -212,8 +213,6 @@ export default class ${validClassName} extends Script {
 				expandedScripts.set( objectKey, new Set() );
 			}
 			const expandedSet = expandedScripts.get( objectKey );
-
-			scriptsContainer.clear();
 
 			for ( let i = 0; i < scripts.length; i ++ ) {
 
@@ -442,6 +441,8 @@ export default class ${validClassName} extends Script {
 		} else {
 
 			container.setDisplay( 'none' );
+			scriptsContainer.clear();
+			scriptsContainer.setDisplay( 'none' );
 
 		}
 

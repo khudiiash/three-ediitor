@@ -4,6 +4,8 @@ import { Engine } from './Engine';
 import { Entity } from './Entity';
 import { AssetRegistry } from './AssetRegistry';
 import { ScriptAsset } from '../assets/ScriptAsset';
+import { ParticleComponent } from '../components/ParticleComponent';
+import { ConstantValue, IntervalValue, ConstantColor, PointEmitter } from 'three.quarks';
 
 export class App {
     public engine: Engine;
@@ -13,7 +15,7 @@ export class App {
     public scene: THREE.Scene;
     private events: SuperEvents | null = null;
     
-    public time: { delta: number; elapsedTime: number } = { delta: 0, elapsedTime: 0 };
+    public time: { delta: number; elapsed: number } = { delta: 0, elapsed: 0 };
     private startTime: number = 0;
 
     constructor(engine: Engine) {
@@ -65,11 +67,28 @@ export class App {
     removeEntity(entity: Entity): void {
         this.events?.emit('entity:destroyed', entity);
 
+        const particleComponent = entity.getComponent(ParticleComponent);
+        if (particleComponent) {
+            particleComponent.destroy();
+        }
+
         if ((entity as any)._object3D.parent) {
             (entity as any)._object3D.parent.remove((entity as any)._object3D);
         }
 
         entity.dispose();
+        
+        if ((this as any).particleRenderer) {
+            const batchedRenderer = (this as any).particleRenderer;
+            if (batchedRenderer && (batchedRenderer as any).systems) {
+                const systems = (batchedRenderer as any).systems;
+                if (systems.length === 0) {
+                    if (batchedRenderer.parent) {
+                        batchedRenderer.parent.remove(batchedRenderer);
+                    }
+                }
+            }
+        }
     }
 
     setCamera(camera: THREE.Camera): void {
@@ -87,7 +106,11 @@ export class App {
     update(deltaTime: number): void {
         const currentTime = performance.now() / 1000;
         this.time.delta = deltaTime;
-        this.time.elapsedTime = currentTime - this.startTime;
+        this.time.elapsed = currentTime - this.startTime;
+        
+        if ((this as any).particleRenderer) {
+            (this as any).particleRenderer.update(deltaTime);
+        }
         
         this.scene.traverse((object3D) => {
             const entity = (object3D as any).__entity as Entity | undefined;
@@ -120,6 +143,8 @@ export class App {
         }
         
         if (loadedScene instanceof THREE.Scene) {
+            const particleRenderer = (this as any).particleRenderer;
+            
             while (this.scene.children.length > 0) {
                 this.scene.remove(this.scene.children[0]);
             }
@@ -137,14 +162,26 @@ export class App {
                 this.scene.add(child);
             }
             
+            if (particleRenderer && this.scene.children.indexOf(particleRenderer) === -1) {
+                this.scene.add(particleRenderer);
+            }
+            
             (this.scene as any).__app = this;
             
             this.scene.traverse((object3D) => {
-                if (!(object3D as any).__entity) {
+                if ((object3D as any).__entity === null) {
+                    return;
+                }
+                if (object3D.userData && object3D.userData.isParticleSystem) {
+                    if (!(object3D as any).__entity) {
+                        Entity.fromObject3D(object3D);
+                    }
+                } else if (!(object3D as any).__entity) {
                     Entity.fromObject3D(object3D);
                 }
             });
 
+            this.loadParticleSystems();
             this.loadScriptsFromScene().catch(() => {});
         } else {
             while (this.scene.children.length > 0) {
@@ -153,13 +190,39 @@ export class App {
             this.scene.add(loadedScene);
             
             loadedScene.traverse((object3D) => {
-                if (!(object3D as any).__entity) {
+                if ((object3D as any).__entity === null) {
+                    return;
+                }
+                if (object3D.userData && object3D.userData.isParticleSystem) {
+                    if (!(object3D as any).__entity) {
+                        Entity.fromObject3D(object3D);
+                    }
+                } else if (!(object3D as any).__entity) {
                     Entity.fromObject3D(object3D);
                 }
             });
+
+            this.loadParticleSystems();
         }
         
         this.events?.emit('scene:loaded', this);
+    }
+
+    private loadParticleSystems(): void {
+        this.scene.traverse((object3D) => {
+            if (object3D.userData && object3D.userData.isParticleSystem) {
+                const entity = (object3D as any).__entity as Entity | undefined;
+                if (entity) {
+                    let particleComponent = entity.getComponent(ParticleComponent);
+                    if (!particleComponent) {
+                        // Adding the component will trigger initialize(), which will create the particle system
+                        particleComponent = entity.addComponent(ParticleComponent);
+                    } else if (!particleComponent.getParticleSystem()) {
+                        particleComponent.initialize();
+                    }
+                }
+            }
+        });
     }
 
 

@@ -8,6 +8,7 @@ export { TransformComponent } from './components/TransformComponent';
 export { MeshComponent } from './components/MeshComponent';
 export { CameraComponent } from './components/CameraComponent';
 export { LightComponent } from './components/LightComponent';
+export { ParticleComponent } from './components/ParticleComponent';
 
 export { SceneLoader } from './runtime/SceneLoader';
 export { ProjectLoader } from './runtime/ProjectLoader';

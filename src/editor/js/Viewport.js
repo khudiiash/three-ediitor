@@ -18,6 +18,8 @@ import { SetScaleCommand } from './commands/SetScaleCommand.js';
 
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ViewportPathtracer } from './Viewport.Pathtracer.js';
+import { ParticleSystem, BatchedRenderer } from 'three.quarks';
+import { ParticleSystemFactory } from './ParticleSystemFactory.js';
 
 function Viewport( editor ) {
 
@@ -36,10 +38,35 @@ function Viewport( editor ) {
 	let renderer = null;
 	let pmremGenerator = null;
 	let pathtracer = null;
+	let particleRenderer = null;
+	let currentParticleSystem = null;
+	let particleTexture = null;
 
 	const camera = editor.camera;
 	const scene = editor.scene;
 	const sceneHelpers = editor.sceneHelpers;
+	
+	function createParticleTexture() {
+		if ( particleTexture ) return particleTexture;
+		
+		const canvas = document.createElement( 'canvas' );
+		canvas.width = 64;
+		canvas.height = 64;
+		const context = canvas.getContext( '2d' );
+		
+		const gradient = context.createRadialGradient( 32, 32, 0, 32, 32, 32 );
+		gradient.addColorStop( 0, 'rgba(255, 255, 255, 1)' );
+		gradient.addColorStop( 0.5, 'rgba(255, 255, 255, 0.8)' );
+		gradient.addColorStop( 1, 'rgba(255, 255, 255, 0)' );
+		
+		context.fillStyle = gradient;
+		context.fillRect( 0, 0, 64, 64 );
+		
+		particleTexture = new THREE.CanvasTexture( canvas );
+		particleTexture.needsUpdate = true;
+		
+		return particleTexture;
+	}
 
 	// helpers
 
@@ -580,6 +607,22 @@ function Viewport( editor ) {
 
 	} );
 
+	signals.objectAdded.add( function ( object ) {
+
+		if ( object && object.userData && object.userData.isParticleSystem ) {
+			if ( !particleRenderer ) {
+				particleRenderer = new BatchedRenderer();
+				particleRenderer.visible = true;
+				particleRenderer.name = 'BatchedRenderer';
+				particleRenderer.userData.skipSerialization = true;
+				scene.add( particleRenderer );
+			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
+				scene.add( particleRenderer );
+			}
+		}
+
+	} );
+
 	signals.sceneGraphChanged.add( function () {
 
 		initPT();
@@ -600,7 +643,58 @@ function Viewport( editor ) {
 		selectionBox.visible = false;
 		transformControls.detach();
 
-		// Show/hide camera preview
+		if ( currentParticleSystem && particleRenderer ) {
+			if ( particleRenderer.removeSystem ) {
+					particleRenderer.removeSystem( currentParticleSystem );
+			}
+			if ( currentParticleSystem.emitter.parent ) {
+				currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
+			}
+			currentParticleSystem = null;
+		}
+
+		if ( object !== null && object.userData && object.userData.isParticleSystem ) {
+			if ( !particleRenderer ) {
+				particleRenderer = new BatchedRenderer();
+				particleRenderer.visible = true;
+				particleRenderer.name = 'BatchedRenderer';
+				particleRenderer.userData.skipSerialization = true;
+				scene.add( particleRenderer );
+			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
+				scene.add( particleRenderer );
+			}
+
+		const particleData = object.userData.particleSystem || {};
+
+		// Use the factory to create the particle system
+		if ( !particleTexture ) {
+			particleTexture = ParticleSystemFactory.createParticleTexture();
+		}
+		
+		currentParticleSystem = ParticleSystemFactory.createParticleSystem( particleData, particleTexture );
+			
+			currentParticleSystem.emitter.name = object.name || 'ParticleSystem';
+			currentParticleSystem.emitter.__entity = null;
+			currentParticleSystem.emitter.userData.skipSerialization = true;
+			currentParticleSystem.emitter.visible = true;
+			
+			object.getWorldPosition( currentParticleSystem.emitter.position );
+			object.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
+
+			scene.add( currentParticleSystem.emitter );
+			particleRenderer.addSystem( currentParticleSystem );
+			
+			if ( scene.children.indexOf( particleRenderer ) === -1 ) {
+				scene.add( particleRenderer );
+			}
+			
+			for ( let i = 0; i < 20; i++ ) {
+				particleRenderer.update( 0.016 );
+			}
+			
+			render();
+		}
+
 		if ( object !== null && ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== camera ) {
 
 			previewCamera = object;
@@ -628,6 +722,65 @@ function Viewport( editor ) {
 		}
 
 		render();
+
+	} );
+
+	signals.objectChanged.add( function ( object ) {
+
+		if ( object && object.userData && object.userData.isParticleSystem ) {
+			if ( !currentParticleSystem && editor.selected === object ) {
+				signals.objectSelected.dispatch( object );
+				return;
+			}
+			
+			if ( !currentParticleSystem ) return;
+			if ( !particleRenderer ) {
+				particleRenderer = new BatchedRenderer();
+				particleRenderer.visible = true;
+				particleRenderer.name = 'BatchedRenderer';
+				particleRenderer.userData.skipSerialization = true;
+				scene.add( particleRenderer );
+			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
+				scene.add( particleRenderer );
+			}
+
+			const particleData = object.userData.particleSystem || {};
+			
+			if ( particleRenderer.removeSystem ) {
+				particleRenderer.removeSystem( currentParticleSystem );
+			}
+			if ( currentParticleSystem.emitter.parent ) {
+				currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
+			}
+
+			// Use the factory to create the particle system
+			if ( !particleTexture ) {
+				particleTexture = ParticleSystemFactory.createParticleTexture();
+			}
+			
+			currentParticleSystem = ParticleSystemFactory.createParticleSystem( particleData, particleTexture );
+			
+			currentParticleSystem.emitter.name = object.name || 'ParticleSystem';
+			currentParticleSystem.emitter.__entity = null;
+			currentParticleSystem.emitter.userData.skipSerialization = true;
+			currentParticleSystem.emitter.visible = true;
+			
+			object.getWorldPosition( currentParticleSystem.emitter.position );
+			object.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
+			// Don't copy scale when worldSpace is true - particles should maintain consistent size
+
+			scene.add( currentParticleSystem.emitter );
+			particleRenderer.addSystem( currentParticleSystem );
+			
+			if ( scene.children.indexOf( particleRenderer ) === -1 ) {
+				scene.add( particleRenderer );
+			}
+			
+			for ( let i = 0; i < 20; i++ ) {
+				particleRenderer.update( 0.016 );
+			}
+			render();
+		}
 
 	} );
 
@@ -683,6 +836,83 @@ function Viewport( editor ) {
 
 			transformControls.detach();
 
+		}
+
+		if ( object && object.userData && object.userData.isParticleSystem ) {
+			if ( currentParticleSystem && currentParticleSystem.emitter ) {
+				const emitterParent = currentParticleSystem.emitter.parent;
+				if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
+					if ( particleRenderer && particleRenderer.removeSystem ) {
+						particleRenderer.removeSystem( currentParticleSystem );
+					}
+					if ( currentParticleSystem.emitter.parent ) {
+						currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
+					}
+					if ( scene.children.indexOf( currentParticleSystem.emitter ) !== -1 ) {
+						scene.remove( currentParticleSystem.emitter );
+					}
+					currentParticleSystem = null;
+				}
+			}
+			
+			if ( particleRenderer && particleRenderer.systems ) {
+				for ( let i = particleRenderer.systems.length - 1; i >= 0; i-- ) {
+					const system = particleRenderer.systems[ i ];
+					if ( system && system.emitter ) {
+						const emitterParent = system.emitter.parent;
+						if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
+							if ( particleRenderer.removeSystem ) {
+								particleRenderer.removeSystem( system );
+							}
+							if ( system.emitter.parent ) {
+								system.emitter.parent.remove( system.emitter );
+							}
+							if ( scene.children.indexOf( system.emitter ) !== -1 ) {
+								scene.remove( system.emitter );
+							}
+						}
+					}
+				}
+			}
+			
+			const emittersToRemove = [];
+			scene.traverse( function ( child ) {
+				if ( child.type === 'ParticleEmitter' ) {
+					const emitterParent = child.parent;
+					if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
+						emittersToRemove.push( child );
+					}
+				}
+			} );
+			
+			for ( let i = 0; i < emittersToRemove.length; i++ ) {
+				const emitter = emittersToRemove[ i ];
+				if ( emitter.parent ) {
+					emitter.parent.remove( emitter );
+				}
+				if ( scene.children.indexOf( emitter ) !== -1 ) {
+					scene.remove( emitter );
+				}
+			}
+			
+			const entityObject = object;
+			if ( entityObject && entityObject.parent ) {
+				entityObject.parent.remove( entityObject );
+			}
+			if ( scene.children.indexOf( entityObject ) !== -1 ) {
+				scene.remove( entityObject );
+			}
+			
+			let hasParticleSystem = false;
+			scene.traverse( function ( child ) {
+				if ( child.userData && child.userData.isParticleSystem && child.parent !== null ) {
+					hasParticleSystem = true;
+				}
+			} );
+			
+			if ( !hasParticleSystem && particleRenderer && scene.children.indexOf( particleRenderer ) !== -1 ) {
+				scene.remove( particleRenderer );
+			}
 		}
 
 		// Only re-enable controls if TransformControls is not active
@@ -983,7 +1213,16 @@ function Viewport( editor ) {
 
 		let needsUpdate = false;
 
-		// Animations
+		if ( particleRenderer ) {
+			try {
+				particleRenderer.update( delta );
+				if ( currentParticleSystem ) {
+					needsUpdate = true;
+				}
+			} catch ( e ) {
+				console.error( '[Viewport] Error updating particle system:', e );
+			}
+		}
 
 		const actions = mixer.stats.actions;
 
@@ -996,14 +1235,12 @@ function Viewport( editor ) {
 
 			if ( editor.selected !== null ) {
 
-				editor.selected.updateWorldMatrix( false, true ); // avoid frame late effect for certain skinned meshes (e.g. Michelle.glb)
-				selectionBox.box.setFromObject( editor.selected, true ); // selection box should reflect current animation state
+				editor.selected.updateWorldMatrix( false, true );
+				selectionBox.box.setFromObject( editor.selected, true );
 
 			}
 
 		}
-
-		// View Helper (only when not playing)
 
 		if ( ! isPlaying && viewHelper.animating === true ) {
 
@@ -1083,6 +1320,12 @@ function Viewport( editor ) {
 	function render() {
 
 		startTime = performance.now();
+
+		if ( currentParticleSystem && currentParticleSystem.emitter && editor.selected && editor.selected.userData && editor.selected.userData.isParticleSystem ) {
+			editor.selected.getWorldPosition( currentParticleSystem.emitter.position );
+			editor.selected.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
+			// Don't copy scale when worldSpace is true - particles should maintain consistent size
+		}
 
 		renderer.setViewport( 0, 0, container.dom.offsetWidth, container.dom.offsetHeight );
 		renderer.render( scene, editor.viewportCamera );

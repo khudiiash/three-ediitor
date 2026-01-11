@@ -496,7 +496,7 @@ class UIOutliner extends UIDiv {
 
 			div.addEventListener( 'click', onClick );
 
-			if ( div.draggable === true ) {
+			if ( div.draggable === true && !div.classList.contains( 'system-entity' ) ) {
 
 				div.addEventListener( 'drag', onDrag );
 				div.addEventListener( 'dragstart', onDragStart ); // Firefox needs this

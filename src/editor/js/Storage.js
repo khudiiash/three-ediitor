@@ -31,14 +31,35 @@ function Storage() {
 					
 					// Use Tauri command to read the file - handles path resolution on Rust side
 					const content = await invoke( 'read_scene_file', { projectPath: currentProjectPath } );
+					
+					if ( !content || content.trim() === '' ) {
+						console.warn( 'Scene file is empty' );
+						callback( undefined );
+						return;
+					}
+					
 					const data = JSON.parse( content );
+					
+					if ( !data || !data.scene ) {
+						console.warn( 'Scene file does not contain valid scene data' );
+						callback( undefined );
+						return;
+					}
+					
 					callback( data );
 
 				} catch ( error ) {
 
-					console.warn( 'Failed to load scene from file:', error );
-					console.warn( 'Error details:', error.message || String( error ) );
-					console.warn( 'This is normal if the scene.json file does not exist yet' );
+					const errorMessage = error.message || String( error );
+					
+					if ( errorMessage && errorMessage.includes( 'File not found' ) ) {
+					} else if ( errorMessage && errorMessage.includes( 'JSON' ) ) {
+						console.error( 'Scene file contains invalid JSON. The file may be corrupted.' );
+					} else {
+						console.warn( 'Failed to load scene from file:', error );
+						console.warn( 'Error details:', errorMessage );
+					}
+					
 					callback( undefined );
 
 				}
@@ -48,6 +69,7 @@ function Storage() {
 			set: async function ( data ) {
 
 				if ( ! currentProjectPath ) {
+					console.warn( '[Storage] Cannot save scene: project path not set' );
 					return;
 				}
 
@@ -106,6 +128,8 @@ function Storage() {
 
 					const content = JSON.stringify( processedData, null, '\t' );
 					
+					console.log( '[Storage] Saving scene to project path:', currentProjectPath );
+					
 					// Use Tauri command to write the file - handles path resolution on Rust side
 					await invoke( 'write_scene_file', { 
 						projectPath: currentProjectPath,
@@ -128,6 +152,7 @@ function Storage() {
 			},
 
 			setProjectPath: function ( path ) {
+				console.log( '[Storage] Setting project path to:', path );
 				currentProjectPath = path;
 			},
 

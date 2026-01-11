@@ -34,12 +34,21 @@ function SidebarScene( editor ) {
 
 	const nodeStates = new WeakMap();
 
+	function isBatchedRenderer( object ) {
+		return object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer';
+	}
+
 	function buildOption( object, draggable ) {
 
 		const option = document.createElement( 'div' );
-		option.draggable = draggable;
+		const isSystemEntity = isBatchedRenderer( object );
+		option.draggable = draggable && !isSystemEntity;
 		option.innerHTML = buildHTML( object );
 		option.value = object.id;
+		
+		if ( isSystemEntity ) {
+			option.classList.add( 'system-entity' );
+		}
 
 		// opener
 
@@ -112,6 +121,8 @@ function SidebarScene( editor ) {
 		if ( object.isMesh ) return 'Mesh';
 		if ( object.isLine ) return 'Line';
 		if ( object.isPoints ) return 'Points';
+		if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) return 'BatchedRenderer';
+		if ( object.type === 'ParticleSystem' || ( object.userData && object.userData.isParticleSystem ) ) return 'Particles';
 
 		return 'Object3D';
 
@@ -120,7 +131,10 @@ function SidebarScene( editor ) {
 	function buildHTML( object ) {
 
 		const objectName = object.name || '';
-		let html = `<span class="type ${ getObjectType( object ) }"></span> ${ escapeHTML( objectName ) }`;
+		const isSystemEntity = isBatchedRenderer( object );
+		const typeClass = getObjectType( object );
+		const nameClass = isSystemEntity ? 'system-entity-name' : '';
+		let html = `<span class="type ${ typeClass }${ isSystemEntity ? ' system-entity-type' : '' }"></span> <span class="${ nameClass }">${ escapeHTML( objectName ) }</span>`;
 
 		if ( object.isMesh ) {
 
@@ -174,7 +188,14 @@ function SidebarScene( editor ) {
 
 		ignoreObjectSelectedSignal = true;
 
-		editor.selectById( parseInt( outliner.getValue() ) );
+		const objectId = parseInt( outliner.getValue() );
+		const object = editor.scene.getObjectById( objectId );
+		
+		if ( object && ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) ) {
+			editor.select( object );
+		} else {
+			editor.selectById( objectId );
+		}
 
 		ignoreObjectSelectedSignal = false;
 
@@ -224,6 +245,20 @@ function SidebarScene( editor ) {
 			for ( let i = 0, l = objects.length; i < l; i ++ ) {
 
 				const object = objects[ i ];
+
+				if ( object.userData && object.userData.skipSerialization === true ) {
+					continue;
+				}
+
+				if ( object.type === 'ParticleEmitter' ) {
+					continue;
+				}
+
+				if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) {
+					if ( object.children.length === 0 ) {
+						continue;
+					}
+				}
 
 				if ( !searchFilter || matchesFilter( object ) || hasMatchingChild( object ) ) {
 

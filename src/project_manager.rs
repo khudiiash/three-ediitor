@@ -110,13 +110,13 @@ impl ProjectManager {
             if is_dir {
                 let metadata_path = project_path.join("project.json");
                 let assets_path = project_path.join("assets");
-                let builds_path = project_path.join("builds");
+                let build_path = project_path.join("build");
                 
                 let has_metadata = metadata_path.exists();
                 let has_assets = assets_path.exists();
-                let has_builds = builds_path.exists();
+                let has_build = build_path.exists();
                 
-                if has_metadata || has_assets || has_builds {
+                if has_metadata || has_assets || has_build {
                     return Err(format!("Project '{}' already exists", sanitized_name));
                 }
             } else {
@@ -136,15 +136,10 @@ impl ProjectManager {
                 format!("Failed to create assets directory: {}", e)
             })?;
 
-        fs::create_dir_all(project_path.join("builds"))
+        fs::create_dir_all(project_path.join("build"))
             .map_err(|e| {
-                format!("Failed to create builds directory: {}", e)
+                format!("Failed to create build directory: {}", e)
             })?;
-
-                fs::create_dir_all(project_path.join("build"))
-                    .map_err(|e| {
-                        format!("Failed to create build directory: {}", e)
-                    })?;
 
                 let tsconfig_content = r#"{
                     "compilerOptions": {
@@ -199,9 +194,6 @@ impl ProjectManager {
         }
         if !project_path.join("assets").exists() {
             return Err(format!("Assets directory was not created: {:?}", project_path.join("assets")));
-        }
-        if !project_path.join("builds").exists() {
-            return Err(format!("Builds directory was not created: {:?}", project_path.join("builds")));
         }
         if !project_path.join("build").exists() {
             return Err(format!("Build directory was not created: {:?}", project_path.join("build")));

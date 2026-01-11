@@ -19,7 +19,8 @@
   "license": "MIT",
   "dependencies": {
     "@khudiiash/super-events": "^1.0.0",
-    "three": "^0.182.0"
+    "three": "^0.182.0",
+    "three.quarks": "^0.16.0"
   },
   "devDependencies": {
     "@types/node": "^25.0.3",

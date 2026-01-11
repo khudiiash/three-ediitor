@@ -13,7 +13,19 @@ function ViewportPathtracer( renderer ) {
 
 		}
 
+		const originalVisible = [];
+		scene.traverse( function ( object ) {
+			if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' || object.type === 'ParticleEmitter' ) {
+				originalVisible.push( { object: object, visible: object.visible } );
+				object.visible = false;
+			}
+		} );
+
 		pathTracer.setScene( scene, camera );
+
+		originalVisible.forEach( function ( item ) {
+			item.object.visible = item.visible;
+		} );
 
 	}
 
