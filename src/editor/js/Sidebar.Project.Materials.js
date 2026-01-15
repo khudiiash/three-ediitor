@@ -31,8 +31,6 @@ function SidebarProjectMaterials( editor ) {
 
 			const oldMaterial = selectedObject.material;
 
-			// only passing materials to objects with a material property (e.g. avoid assigning material to THREE.Group)
-
 			if ( oldMaterial !== undefined ) {
 
 				const material = editor.getMaterialById( parseInt( listbox.getValue() ) );
@@ -51,8 +49,6 @@ function SidebarProjectMaterials( editor ) {
 
 	} );
 	buttonsRow.add( assignMaterial );
-
-	// Signals
 
 	function refreshMaterialBrowserUI() {
 

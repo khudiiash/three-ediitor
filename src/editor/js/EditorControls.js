@@ -6,7 +6,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 		super();
 
-		// API
+		
 
 		this.enabled = true;
 		this.center = new THREE.Vector3();
@@ -14,7 +14,7 @@ class EditorControls extends THREE.EventDispatcher {
 		this.zoomSpeed = 0.1;
 		this.rotationSpeed = 0.005;
 
-		// internals
+		
 
 		var scope = this;
 		var vector = new THREE.Vector3();
@@ -36,7 +36,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 		var domElement = null;
 
-		// events
+		
 
 		var changeEvent = { type: 'change' };
 
@@ -53,7 +53,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 			} else {
 
-				// Focusing on an Group, AmbientLight, etc
+				
 
 				center.setFromMatrixPosition( target.matrixWorld );
 				distance = 0.1;
@@ -76,11 +76,11 @@ class EditorControls extends THREE.EventDispatcher {
 
 			delta.multiplyScalar( distance * scope.panSpeed );
 			
-			// Transform delta from screen space to world space using camera's rotation only
+			
 			var rotationMatrix = new THREE.Matrix4().extractRotation( object.matrix );
 			delta.applyMatrix4( rotationMatrix );
 
-			// Move both camera and center by the same world-space delta
+			
 			object.position.add( delta );
 			center.add( delta );
 
@@ -196,7 +196,7 @@ class EditorControls extends THREE.EventDispatcher {
 					var pointerId = pointers[ 0 ];
 					var position = pointerPositions[ pointerId ];
 
-					// minimal placeholder event - allows state correction on pointer-up
+					
 					onTouchStart( { pointerId: pointerId, pageX: position.x, pageY: position.y } );
 
 					break;
@@ -205,13 +205,13 @@ class EditorControls extends THREE.EventDispatcher {
 
 		}
 
-		// mouse
+		
 
 		function onMouseDown( event ) {
 
 			if ( event.button === 0 ) {
 
-				// SHIFT + left click = pan (reposition orbit center)
+				
 				if ( event.shiftKey ) {
 
 					state = STATE.PAN;
@@ -273,7 +273,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 			event.preventDefault();
 
-			// Normalize deltaY due to https://bugzilla.mozilla.org/show_bug.cgi?id=1392460
+			
 			scope.zoom( delta.set( 0, 0, event.deltaY > 0 ? 1 : - 1 ) );
 
 		}
@@ -310,7 +310,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 		};
 
-		// touch
+		
 
 		var touches = [ new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3() ];
 		var prevTouches = [ new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3() ];
@@ -377,7 +377,7 @@ class EditorControls extends THREE.EventDispatcher {
 
 					touches[ 0 ].set( event.pageX, event.pageY, 0 ).divideScalar( window.devicePixelRatio );
 					touches[ 1 ].set( position.x, position.y, 0 ).divideScalar( window.devicePixelRatio );
-					// Divide by 10 to offset inherent over-sensitivity (https://github.com/mrdoob/three.js/issues/32442)
+					
 					var distance = touches[ 0 ].distanceTo( touches[ 1 ] ) / 10;
 					scope.zoom( delta.set( 0, 0, prevDistance - distance ) );
 					prevDistance = distance;

@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// innerRadius
+	
 
 	const innerRadiusRow = new UIRow();
 	const innerRadius = new UINumber( parameters.innerRadius ).onChange( update );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( innerRadiusRow );
 
-	// outerRadius
+	
 
 	const outerRadiusRow = new UIRow();
 	const outerRadius = new UINumber( parameters.outerRadius ).onChange( update );
@@ -34,7 +34,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( outerRadiusRow );
 
-	// thetaSegments
+	
 
 	const thetaSegmentsRow = new UIRow();
 	const thetaSegments = new UIInteger( parameters.thetaSegments ).setRange( 3, Infinity ).onChange( update );
@@ -44,7 +44,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( thetaSegmentsRow );
 
-	// phiSegments
+	
 
 	const phiSegmentsRow = new UIRow();
 	const phiSegments = new UIInteger( parameters.phiSegments ).setRange( 3, Infinity ).onChange( update );
@@ -54,7 +54,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( phiSegmentsRow );
 
-	// thetaStart
+	
 
 	const thetaStartRow = new UIRow();
 	const thetaStart = new UINumber( parameters.thetaStart * THREE.MathUtils.RAD2DEG ).setUnit( '°' ).setStep( 10 ).onChange( update );
@@ -64,7 +64,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( thetaStartRow );
 
-	// thetaLength
+	
 
 	const thetaLengthRow = new UIRow();
 	const thetaLength = new UINumber( parameters.thetaLength * THREE.MathUtils.RAD2DEG ).setUnit( '°' ).setStep( 10 ).onChange( update );

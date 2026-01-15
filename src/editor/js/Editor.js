@@ -11,6 +11,7 @@ import { CopyObjectCommand } from './commands/CopyObjectCommand.js';
 import { CutObjectCommand } from './commands/CutObjectCommand.js';
 import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
 import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
+import { AssetObjectLoader } from './AssetObjectLoader.js';
 
 var _DEFAULT_CAMERA = new THREE.PerspectiveCamera( 50, 1, 0.01, 1000 );
 _DEFAULT_CAMERA.name = 'Camera';
@@ -19,26 +20,26 @@ _DEFAULT_CAMERA.lookAt( new THREE.Vector3() );
 
 function Editor() {
 
-	const Signal = signals.Signal; // eslint-disable-line no-undef
+	const Signal = signals.Signal; 
 
 	this.signals = {
 
-		// script
+		
 
 		editScript: new Signal(),
 
-		// player
+		
 
 		startPlayer: new Signal(),
 		stopPlayer: new Signal(),
 
-		// xr
+		
 
 		enterXR: new Signal(),
 		offerXR: new Signal(),
 		leaveXR: new Signal(),
 
-		// notifications
+		
 
 		editorCleared: new Signal(),
 
@@ -101,10 +102,10 @@ function Editor() {
 
 	};
 
+	this.storage = new _Storage();
 	this.config = new Config( this.storage );
 	this.history = new _History( this );
 	this.selector = new Selector( this );
-	this.storage = new _Storage();
 	this.strings = new Strings( this.config );
 	this.input = new Input( this );
 
@@ -126,7 +127,7 @@ function Editor() {
 	this.textures = {};
 	this.scripts = {};
 
-	this.materialsRefCounter = new Map(); // tracks how often is a material used by a 3D object
+	this.materialsRefCounter = new Map(); 
 
 	this.mixer = new THREE.AnimationMixer( this.scene );
 
@@ -160,7 +161,7 @@ Editor.prototype = {
 
 		this.scene.userData = JSON.parse( JSON.stringify( scene.userData ) );
 
-		// avoid render per object
+		
 
 		this.signals.sceneGraphChanged.active = false;
 
@@ -181,6 +182,11 @@ Editor.prototype = {
 
 		var scope = this;
 
+		const defaultCastShadows = this.config.getKey( 'project/defaults/castShadows' ) === true;
+		const defaultReceiveShadows = this.config.getKey( 'project/defaults/receiveShadows' ) === true;
+		const defaultMaterialUuid = this.config.getKey( 'project/defaults/material' );
+		const defaultMaterial = defaultMaterialUuid ? this.materials[ defaultMaterialUuid ] : null;
+
 		object.traverse( function ( child ) {
 
 			if ( child.geometry !== undefined ) scope.addGeometry( child.geometry );
@@ -188,6 +194,33 @@ Editor.prototype = {
 
 			scope.addCamera( child );
 			scope.addHelper( child );
+
+			if ( child.isMesh ) {
+				if ( defaultCastShadows && child.castShadow === false ) {
+					child.castShadow = true;
+				}
+				if ( defaultReceiveShadows && child.receiveShadow === false ) {
+					child.receiveShadow = true;
+				}
+				if ( defaultMaterial ) {
+					const clonedMaterial = defaultMaterial.clone();
+					if ( Array.isArray( child.material ) ) {
+						for ( let i = 0; i < child.material.length; i ++ ) {
+							child.material[ i ] = clonedMaterial.clone();
+							scope.addMaterial( child.material[ i ] );
+						}
+					} else {
+						child.material = clonedMaterial;
+						scope.addMaterial( clonedMaterial );
+					}
+				}
+			}
+
+			if ( child.isLight ) {
+				if ( defaultCastShadows && child.castShadow === false ) {
+					child.castShadow = true;
+				}
+			}
 
 		} );
 
@@ -463,7 +496,7 @@ Editor.prototype = {
 
 				} else {
 
-					// no helper for this object type
+					
 					return;
 
 				}
@@ -689,18 +722,20 @@ Editor.prototype = {
 				console.warn( '[Editor] Failed to load resource:', url );
 			};
 			
-			var loader = new THREE.ObjectLoader( manager );
+			
+			const projectPath = this.storage && this.storage.getProjectPath ? this.storage.getProjectPath() : null;
+			var loader = new AssetObjectLoader( manager, projectPath );
 			var camera = await loader.parseAsync( json.camera );
 
 			const existingUuid = this.camera.uuid;
 			const incomingUuid = camera.uuid;
 
-			// copy all properties, including uuid
+			
 			this.camera.copy( camera );
 			this.camera.uuid = incomingUuid;
 
-			delete this.cameras[ existingUuid ]; // remove old entry [existingUuid, this.camera]
-			this.cameras[ incomingUuid ] = this.camera; // add new entry [incomingUuid, this.camera]
+			delete this.cameras[ existingUuid ]; 
+			this.cameras[ incomingUuid ] = this.camera; 
 
 			if ( json.controls !== undefined ) {
 
@@ -808,7 +843,7 @@ Editor.prototype = {
 
 	toJSON: function () {
 
-		// scripts clean up
+		
 
 		if ( !this.scene ) {
 			return {
@@ -946,24 +981,91 @@ Editor.prototype = {
 
 		};
 
-		// Restore objects that were temporarily removed
+		
 		for ( let i = 0; i < objectsToRestore.length; i++ ) {
 			const item = objectsToRestore[ i ];
 			item.parent.add( item.object );
 		}
 
-		// Replace base64 image data with asset URLs in the images array
+		
+		
 		if ( result.scene && result.scene.images && Array.isArray( result.scene.images ) ) {
 			result.scene.images = result.scene.images.map( function( image ) {
 				if ( image && image.url && image.url.startsWith( 'data:' ) ) {
-					// This is base64 data - replace with asset URL
+					
 					const imageUuid = image.uuid;
+					
+					
+					let assetPath = null;
+					if ( result.scene.textures && Array.isArray( result.scene.textures ) ) {
+						for ( const texture of result.scene.textures ) {
+							if ( texture.image === imageUuid && texture.userData && texture.userData.assetPath ) {
+								assetPath = texture.userData.assetPath;
+								break;
+							}
+						}
+					}
+					
 					return {
 						uuid: imageUuid,
-						url: 'assets/textures/' + imageUuid + '.png'
+						url: assetPath || 'assets/textures/' + imageUuid + '.png'
 					};
 				}
 				return image;
+			} );
+		}
+
+		
+		if ( result.scene && result.scene.textures && Array.isArray( result.scene.textures ) ) {
+			
+			const textureMap = {};
+			this.scene.traverse( function( object ) {
+				if ( object.material ) {
+					const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+					materials.forEach( function( material ) {
+						if ( material ) {
+							
+							const textureProps = [ 'map', 'normalMap', 'bumpMap', 'roughnessMap', 'metalnessMap', 
+								'aoMap', 'emissiveMap', 'displacementMap', 'alphaMap', 'envMap', 
+								'lightMap', 'clearcoatMap', 'clearcoatNormalMap', 'clearcoatRoughnessMap',
+								'sheenColorMap', 'sheenRoughnessMap', 'specularColorMap', 'specularIntensityMap',
+								'transmissionMap', 'thicknessMap', 'iridescenceMap', 'iridescenceThicknessMap' ];
+							
+							textureProps.forEach( function( prop ) {
+								const texture = material[ prop ];
+								if ( texture && texture.isTexture && texture.uuid ) {
+									textureMap[ texture.uuid ] = texture;
+								}
+							} );
+						}
+					} );
+				}
+			} );
+
+			
+			result.scene.textures = result.scene.textures.map( function( textureJson ) {
+				const texture = textureMap[ textureJson.uuid ];
+				if ( texture && texture.assetPath ) {
+					if ( ! textureJson.userData ) {
+						textureJson.userData = {};
+					}
+					textureJson.userData.assetPath = texture.assetPath;
+					
+					
+					if ( textureJson.image && typeof textureJson.image === 'string' ) {
+						
+					} else if ( textureJson.image && typeof textureJson.image === 'object' ) {
+						
+						const imageUuid = textureJson.image.uuid;
+						if ( result.scene.images ) {
+							const imageIndex = result.scene.images.findIndex( img => img.uuid === imageUuid );
+							if ( imageIndex >= 0 ) {
+								result.scene.images[ imageIndex ].url = texture.assetPath;
+							}
+						}
+					}
+				}
+				return textureJson;
 			} );
 		}
 
@@ -1083,7 +1185,7 @@ Editor.prototype = {
 
 		const scope = this;
 		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-		const invoke = isTauri ? window.__TAURI__.invoke : null;
+		const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 
 		if ( !isTauri || !invoke ) return;
 
@@ -1121,7 +1223,7 @@ Editor.prototype = {
 
 		const scope = this;
 		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-		const invoke = isTauri ? window.__TAURI__.invoke : null;
+		const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 
 		if ( !isTauri || !invoke ) return;
 

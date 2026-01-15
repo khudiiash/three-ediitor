@@ -9,7 +9,7 @@ export class EngineEvents {
     private static instance: EngineEvents | null = null;
 
     private constructor() {
-        // Private constructor for singleton
+        
     }
 
     /**
@@ -105,7 +105,7 @@ export class EngineEvents {
     }
 }
 
-// Export convenience methods
+
 export const events = EngineEvents.getInstance();
 export const on = EngineEvents.on;
 export const once = EngineEvents.once;

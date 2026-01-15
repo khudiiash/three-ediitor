@@ -128,7 +128,7 @@ function Script( editor ) {
 
 	} );
 
-	// prevent backspace from deleting objects
+	
 	const wrapper = codemirror.getWrapperElement();
 	wrapper.addEventListener( 'keydown', function ( event ) {
 
@@ -136,7 +136,7 @@ function Script( editor ) {
 
 	} );
 
-	// validate
+	
 
 	const errorLines = [];
 	const widgets = [];
@@ -214,7 +214,7 @@ function Script( editor ) {
 
 					} catch ( error ) {
 
-						// ignore failed error recovery
+						
 
 					}
 
@@ -224,7 +224,7 @@ function Script( editor ) {
 
 					currentObject.material[ currentScript ] = string;
 					currentObject.material.needsUpdate = true;
-					signals.materialChanged.dispatch( currentObject, 0 ); // TODO: Add multi-material support
+					signals.materialChanged.dispatch( currentObject, 0 ); 
 
 					const programs = renderer.info.programs;
 
@@ -255,13 +255,13 @@ function Script( editor ) {
 
 							} );
 
-						} // messages
+						} 
 
 						break;
 
-					} // programs
+					} 
 
-			} // mode switch
+			} 
 
 			for ( let i = 0; i < errors.length; i ++ ) {
 
@@ -288,7 +288,7 @@ function Script( editor ) {
 
 	};
 
-	// tern js autocomplete
+	
 
 	const server = new CodeMirror.TernServer( {
 		caseInsensitive: true,
@@ -490,7 +490,7 @@ function Script( editor ) {
 
 		if ( object !== currentObject ) return;
 
-		// TODO: Adds multi-material support
+		
 
 		setTitle( currentObject, currentScript );
 

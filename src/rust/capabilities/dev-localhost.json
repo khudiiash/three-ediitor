@@ -1,0 +1,31 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "dev-localhost",
+  "description": "allows localhost:5173 dev server to access Tauri API",
+  "windows": [
+    "hub",
+    "editor"
+  ],
+  "remote": {
+    "urls": [
+      "http://localhost:5173",
+      "http://localhost:5173/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "fs:allow-read-dir",
+    "fs:allow-create",
+    "fs:allow-remove",
+    "fs:allow-exists",
+    "fs:allow-stat",
+    "fs:allow-fstat",
+    "fs:allow-lstat",
+    "fs:read-meta",
+    "shell:allow-open"
+  ]
+}

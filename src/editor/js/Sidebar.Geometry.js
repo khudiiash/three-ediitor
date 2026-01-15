@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 
-import { UIPanel, UIRow, UIText, UIInput, UIButton, UISpan, UITextArea } from './libs/ui.js';
+import { UIPanel, UIRow, UIText, UIInput, UIButton, UISpan, UITextArea, UISelect } from './libs/ui.js';
 
 import { SetGeometryValueCommand } from './commands/SetGeometryValueCommand.js';
+import { SetGeometryCommand } from './commands/SetGeometryCommand.js';
+import { SetMaterialCommand } from './commands/SetMaterialCommand.js';
+import { AssetSelector } from './AssetSelector.js';
 
 import { SidebarGeometryBufferGeometry } from './Sidebar.Geometry.BufferGeometry.js';
 import { SidebarGeometryModifiers } from './Sidebar.Geometry.Modifiers.js';
@@ -22,7 +25,7 @@ function SidebarGeometry( editor ) {
 
 	let currentGeometryType = null;
 
-	// Actions
+	
 
 	/*
 	let objectActions = new UISelect().setPosition( 'absolute' ).setRight( '8px' ).setFontSize( '11px' );
@@ -36,7 +39,7 @@ function SidebarGeometry( editor ) {
 	} );
 	objectActions.onClick( function ( event ) {
 
-		event.stopPropagation(); // Avoid panel collapsing
+		event.stopPropagation(); 
 
 	} );
 	objectActions.onChange( function ( event ) {
@@ -85,7 +88,7 @@ function SidebarGeometry( editor ) {
 	container.addStatic( objectActions );
 	*/
 
-	// type
+	
 
 	const geometryTypeRow = new UIRow();
 	const geometryType = new UIText();
@@ -95,7 +98,7 @@ function SidebarGeometry( editor ) {
 
 	container.add( geometryTypeRow );
 
-	// uuid
+	
 
 	const geometryUUIDRow = new UIRow();
 	const geometryUUID = new UIInput().setWidth( '102px' ).setFontSize( '12px' ).setDisabled( true );
@@ -113,7 +116,7 @@ function SidebarGeometry( editor ) {
 
 	container.add( geometryUUIDRow );
 
-	// name
+	
 
 	const geometryNameRow = new UIRow();
 	const geometryName = new UIInput().setWidth( '150px' ).setFontSize( '12px' ).onChange( function () {
@@ -127,16 +130,245 @@ function SidebarGeometry( editor ) {
 
 	container.add( geometryNameRow );
 
-	// parameters
+	
+	const geometrySelectorRow = new UIRow();
+	const geometrySelectorButton = new UIButton( 'Select Geometry...' ).setWidth( '150px' );
+	
+	
+	const defaultGeometries = {
+		'BoxGeometry': THREE.BoxGeometry,
+		'SphereGeometry': THREE.SphereGeometry,
+		'CylinderGeometry': THREE.CylinderGeometry,
+		'PlaneGeometry': THREE.PlaneGeometry,
+		'ConeGeometry': THREE.ConeGeometry,
+		'TorusGeometry': THREE.TorusGeometry,
+		'TorusKnotGeometry': THREE.TorusKnotGeometry,
+		'OctahedronGeometry': THREE.OctahedronGeometry,
+		'TetrahedronGeometry': THREE.TetrahedronGeometry,
+		'IcosahedronGeometry': THREE.IcosahedronGeometry,
+		'DodecahedronGeometry': THREE.DodecahedronGeometry,
+		'CapsuleGeometry': THREE.CapsuleGeometry,
+		'CircleGeometry': THREE.CircleGeometry,
+		'RingGeometry': THREE.RingGeometry,
+		'LatheGeometry': THREE.LatheGeometry
+	};
+
+	geometrySelectorButton.onClick( function () {
+		if ( ! editor.selected ) {
+			alert( 'Please select an object first' );
+			return;
+		}
+
+		if ( ! editor.assetSelector ) {
+			editor.assetSelector = new AssetSelector( editor );
+		}
+
+		editor.assetSelector.show( async function ( assetData ) {
+			if ( ! assetData ) return;
+
+			const object = editor.selected;
+			if ( ! object ) return;
+
+			let newGeometry = null;
+
+			
+			if ( assetData.type === 'default-geometry' && assetData.geometryType ) {
+				const GeometryClass = defaultGeometries[ assetData.geometryType ];
+				if ( GeometryClass ) {
+					
+					if ( assetData.geometryType === 'BoxGeometry' ) {
+						newGeometry = new GeometryClass( 1, 1, 1 );
+					} else if ( assetData.geometryType === 'SphereGeometry' ) {
+						newGeometry = new GeometryClass( 1, 32, 16 );
+					} else if ( assetData.geometryType === 'CylinderGeometry' ) {
+						newGeometry = new GeometryClass( 1, 1, 1, 32 );
+					} else if ( assetData.geometryType === 'PlaneGeometry' ) {
+						newGeometry = new GeometryClass( 1, 1 );
+					} else if ( assetData.geometryType === 'ConeGeometry' ) {
+						newGeometry = new GeometryClass( 1, 1, 32 );
+					} else if ( assetData.geometryType === 'TorusGeometry' ) {
+						newGeometry = new GeometryClass( 1, 0.4, 16, 100 );
+					} else if ( assetData.geometryType === 'TorusKnotGeometry' ) {
+						newGeometry = new GeometryClass( 1, 0.3, 100, 16 );
+					} else if ( assetData.geometryType === 'CapsuleGeometry' ) {
+						newGeometry = new GeometryClass( 1, 1, 4, 8 );
+					} else if ( assetData.geometryType === 'CircleGeometry' ) {
+						newGeometry = new GeometryClass( 1, 32 );
+					} else if ( assetData.geometryType === 'RingGeometry' ) {
+						newGeometry = new GeometryClass( 0.5, 1, 32 );
+					} else {
+						newGeometry = new GeometryClass();
+					}
+					newGeometry.name = assetData.geometryType;
+				}
+			} else if ( assetData && assetData.isGeometry ) {
+				
+				newGeometry = assetData;
+			}
+
+			if ( newGeometry ) {
+				newGeometry.uuid = object.geometry.uuid;
+				editor.execute( new SetGeometryCommand( editor, object, newGeometry ) );
+				build();
+			}
+		}, null, 'geometry' );
+	} );
+
+	geometrySelectorRow.add( new UIText( 'Geometry' ).setClass( 'Label' ) );
+	geometrySelectorRow.add( geometrySelectorButton );
+	container.add( geometrySelectorRow );
+
+	
+	const replaceMeshRow = new UIRow();
+	const replaceMeshButton = new UIButton( 'Replace Mesh from Assets' ).setWidth( '150px' ).onClick( function () {
+
+		if ( ! editor.assetSelector ) {
+			editor.assetSelector = new AssetSelector( editor );
+		}
+
+		editor.assetSelector.show( async function ( modelData ) {
+
+			
+			if ( modelData && modelData.isObject3D ) {
+				
+				const object = editor.selected;
+				if ( object && object.isMesh ) {
+					
+					let loadedMesh = null;
+					modelData.traverse( ( child ) => {
+						if ( child.isMesh && ! loadedMesh ) {
+							loadedMesh = child;
+						}
+					} );
+
+					if ( loadedMesh && loadedMesh.isMesh ) {
+						
+						const newGeometry = loadedMesh.geometry.clone();
+						const newMaterial = loadedMesh.material ? ( Array.isArray( loadedMesh.material ) ? loadedMesh.material[ 0 ].clone() : loadedMesh.material.clone() ) : null;
+
+						
+						editor.execute( new SetGeometryCommand( editor, object, newGeometry ) );
+						
+						if ( newMaterial ) {
+							editor.addMaterial( newMaterial );
+							editor.execute( new SetMaterialCommand( editor, object, newMaterial, 0 ) );
+						}
+
+						editor.signals.objectChanged.dispatch( object );
+						build();
+					}
+				}
+			} else if ( modelData && modelData.type === 'model' ) {
+				const object = editor.selected;
+				if ( object && object.isMesh ) {
+					try {
+						const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
+						const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+
+						if ( ! projectPath ) {
+							console.error( 'No project path available' );
+							return;
+						}
+
+						let loader;
+						const ext = modelData.extension;
+
+						if ( ext === 'glb' || ext === 'gltf' ) {
+							const { GLTFLoader } = await import( 'three/addons/loaders/GLTFLoader.js' );
+							loader = new GLTFLoader();
+						} else if ( ext === 'fbx' ) {
+							const { FBXLoader } = await import( 'three/addons/loaders/FBXLoader.js' );
+							loader = new FBXLoader();
+						} else if ( ext === 'obj' ) {
+							const { OBJLoader } = await import( 'three/addons/loaders/OBJLoader.js' );
+							loader = new OBJLoader();
+						} else {
+							console.error( 'Unsupported model format:', ext );
+							return;
+						}
+
+						if ( isTauri ) {
+							const assetPath = modelData.path.startsWith( '/' ) ? modelData.path.substring( 1 ) : modelData.path;
+							const assetBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
+								projectPath: projectPath,
+								assetPath: assetPath
+							} );
+
+							const uint8Array = new Uint8Array( assetBytes );
+							const blob = new Blob( [ uint8Array ] );
+							const blobUrl = URL.createObjectURL( blob );
+
+							loader.load( blobUrl, function ( result ) {
+
+								let loadedMesh;
+								if ( result.scene ) {
+									
+									loadedMesh = result.scene.children[ 0 ];
+									if ( ! loadedMesh || ! loadedMesh.isMesh ) {
+										
+										result.scene.traverse( function ( child ) {
+											if ( child.isMesh && ! loadedMesh ) {
+												loadedMesh = child;
+											}
+										} );
+									}
+								} else if ( result.isGroup ) {
+									
+									loadedMesh = result.children[ 0 ];
+								} else if ( result.isMesh ) {
+									loadedMesh = result;
+								}
+
+								if ( loadedMesh && loadedMesh.isMesh ) {
+									
+									const newGeometry = loadedMesh.geometry.clone();
+									const newMaterial = loadedMesh.material ? ( Array.isArray( loadedMesh.material ) ? loadedMesh.material[ 0 ].clone() : loadedMesh.material.clone() ) : null;
+
+									
+									editor.execute( new SetGeometryCommand( editor, object, newGeometry ) );
+									
+									if ( newMaterial ) {
+										editor.addMaterial( newMaterial );
+										editor.execute( new SetMaterialCommand( editor, object, newMaterial, 0 ) );
+									}
+
+									editor.signals.objectChanged.dispatch( object );
+									build();
+								}
+
+								URL.revokeObjectURL( blobUrl );
+
+							}, undefined, function ( error ) {
+								console.error( 'Error loading model:', error );
+								URL.revokeObjectURL( blobUrl );
+							} );
+
+						}
+
+					} catch ( error ) {
+						console.error( 'Error replacing mesh:', error );
+					}
+				}
+			}
+
+		}, null, 'model' );
+
+	} );
+
+	replaceMeshRow.add( new UIText( 'Replace Mesh' ).setClass( 'Label' ) );
+	replaceMeshRow.add( replaceMeshButton );
+	container.add( replaceMeshRow );
+
+	
 
 	const parameters = new UISpan();
 	container.add( parameters );
 
-	// buffergeometry
+	
 
 	container.add( new SidebarGeometryBufferGeometry( editor ) );
 
-	// Size
+	
 
 	const geometryBoundingBox = new UIText().setFontSize( '12px' );
 
@@ -145,7 +377,7 @@ function SidebarGeometry( editor ) {
 	geometryBoundingBoxRow.add( geometryBoundingBox );
 	container.add( geometryBoundingBoxRow );
 
-	// userData
+	
 
 	const geometryUserDataRow = new UIRow();
 	const geometryUserData = new UITextArea().setValue( '{}' ).setWidth( '150px' ).setHeight( '40px' ).setFontSize( '12px' ).onChange( function () {
@@ -192,7 +424,7 @@ function SidebarGeometry( editor ) {
 
 	container.add( geometryUserDataRow );
 
-	// Helpers
+	
 
 	const helpersRow = new UIRow().setMarginLeft( '120px' );
 	container.add( helpersRow );
@@ -217,7 +449,7 @@ function SidebarGeometry( editor ) {
 	} );
 	helpersRow.add( vertexNormalsButton );
 
-	// Export JSON
+	
 
 	const exportJson = new UIButton( strings.getKey( 'sidebar/geometry/export' ) );
 	exportJson.setMarginLeft( '120px' );

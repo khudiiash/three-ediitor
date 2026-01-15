@@ -62,7 +62,7 @@ function ViewportInfo( editor ) {
 					const geometry = object.geometry;
 					const positionAttribute = geometry.attributes.position;
 
-					// update counts only if vertex data are defined
+					
 
 					if ( positionAttribute !== undefined && positionAttribute !== null ) {
 

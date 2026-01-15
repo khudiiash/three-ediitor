@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// radius
+	
 
 	const radiusRow = new UIRow();
 	const radius = new UINumber( parameters.radius ).onChange( update );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radiusRow );
 
-	// tube
+	
 
 	const tubeRow = new UIRow();
 	const tube = new UINumber( parameters.tube ).onChange( update );
@@ -34,7 +34,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( tubeRow );
 
-	// tubularSegments
+	
 
 	const tubularSegmentsRow = new UIRow();
 	const tubularSegments = new UIInteger( parameters.tubularSegments ).setRange( 1, Infinity ).onChange( update );
@@ -44,7 +44,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( tubularSegmentsRow );
 
-	// radialSegments
+	
 
 	const radialSegmentsRow = new UIRow();
 	const radialSegments = new UIInteger( parameters.radialSegments ).setRange( 1, Infinity ).onChange( update );
@@ -54,7 +54,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radialSegmentsRow );
 
-	// p
+	
 
 	const pRow = new UIRow();
 	const p = new UIInteger( parameters.p ).onChange( update );
@@ -64,7 +64,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( pRow );
 
-	// q
+	
 
 	const qRow = new UIRow();
 	const q = new UIInteger( parameters.q ).onChange( update );

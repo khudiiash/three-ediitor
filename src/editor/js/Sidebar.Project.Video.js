@@ -9,16 +9,16 @@ function SidebarProjectVideo( editor ) {
 	const container = new UIPanel();
 	container.setId( 'render' );
 
-	// Video
+	
 
 	container.add( new UIText( strings.getKey( 'sidebar/project/video' ) ).setTextTransform( 'uppercase' ) );
 	container.add( new UIBreak(), new UIBreak() );
 
-	// Resolution
+	
 
 	function toDiv2() {
 
-		// Make sure dimensions are divisible by 2 (requirement of libx264)
+		
 
 		this.setValue( 2 * Math.floor( this.getValue() / 2 ) );
 
@@ -42,7 +42,7 @@ function SidebarProjectVideo( editor ) {
 
 	resolutionRow.add( new UIText( 'fps' ).setFontSize( '12px' ) );
 
-	// Duration
+	
 
 	const videoDurationRow = new UIRow();
 	videoDurationRow.add( new UIText( strings.getKey( 'sidebar/project/duration' ) ).setClass( 'Label' ) );
@@ -52,7 +52,7 @@ function SidebarProjectVideo( editor ) {
 
 	container.add( videoDurationRow );
 
-	// Render
+	
 
 	const renderButton = new UIButton( strings.getKey( 'sidebar/project/render' ) );
 	renderButton.setWidth( '170px' );
@@ -102,7 +102,7 @@ function SidebarProjectVideo( editor ) {
 		status.appendChild( writeFileStatus );
 
 		const encodingText = document.createElement( 'span' );
-		encodingText.textContent = ' encoding'; // TODO: l10n
+		encodingText.textContent = ' encoding'; 
 		encodingText.hidden = true;
 		status.appendChild( encodingText );
 
@@ -111,7 +111,7 @@ function SidebarProjectVideo( editor ) {
 		status.appendChild( encodingStatus );
 
 		const videoSizeText = document.createElement( 'span' );
-		videoSizeText.textContent = ' size'; // TODO: l10n
+		videoSizeText.textContent = ' size'; 
 		videoSizeText.hidden = true;
 		status.appendChild( videoSizeText );
 
@@ -134,7 +134,7 @@ function SidebarProjectVideo( editor ) {
 
 		//
 
-		const { createFFmpeg, fetchFile } = FFmpeg; // eslint-disable-line no-undef
+		const { createFFmpeg, fetchFile } = FFmpeg; 
 		const ffmpeg = createFFmpeg( { log: true } );
 
 		await ffmpeg.load();

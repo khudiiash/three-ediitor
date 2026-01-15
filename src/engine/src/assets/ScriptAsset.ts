@@ -28,8 +28,15 @@ export class ScriptAsset extends Asset {
             let compiledCode: string;
 
             if (typeof window !== 'undefined' && (window as any).__TAURI__) {
-                const invoke = (window as any).__TAURI__.invoke;
-                const projectPath = (window as any).__editorProjectPath || (window as any).__projectPath;
+                const invoke = (window as any).__TAURI__.core.invoke;
+                let projectPath = (window as any).__editorProjectPath || (window as any).__projectPath;
+                if (!projectPath && typeof sessionStorage !== 'undefined') {
+                    projectPath = sessionStorage.getItem('editor_project_path');
+                }
+                
+                if (!projectPath) {
+                    console.warn(`[ScriptAsset] Project path not found for ${this.name}. Available: __editorProjectPath=${(window as any).__editorProjectPath}, __projectPath=${(window as any).__projectPath}, sessionStorage=${sessionStorage?.getItem('editor_project_path')}`);
+                }
                 
                 if (projectPath && invoke) {
                     let assetPath = scriptUrl;
@@ -120,25 +127,17 @@ export class ScriptAsset extends Asset {
                         });
                         compiledCode = new TextDecoder().decode(new Uint8Array(fileBytes));
                     } catch (tauriError) {
-                        const response = await fetch(scriptUrl);
-                        if (!response.ok) {
-                            throw new Error(`Failed to load script: ${response.statusText}`);
-                        }
-                        compiledCode = await response.text();
+                        console.warn(`[ScriptAsset] Failed to load via Tauri (${this.name}):`, tauriError);
+                        console.warn(`[ScriptAsset] Project path: ${projectPath}, Asset path: ${assetPath}`);
+                        throw new Error(`Failed to load script via Tauri: ${tauriError}`);
                     }
                 } else {
-                    const response = await fetch(scriptUrl);
-                    if (!response.ok) {
-                        throw new Error(`Failed to load script: ${response.statusText}`);
-                    }
-                    compiledCode = await response.text();
+                    console.warn(`[ScriptAsset] Tauri available but project path not set for ${this.name}`);
+                    throw new Error(`Project path not available for script: ${this.name}`);
                 }
             } else {
-                const response = await fetch(scriptUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to load script: ${response.statusText}`);
-                }
-                compiledCode = await response.text();
+                console.warn(`[ScriptAsset] Tauri not available, cannot load script: ${this.name}`);
+                throw new Error(`Tauri not available, cannot load script: ${this.name}`);
             }
 
             if (typeof window !== 'undefined') {

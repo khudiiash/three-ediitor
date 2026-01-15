@@ -13,7 +13,7 @@ function SidebarGeometryModifiers( editor, object ) {
 
 	const geometry = object.geometry;
 
-	// Compute Vertex Normals
+	
 
 	const computeVertexNormalsButton = new UIButton( strings.getKey( 'sidebar/geometry/compute_vertex_normals' ) );
 	computeVertexNormalsButton.onClick( function () {
@@ -28,7 +28,7 @@ function SidebarGeometryModifiers( editor, object ) {
 	computeVertexNormalsRow.add( computeVertexNormalsButton );
 	container.add( computeVertexNormalsRow );
 
-	// Compute Vertex Tangents
+	
 
 	if ( geometry.hasAttribute( 'position' ) && geometry.hasAttribute( 'normal' ) && geometry.hasAttribute( 'uv' ) ) {
 
@@ -49,7 +49,7 @@ function SidebarGeometryModifiers( editor, object ) {
 
 	}
 
-	// Center Geometry
+	
 
 	const centerButton = new UIButton( strings.getKey( 'sidebar/geometry/center' ) );
 	centerButton.onClick( function () {

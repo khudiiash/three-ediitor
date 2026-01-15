@@ -111,7 +111,7 @@ textarea, input { outline: none; } /* osx */
 /* Listbox */
 .Listbox {
 	color: #444;
-	background-color: #ddd;
+	background-color: #222;
 	padding: 0;
 	width: 100%;
 	min-height: 180px;
@@ -202,7 +202,7 @@ textarea, input { outline: none; } /* osx */
 	display: inline-block;
 	width: 14px;
 	height: 14px;
-	color: #ddd;
+	color: #222;
 	text-align: center;
 }
 
@@ -266,7 +266,7 @@ textarea, input { outline: none; } /* osx */
 
 button {
 	color: #555;
-	background-color: #ddd;
+	background-color: #222;
 	border: 0px;
 	margin: 0px; /* GNOME Web */
 	padding: 5px 8px;
@@ -277,16 +277,17 @@ button {
 }
 
 	button:hover {
-		background-color: #ddd;
+		background-color: #444;
 	}
 
 	button.selected {
-		background-color: #ddd;
+		background-color: #08f;
 	}
 
 input, textarea {
 	border: 1px solid transparent;
 	color: #444;
+	background-color: #222;
 }
 
 input.Number {
@@ -298,16 +299,25 @@ input.Number {
 
 select {
 	color: #666;
-	background-color: #ddd;
+	background-color: #222;
 	border: 0px;
 	text-transform: uppercase;
 	cursor: pointer;
 	outline: none;
 }
 
-	select:hover {
-		background-color: #ddd;
-	}
+select:hover {
+	background-color: #444;
+}
+
+option {
+	background-color: #222;
+	color: #666;
+}
+
+option:hover {
+	background-color: #444;
+}
 
 /* UI */
 
@@ -464,7 +474,7 @@ select {
 		}
 
 			#menubar .menu .options hr {
-				border-color: #ddd;
+				border-color: #222;
 			}
 
 			#menubar .menu .options .option {
@@ -765,7 +775,7 @@ select {
 	top: 32px;
 	bottom: 0;
 	width: 350px;
-	background: #ddd;
+	background: #222;
 	overflow: auto;
 	overflow-x: hidden;
 }
@@ -882,7 +892,6 @@ select {
 	#sidebar-bottom .Row select {
 		font-size: 11px;
 		padding: 4px 8px;
-		background: rgba(0, 0, 0, 0.15);
 		border: 1px solid transparent;
 		border-radius: 3px;
 		cursor: pointer;
@@ -931,7 +940,7 @@ select {
 
 	#tabs span.selected {
 		color: #888;
-		background-color: #ddd;
+		background-color: #222;
 	}
 
 #toolbar {
@@ -1047,7 +1056,7 @@ select {
 
 
 .TabbedPanel .Tabs {
-	background-color: #ddd;
+	background-color: #222;
 }
 
 	.TabbedPanel .Tab {
@@ -1124,15 +1133,15 @@ select {
 		background-color: #222;
 	}
 
-		button:hover {
-			color: #ccc;
-			background-color: #444;
-		}
+	button:hover {
+		color: #ccc;
+		background-color: #444;
+	}
 
-		button.selected {
-			color: #fff;
-			background-color: #08f;
-		}
+	button.selected {
+		color: #fff;
+		background-color: #08f;
+	}
 
 	input, textarea {
 		background-color: #222;
@@ -1145,10 +1154,10 @@ select {
 		background-color: #222;
 	}
 
-		select:hover {
-			color: #ccc;
-			background-color: #444;
-		}
+	select:hover {
+		color: #ccc;
+		background-color: #444;
+	}
 
 	/* UI */
 

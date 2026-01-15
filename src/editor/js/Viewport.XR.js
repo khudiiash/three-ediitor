@@ -64,7 +64,7 @@ class XR {
 
 					if ( intersects.length > 0 ) {
 
-						// Ignore menu clicks
+						
 
 						const intersect = intersects[ 0 ];
 						if ( intersect.object === group.children[ 0 ] ) return;
@@ -132,12 +132,12 @@ class XR {
 				controllerGrip2.add( controllerModelFactory.createControllerModel( controllerGrip2 ) );
 				controllers.add( controllerGrip2 );
 
-				// menu
+				
 
 				group = new InteractiveGroup();
 
 				const mesh = new HTMLMesh( sidebar );
-				mesh.name = 'picker'; // Make Selector be aware of the menu
+				mesh.name = 'picker'; 
 				mesh.position.set( 0.5, 1.0, - 0.5 );
 				mesh.rotation.y = - 0.5;
 				group.add( mesh );
@@ -176,7 +176,7 @@ class XR {
 
 		};
 
-		// signals
+		
 
 		const sessionInit = { optionalFeatures: [ 'local-floor' ] };
 

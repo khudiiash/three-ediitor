@@ -4,7 +4,7 @@ function Resizer( editor ) {
 
 	const signals = editor.signals;
 
-	// Left sidebar resizer (resizes left sidebar width)
+	
 	const leftResizer = document.createElement( 'div' );
 	leftResizer.id = 'resizer-left';
 	leftResizer.style.cssText = 'position: absolute; z-index: 1001; top: 32px; left: 250px; width: 5px; bottom: 200px; transform: translatex(-2.5px); cursor: col-resize; pointer-events: auto; background: transparent;';
@@ -60,7 +60,7 @@ function Resizer( editor ) {
 
 	leftResizer.addEventListener( 'pointerdown', onLeftPointerDown );
 
-	// Right sidebar resizer (resizes right sidebar width)
+	
 	const rightResizer = document.createElement( 'div' );
 	rightResizer.id = 'resizer';
 	rightResizer.style.cssText = 'position: absolute; z-index: 1001; top: 32px; right: 350px; width: 5px; bottom: 200px; transform: translatex(2.5px); cursor: col-resize; pointer-events: auto; background: transparent;';
@@ -121,11 +121,11 @@ function Resizer( editor ) {
 
 	rightResizer.addEventListener( 'pointerdown', onRightPointerDown );
 
-	// Bottom sidebar resizer (resizes bottom sidebar height)
+	
 	const bottomResizer = document.createElement( 'div' );
 	bottomResizer.id = 'resizer-bottom';
 	
-	// Update bottom resizer position when sidebars change
+	
 	function updateBottomResizerPosition() {
 		const sidebarLeft = document.getElementById( 'sidebar-left' );
 		const sidebarRight = document.getElementById( 'sidebar-right' );
@@ -173,8 +173,8 @@ function Resizer( editor ) {
 		const windowHeight = window.innerHeight;
 		const clientY = event.clientY;
 
-		// Calculate height from bottom: window height - mouse Y position
-		// The sidebar is at bottom: 0, so height = distance from mouse to bottom
+		
+		
 		const rawHeight = windowHeight - clientY;
 
 		const minHeight = 100;
@@ -188,10 +188,10 @@ function Resizer( editor ) {
 
 			sidebarBottom.style.height = height + 'px';
 			viewport.style.bottom = height + 'px';
-			// Position resizer at the top edge of the bottom sidebar
+			
 			bottomResizer.style.bottom = height + 'px';
 			
-			// Update left and right sidebars to extend to the new bottom
+			
 			const sidebarLeft = document.getElementById( 'sidebar-left' );
 			const sidebarRight = document.getElementById( 'sidebar-right' );
 			if ( sidebarLeft ) {
@@ -211,7 +211,7 @@ function Resizer( editor ) {
 
 	bottomResizer.addEventListener( 'pointerdown', onBottomPointerDown );
 
-	// Add hover styles
+	
 	[ leftResizer, rightResizer, bottomResizer ].forEach( resizer => {
 
 		resizer.addEventListener( 'mouseenter', function () {
@@ -234,12 +234,12 @@ function Resizer( editor ) {
 
 	} );
 
-	// Add resizers directly to body
+	
 	document.body.appendChild( leftResizer );
 	document.body.appendChild( rightResizer );
 	document.body.appendChild( bottomResizer );
 
-	// Return a dummy element for compatibility
+	
 	return new UIElement( document.createElement( 'div' ) );
 
 }

@@ -9,9 +9,10 @@ use project_manager::ProjectManager;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use std::process::{Command, Child};
-use tauri::{Manager, State};
+use std::path::PathBuf;
+use tauri::{Manager, State, Emitter, webview::WebviewWindowBuilder};
+use notify::{Watcher, RecommendedWatcher, RecursiveMode, Event, EventKind};
 
-// Global state shared between Tauri and WebSocket
 struct AppState {
     ws_server: Arc<Mutex<WebSocketServer>>,
     connected: Arc<Mutex<bool>>,
@@ -20,7 +21,6 @@ struct AppState {
     engine_process: Arc<Mutex<Option<Child>>>,
 }
 
-// Tauri commands that the frontend can call
 #[tauri::command]
 fn send_to_engine(state: State<AppState>, message: String) -> Result<(), String> {
     let msg: EditorMessage = serde_json::from_str(&message)
@@ -40,7 +40,6 @@ fn get_entities(state: State<AppState>) -> Vec<serde_json::Value> {
     state.entities.lock().clone()
 }
 
-// Project management commands
 #[tauri::command]
 fn list_projects() -> Result<Vec<project_manager::ProjectInfo>, String> {
     let manager = ProjectManager::new()?;
@@ -59,7 +58,6 @@ fn delete_project(path: String) -> Result<(), String> {
     manager.delete_project(&path)
 }
 
-// Helper commands for reading/writing scene.json files
 #[tauri::command]
 fn read_scene_file(project_path: String) -> Result<String, String> {
     use std::fs;
@@ -120,9 +118,6 @@ fn write_scene_file(project_path: String, content: String) -> Result<(), String>
     
     let path = PathBuf::from(&project_path).join("scene.json");
     
-    eprintln!("[write_scene_file] Writing scene.json to: {:?}", path);
-    eprintln!("[write_scene_file] Project path received: {}", project_path);
-    
     fs::write(&path, content)
         .map_err(|e| format!("Failed to write file: {}", e))?;
     
@@ -147,13 +142,11 @@ fn write_scene_file(project_path: String, content: String) -> Result<(), String>
 }
 
 #[tauri::command]
-fn read_editor_config() -> Result<String, String> {
+fn read_editor_config(app: tauri::AppHandle) -> Result<String, String> {
     use std::fs;
-    use tauri::api::path::app_data_dir;
-    use tauri::Config;
     
-    let config_dir = app_data_dir(&Config::default())
-        .ok_or("Failed to get app data directory")?;
+    let config_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
     let config_path = config_dir.join("editor.json");
     
     match fs::read_to_string(&config_path) {
@@ -169,13 +162,11 @@ fn read_editor_config() -> Result<String, String> {
 }
 
 #[tauri::command]
-fn write_editor_config(content: String) -> Result<(), String> {
+fn write_editor_config(app: tauri::AppHandle, content: String) -> Result<(), String> {
     use std::fs;
-    use tauri::api::path::app_data_dir;
-    use tauri::Config;
     
-    let config_dir = app_data_dir(&Config::default())
-        .ok_or("Failed to get app data directory")?;
+    let config_dir = app.path().app_data_dir()
+        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
     
     if !config_dir.exists() {
         fs::create_dir_all(&config_dir)
@@ -475,9 +466,37 @@ async fn list_assets_directory(project_path: String, dir_path: String) -> Result
 }
 
 #[tauri::command]
+fn reload_window(app: tauri::AppHandle, window_label: String) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(&window_label) {
+        let reload_script = r#"
+            (async function() {
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                    }
+                    const cacheNames = await caches.keys();
+                    for (let cacheName of cacheNames) {
+                        await caches.delete(cacheName);
+                    }
+                }
+                const baseUrl = window.location.href.split('?')[0].split('#')[0];
+                const timestamp = Date.now();
+                window.location.href = baseUrl + '?t=' + timestamp + '&_=' + Math.random();
+            })();
+        "#;
+        window.eval(reload_script)
+            .map_err(|e| format!("Failed to reload window: {}", e))?;
+        Ok(())
+    } else {
+        Err(format!("Window '{}' not found", window_label))
+    }
+}
+
+#[tauri::command]
 fn open_project(app: tauri::AppHandle, path: String) -> Result<(), String> {
     
-    if let Some(existing_window) = app.get_window("editor") {
+    if let Some(existing_window) = app.get_webview_window("editor") {
         match existing_window.is_visible() {
             Ok(true) => {
                 return Err("Editor is already open. Please close it first.".to_string());
@@ -509,24 +528,18 @@ fn open_project(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let app_clone = app.clone();
     let path_clone = path.clone();
     std::thread::spawn(move || {
-        let editor_window = match tauri::WindowBuilder::new(
-            &app_clone,
-            "editor",
-            tauri::WindowUrl::App("editor/index.html".into())
-        )
-        .title("Three.js Editor")
-        .inner_size(1280.0, 720.0)
-        .resizable(true)
-        .visible(true)
-        .focused(true)
-        .build() {
-            Ok(window) => {
+        let editor_window = match app_clone.get_webview_window("editor") {
+            Some(window) => {
+                #[cfg(debug_assertions)]
+                {
+                    let _ = window.eval(&format!("window.location.href = 'http://localhost:5173/';"));
+                }
                 window
             }
-            Err(e) => {
-                eprintln!("[Editor] Failed to create editor window: {}", e);
-                if let Some(hub_window) = app_clone.get_window("hub") {
-                    let _ = hub_window.emit("editor-error", format!("Failed to create editor window: {}", e));
+            None => {
+                eprintln!("[Editor] Editor window not found in config");
+                if let Some(hub_window) = app_clone.get_webview_window("hub") {
+                    let _ = hub_window.emit("editor-error", "Editor window not found in config");
                 }
                 return;
             }
@@ -577,10 +590,47 @@ fn main() {
     let engine_process_for_cleanup = engine_process.clone();
     
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(app_state)
         .setup(move |app| {
-            let _hub_window = app.get_window("hub")
-                .expect("Hub window should exist");
+            println!("[Editor] Setup function called");
+            
+            let hub_window = match app.get_webview_window("hub") {
+                Some(window) => {
+                    println!("[Editor] Hub window found");
+                    window
+                },
+                None => {
+                    eprintln!("[Editor] Error: Hub window not found!");
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::NotFound,
+                        "Hub window not found"
+                    ).into());
+                }
+            };
+            
+            // Ensure the hub window is visible
+            println!("[Editor] Attempting to show hub window...");
+            if let Err(e) = hub_window.show() {
+                eprintln!("[Editor] Error: Failed to show hub window: {}", e);
+            } else {
+                println!("[Editor] Hub window shown successfully");
+            }
+            
+            if let Err(e) = hub_window.set_focus() {
+                eprintln!("[Editor] Warning: Failed to focus hub window: {}", e);
+            } else {
+                println!("[Editor] Hub window focused");
+            }
+            
+            // Check window visibility status
+            match hub_window.is_visible() {
+                Ok(true) => println!("[Editor] Hub window is visible"),
+                Ok(false) => eprintln!("[Editor] Warning: Hub window is not visible"),
+                Err(e) => eprintln!("[Editor] Warning: Could not check hub window visibility: {}", e),
+            }
             
             let app_handle = app.handle().clone();
             let ws_server_clone = ws_server.clone();
@@ -591,8 +641,8 @@ fn main() {
                 .name("websocket-polling".to_string())
                 .spawn(move || {
                     loop {
-                        let hub_exists = app_handle.get_window("hub").is_some();
-                        let editor_exists = app_handle.get_window("editor").is_some();
+                        let hub_exists = app_handle.get_webview_window("hub").is_some();
+                        let editor_exists = app_handle.get_webview_window("editor").is_some();
                         
                         if !hub_exists && !editor_exists {
                             break;
@@ -611,7 +661,7 @@ fn main() {
                                     }
                                 }
                                 EngineMessage::FrameStats { fps, entity_count } => {
-                                    if let Some(editor_window) = app_handle.get_window("editor") {
+                                    if let Some(editor_window) = app_handle.get_webview_window("editor") {
                                         let _ = editor_window.emit("frame-stats", serde_json::json!({
                                             "fps": fps,
                                             "entity_count": entity_count
@@ -621,7 +671,7 @@ fn main() {
                                 _ => {}
                             }
 
-                            if let Some(editor_window) = app_handle.get_window("editor") {
+                            if let Some(editor_window) = app_handle.get_webview_window("editor") {
                                 let _ = editor_window.emit("engine-message", serde_json::to_string(&msg).unwrap());
                             }
                         }
@@ -629,6 +679,97 @@ fn main() {
                     }
                 })
                 .expect("Failed to spawn WebSocket polling thread");
+
+            #[cfg(debug_assertions)]
+            {
+                let app_handle_for_watcher = app.handle().clone();
+                std::thread::Builder::new()
+                    .name("hot-reload-watcher".to_string())
+                    .spawn(move || {
+                        use std::time::Duration;
+                        
+                        let editor_js_path = std::env::current_dir()
+                            .unwrap()
+                            .join("src")
+                            .join("editor")
+                            .join("js");
+                        
+                        if !editor_js_path.exists() {
+                            eprintln!("[Hot Reload] Editor JS path does not exist: {:?}", editor_js_path);
+                            return;
+                        }
+                        
+                        let (tx, rx) = std::sync::mpsc::channel();
+                        let mut watcher: RecommendedWatcher = notify::recommended_watcher(tx)
+                            .expect("Failed to create file watcher");
+                        
+                        watcher.watch(&editor_js_path, RecursiveMode::Recursive)
+                            .expect("Failed to watch editor JS directory");
+                        
+                        println!("[Hot Reload] Watching for changes in: {:?}", editor_js_path);
+                        
+                        let mut last_reload = std::time::Instant::now();
+                        const DEBOUNCE_MS: u64 = 300;
+                        
+                        loop {
+                            match rx.recv_timeout(Duration::from_millis(100)) {
+                                Ok(Ok(Event { kind: EventKind::Modify(_) | EventKind::Create(_), paths, .. })) => {
+                                    let is_js_file = paths.iter().any(|path| {
+                                        path.extension()
+                                            .and_then(|ext| ext.to_str())
+                                            .map(|ext| ext == "js" || ext == "mjs")
+                                            .unwrap_or(false)
+                                    });
+                                    
+                                    if is_js_file {
+                                        let now = std::time::Instant::now();
+                                        if now.duration_since(last_reload).as_millis() > DEBOUNCE_MS as u128 {
+                                            last_reload = now;
+                                            
+                                            std::thread::sleep(Duration::from_millis(100));
+                                            
+                                            if let Some(editor_window) = app_handle_for_watcher.get_webview_window("editor") {
+                                                if editor_window.is_visible().unwrap_or(false) {
+                                                    let reload_script = r#"
+                                                        (async function() {
+                                                            if ('serviceWorker' in navigator) {
+                                                                const registrations = await navigator.serviceWorker.getRegistrations();
+                                                                for (let registration of registrations) {
+                                                                    await registration.unregister();
+                                                                }
+                                                                const cacheNames = await caches.keys();
+                                                                for (let cacheName of cacheNames) {
+                                                                    await caches.delete(cacheName);
+                                                                }
+                                                            }
+                                                            const baseUrl = window.location.href.split('?')[0].split('#')[0];
+                                                            const timestamp = Date.now();
+                                                            window.location.href = baseUrl + '?t=' + timestamp + '&_=' + Math.random();
+                                                        })();
+                                                    "#;
+                                                    let _ = editor_window.eval(reload_script);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                Ok(Err(e)) => {
+                                    eprintln!("[Hot Reload] Watcher error: {:?}", e);
+                                }
+                                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                    if app_handle_for_watcher.get_webview_window("editor").is_none() 
+                                        && app_handle_for_watcher.get_webview_window("hub").is_none() {
+                                        break;
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                        
+                        println!("[Hot Reload] File watcher stopped");
+                    })
+                    .expect("Failed to spawn hot reload watcher thread");
+            }
 
             Ok(())
         })
@@ -655,15 +796,16 @@ fn main() {
             read_editor_config,
             write_editor_config,
             read_project_config,
-            write_project_config
+            write_project_config,
+            reload_window
         ])
-        .on_window_event(move |event| {
-            match event.event() {
+        .on_window_event(move |_window, event| {
+            match event {
                 tauri::WindowEvent::CloseRequested { .. } => {
-                    let window_label = event.window().label();
+                    let _window_label = _window.label();
                 }
                 tauri::WindowEvent::Destroyed => {
-                    let window_label = event.window().label();
+                    let window_label = _window.label();
                     
                     if window_label == "editor" {
                         let engine_process_clone = engine_process_for_cleanup.clone();
@@ -673,8 +815,8 @@ fn main() {
                     }
                     
                     if window_label == "hub" {
-                        let app = event.window().app_handle();
-                        if app.get_window("editor").is_none() {
+                        let app = _window.app_handle();
+                        if app.get_webview_window("editor").is_none() {
                             std::process::exit(0);
                         }
                     }

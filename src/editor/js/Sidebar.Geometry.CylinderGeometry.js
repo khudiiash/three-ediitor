@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// radiusTop
+	
 
 	const radiusTopRow = new UIRow();
 	const radiusTop = new UINumber( parameters.radiusTop ).onChange( update );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radiusTopRow );
 
-	// radiusBottom
+	
 
 	const radiusBottomRow = new UIRow();
 	const radiusBottom = new UINumber( parameters.radiusBottom ).onChange( update );
@@ -34,7 +34,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radiusBottomRow );
 
-	// height
+	
 
 	const heightRow = new UIRow();
 	const height = new UINumber( parameters.height ).onChange( update );
@@ -44,7 +44,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( heightRow );
 
-	// radialSegments
+	
 
 	const radialSegmentsRow = new UIRow();
 	const radialSegments = new UIInteger( parameters.radialSegments ).setRange( 1, Infinity ).onChange( update );
@@ -54,7 +54,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radialSegmentsRow );
 
-	// heightSegments
+	
 
 	const heightSegmentsRow = new UIRow();
 	const heightSegments = new UIInteger( parameters.heightSegments ).setRange( 1, Infinity ).onChange( update );
@@ -64,7 +64,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( heightSegmentsRow );
 
-	// openEnded
+	
 
 	const openEndedRow = new UIRow();
 	const openEnded = new UICheckbox( parameters.openEnded ).onChange( update );

@@ -98,7 +98,7 @@ export default class ${validClassName} extends Script {
 		}
 
 		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-		const invoke = isTauri ? window.__TAURI__.invoke : null;
+		const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 
 		if ( isTauri && invoke ) {
 			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
@@ -234,7 +234,7 @@ export default class ${validClassName} extends Script {
 					editButton.setFontSize( '11px' );
 					editButton.onClick( async function () {
 						const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-						const invoke = isTauri ? window.__TAURI__.invoke : null;
+						const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 						
 						if ( !isTauri || !invoke ) return;
 						
@@ -313,7 +313,7 @@ export default class ${validClassName} extends Script {
 						const attributesFromFile = {};
 						
 						const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-						const invoke = isTauri ? window.__TAURI__.invoke : null;
+						const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 						
 						if ( isTauri && invoke && window.assetsRoot ) {
 							try {

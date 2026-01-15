@@ -24,7 +24,13 @@ export class App {
         
         this.scene = new THREE.Scene();
         this.events = SuperEvents.getInstance();
-        this.scene.background = new THREE.Color(0x222222);
+        
+        let clearColor = 0xaaaaaa;
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            clearColor = mediaQuery.matches ? 0x333333 : 0xaaaaaa;
+        }
+        this.scene.background = new THREE.Color(clearColor);
         
         this.startTime = performance.now() / 1000;
     }
@@ -156,6 +162,21 @@ export class App {
             this.scene.backgroundIntensity = loadedScene.backgroundIntensity;
             this.scene.userData = JSON.parse(JSON.stringify(loadedScene.userData));
             
+            if (this.renderer) {
+                if (this.scene.background) {
+                    if (this.scene.background instanceof THREE.Color) {
+                        this.renderer.setClearColor(this.scene.background.getHex(), 1);
+                    }
+                } else {
+                    let clearColor = 0xaaaaaa;
+                    if (typeof window !== 'undefined' && window.matchMedia) {
+                        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                        clearColor = mediaQuery.matches ? 0x333333 : 0xaaaaaa;
+                    }
+                    this.renderer.setClearColor(clearColor, 1);
+                }
+            }
+            
             const childrenToAdd = [...loadedScene.children];
             for (let i = 0; i < childrenToAdd.length; i++) {
                 const child = childrenToAdd[i];
@@ -215,7 +236,7 @@ export class App {
                 if (entity) {
                     let particleComponent = entity.getComponent(ParticleComponent);
                     if (!particleComponent) {
-                        // Adding the component will trigger initialize(), which will create the particle system
+                        
                         particleComponent = entity.addComponent(ParticleComponent);
                     } else if (!particleComponent.getParticleSystem()) {
                         particleComponent.initialize();

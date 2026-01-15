@@ -1,0 +1,22 @@
+{
+                    "compilerOptions": {
+                        "target": "ES2020",
+                        "module": "ESNext",
+                        "lib": ["ES2020", "DOM"],
+                        "moduleResolution": "bundler",
+                        "strict": false,
+                        "esModuleInterop": true,
+                        "skipLibCheck": true,
+                        "forceConsistentCasingInFileNames": true,
+                        "resolveJsonModule": true,
+                        "experimentalDecorators": true,
+                        "emitDecoratorMetadata": true,
+                        "baseUrl": ".",
+                        "paths": {
+                        "@engine/*": ["../../src/engine/src/*"]
+                        },
+                        "types": ["three"]
+                    },
+                    "include": ["assets/**/*.ts"],
+                    "exclude": ["node_modules"]
+                    }

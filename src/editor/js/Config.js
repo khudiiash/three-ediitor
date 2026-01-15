@@ -23,14 +23,17 @@ function Config( storage ) {
 		'renderer/shadows': true,
 		'renderer/shadowType': 1,
 		'renderer/toneMapping': 0,
-		'renderer/toneMappingExposure': 1
+		'renderer/toneMappingExposure': 1,
+		'defaults/castShadows': false,
+		'defaults/receiveShadows': false,
+		'defaults/material': null
 	};
 
 	let editorStorage = { ...editorDefaults };
 	let projectStorage = { ...projectDefaults };
 
 	const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-	const invoke = isTauri ? window.__TAURI__.invoke : null;
+	const invoke = isTauri ? window.__TAURI__.core.invoke : null;
 
 	async function loadEditorConfig() {
 		if ( !isTauri || !invoke ) {
@@ -64,7 +67,10 @@ function Config( storage ) {
 	}
 
 	async function loadProjectConfig() {
-		if ( !isTauri || !invoke || !storage ) {
+		const currentIsTauri = typeof window !== 'undefined' && window.__TAURI__;
+		const currentInvoke = currentIsTauri ? window.__TAURI__.core.invoke : null;
+		
+		if ( !currentIsTauri || !currentInvoke || !storage ) {
 			return;
 		}
 
@@ -74,11 +80,19 @@ function Config( storage ) {
 		}
 
 		try {
-			const content = await invoke( 'read_project_config', { projectPath: projectPath } );
+			const content = await currentInvoke( 'read_project_config', { projectPath: projectPath } );
 			if ( content && content.trim() !== '' ) {
 				const data = JSON.parse( content );
-				for ( const key in data ) {
-					projectStorage[ key ] = data[ key ];
+				if ( data.settings && typeof data.settings === 'object' ) {
+					for ( const key in data.settings ) {
+						if ( typeof data.settings[ key ] === 'object' && data.settings[ key ] !== null && !Array.isArray( data.settings[ key ] ) ) {
+							for ( const subKey in data.settings[ key ] ) {
+								projectStorage[ key + '/' + subKey ] = data.settings[ key ][ subKey ];
+							}
+						} else {
+							projectStorage[ key ] = data.settings[ key ];
+						}
+					}
 				}
 			}
 		} catch ( error ) {
@@ -87,18 +101,62 @@ function Config( storage ) {
 	}
 
 	async function saveProjectConfig() {
-		if ( !isTauri || !invoke || !storage ) {
+		const currentIsTauri = typeof window !== 'undefined' && window.__TAURI__;
+		const currentInvoke = currentIsTauri ? window.__TAURI__.core.invoke : null;
+		
+		if ( !currentIsTauri || !currentInvoke || !storage ) {
 			return;
 		}
 
 		const projectPath = storage.getProjectPath ? storage.getProjectPath() : null;
 		if ( !projectPath ) {
+			console.warn( '[Config] Cannot save project config: project path not set' );
 			return;
 		}
 
 		try {
-			await invoke( 'write_project_config', { projectPath: projectPath, content: JSON.stringify( projectStorage, null, '\t' ) } );
-			console.log( '[' + /\d\d\:\d\d\:\d\d/.exec( new Date() )[ 0 ] + ']', 'Saved project config to file.' );
+			const existingContent = await currentInvoke( 'read_project_config', { projectPath: projectPath } );
+			let existingData = {};
+			if ( existingContent && existingContent.trim() !== '' ) {
+				try {
+					existingData = JSON.parse( existingContent );
+				} catch ( e ) {
+					console.warn( '[Config] Failed to parse existing project config:', e );
+					existingData = {};
+				}
+			}
+
+			const settingsData = {};
+			for ( const key in projectStorage ) {
+				if ( key.includes( '/' ) ) {
+					const parts = key.split( '/' );
+					let current = settingsData;
+					for ( let i = 0; i < parts.length - 1; i ++ ) {
+						if ( !current[ parts[ i ] ] ) {
+							current[ parts[ i ] ] = {};
+						}
+						current = current[ parts[ i ] ];
+					}
+					current[ parts[ parts.length - 1 ] ] = projectStorage[ key ];
+				} else {
+					settingsData[ key ] = projectStorage[ key ];
+				}
+			}
+
+			const mergedData = { ...existingData };
+			if ( !mergedData.settings ) {
+				mergedData.settings = {};
+			}
+			for ( const key in settingsData ) {
+				if ( typeof settingsData[ key ] === 'object' && settingsData[ key ] !== null && !Array.isArray( settingsData[ key ] ) ) {
+					mergedData.settings[ key ] = { ...( mergedData.settings[ key ] || {} ), ...settingsData[ key ] };
+				} else {
+					mergedData.settings[ key ] = settingsData[ key ];
+				}
+			}
+
+			const contentToWrite = JSON.stringify( mergedData, null, '\t' );
+			await currentInvoke( 'write_project_config', { projectPath: projectPath, content: contentToWrite } );
 		} catch ( error ) {
 			console.error( '[Config] Failed to save project config:', error );
 		}
@@ -147,13 +205,15 @@ function Config( storage ) {
 			}
 
 			if ( projectChanged ) {
-				saveProjectConfig();
+				saveProjectConfig().catch( function ( error ) {
+					console.error( '[Config] Error saving project config:', error );
+				} );
 			}
 
 		},
 
 		loadProjectConfig: function () {
-			loadProjectConfig();
+			return loadProjectConfig();
 		},
 
 		clear: function () {

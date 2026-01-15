@@ -33,7 +33,7 @@ function Loader( editor ) {
 			const manager = new THREE.LoadingManager();
 			manager.setURLModifier( function ( url ) {
 
-				url = url.replace( /^(\.?\/)/, '' ); // remove './'
+				url = url.replace( /^(\.?\/)/, '' ); 
 
 				const file = filesMap[ url ];
 
@@ -329,7 +329,7 @@ function Loader( editor ) {
 
 					const contents = event.target.result;
 
-					// 2.0
+					
 
 					if ( contents.indexOf( 'postMessage' ) !== - 1 ) {
 
@@ -351,7 +351,7 @@ function Loader( editor ) {
 
 					}
 
-					// >= 3.0
+					
 
 					let data;
 
@@ -411,7 +411,7 @@ function Loader( editor ) {
 					loader.parse( event.target.result, function ( group ) {
 
 						group.name = filename;
-						// Convert from LDraw coordinates: rotate 180 degrees around OX
+						
 						group.rotation.x = Math.PI;
 
 						editor.execute( new AddObjectCommand( editor, group ) );
@@ -791,13 +791,13 @@ function Loader( editor ) {
 
 	function handleJSON( data ) {
 
-		if ( data.metadata === undefined ) { // 2.0
+		if ( data.metadata === undefined ) { 
 
 			data.metadata = { type: 'Geometry' };
 
 		}
 
-		if ( data.metadata.type === undefined ) { // 3.0
+		if ( data.metadata.type === undefined ) { 
 
 			data.metadata.type = 'Geometry';
 
@@ -881,7 +881,7 @@ function Loader( editor ) {
 
 		} );
 
-		// Poly
+		
 
 		if ( zip[ 'model.obj' ] && zip[ 'materials.mtl' ] ) {
 

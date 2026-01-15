@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// curveSegments
+	
 
 	const curveSegmentsRow = new UIRow();
 	const curveSegments = new UIInteger( parameters.curveSegments || 12 ).onChange( changeShape ).setRange( 1, Infinity );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( curveSegmentsRow );
 
-	// to extrude
+	
 	const button = new UIButton( strings.getKey( 'sidebar/geometry/shape_geometry/extrude' ) ).onClick( toExtrude ).setClass( 'Label' ).setMarginLeft( '120px' );
 	container.add( button );
 

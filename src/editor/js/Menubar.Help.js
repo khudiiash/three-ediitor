@@ -16,7 +16,7 @@ function MenubarHelp( editor ) {
 	options.setClass( 'options' );
 	container.add( options );
 
-	// Source code
+	
 
 	let option = new UIRow();
 	option.setClass( 'option' );
@@ -29,7 +29,7 @@ function MenubarHelp( editor ) {
 	options.add( option );
 
 	/*
-	// Icon
+	
 
 	let option = new UIRow();
 	option.setClass( 'option' );
@@ -42,7 +42,7 @@ function MenubarHelp( editor ) {
 	options.add( option );
 	*/
 
-	// About
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -54,7 +54,7 @@ function MenubarHelp( editor ) {
 	} );
 	options.add( option );
 
-	// Manual
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );

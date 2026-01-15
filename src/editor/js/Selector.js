@@ -12,13 +12,13 @@ class Selector {
 		this.editor = editor;
 		this.signals = signals;
 
-		// signals
+		
 
 		signals.intersectionsDetected.add( ( intersects ) => {
 
 			if ( intersects.length > 0 ) {
 
-				// Resolve helpers to their actual objects
+				
 
 				const objects = [];
 
@@ -40,7 +40,7 @@ class Selector {
 
 				}
 
-				// Cycle through objects if the first one is already selected
+				
 
 				const index = objects.indexOf( editor.selected );
 

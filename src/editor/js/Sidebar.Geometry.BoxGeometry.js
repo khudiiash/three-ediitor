@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// width
+	
 
 	const widthRow = new UIRow();
 	const width = new UINumber().setPrecision( 3 ).setValue( parameters.width ).onChange( update );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( widthRow );
 
-	// height
+	
 
 	const heightRow = new UIRow();
 	const height = new UINumber().setPrecision( 3 ).setValue( parameters.height ).onChange( update );
@@ -34,7 +34,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( heightRow );
 
-	// depth
+	
 
 	const depthRow = new UIRow();
 	const depth = new UINumber().setPrecision( 3 ).setValue( parameters.depth ).onChange( update );
@@ -44,7 +44,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( depthRow );
 
-	// widthSegments
+	
 
 	const widthSegmentsRow = new UIRow();
 	const widthSegments = new UIInteger( parameters.widthSegments ).setRange( 1, Infinity ).onChange( update );
@@ -54,7 +54,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( widthSegmentsRow );
 
-	// heightSegments
+	
 
 	const heightSegmentsRow = new UIRow();
 	const heightSegments = new UIInteger( parameters.heightSegments ).setRange( 1, Infinity ).onChange( update );
@@ -64,7 +64,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( heightSegmentsRow );
 
-	// depthSegments
+	
 
 	const depthSegmentsRow = new UIRow();
 	const depthSegments = new UIInteger( parameters.depthSegments ).setRange( 1, Infinity ).onChange( update );

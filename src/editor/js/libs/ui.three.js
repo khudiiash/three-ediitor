@@ -4,6 +4,7 @@ import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 import { UISpan, UIDiv, UIRow, UIButton, UICheckbox, UIText, UINumber } from './ui.js';
 import { MoveObjectCommand } from '../commands/MoveObjectCommand.js';
+import { AssetSelector } from '../AssetSelector.js';
 
 const cache = new Map();
 
@@ -14,11 +15,18 @@ class UITexture extends UISpan {
 		super();
 
 		const scope = this;
+		this.editor = editor;
+
+		// Initialize asset selector (lazy load)
+		if ( ! editor.assetSelector ) {
+			editor.assetSelector = new AssetSelector( editor );
+		}
 
 		const form = document.createElement( 'form' );
 
 		const input = document.createElement( 'input' );
 		input.type = 'file';
+		input.style.display = 'none';
 		input.addEventListener( 'change', function ( event ) {
 
 			loadFile( event.target.files[ 0 ] );
@@ -32,18 +40,77 @@ class UITexture extends UISpan {
 		canvas.style.cursor = 'pointer';
 		canvas.style.marginRight = '5px';
 		canvas.style.border = '1px solid #888';
-		canvas.addEventListener( 'click', function () {
+		canvas.style.position = 'relative';
+		
+		// Click to open asset selector
+		canvas.addEventListener( 'click', function ( event ) {
 
-			input.click();
+			// Right click or Ctrl+click for file input fallback
+			if ( event.ctrlKey || event.metaKey || event.button === 2 ) {
+				input.click();
+				return;
+			}
+
+			// Show asset selector
+			editor.assetSelector.show( function ( texture ) {
+
+				if ( texture !== null ) {
+					scope.setValue( texture );
+					if ( scope.onChangeCallback ) scope.onChangeCallback( texture );
+				}
+
+			}, scope.texture, 'texture' );
 
 		} );
+
+		// Drag and drop support
+		canvas.addEventListener( 'dragover', function ( event ) {
+
+			event.preventDefault();
+			event.stopPropagation();
+			canvas.style.borderColor = '#0088ff';
+			canvas.style.background = 'rgba(0, 136, 255, 0.1)';
+
+		} );
+
+		canvas.addEventListener( 'dragleave', function ( event ) {
+
+			event.preventDefault();
+			event.stopPropagation();
+			canvas.style.borderColor = '#888';
+			canvas.style.background = 'transparent';
+
+		} );
+
 		canvas.addEventListener( 'drop', function ( event ) {
 
 			event.preventDefault();
 			event.stopPropagation();
-			loadFile( event.dataTransfer.files[ 0 ] );
+			canvas.style.borderColor = '#888';
+			canvas.style.background = 'transparent';
+
+			// Check if it's an asset drop (from asset panel)
+			const assetData = event.dataTransfer.getData( 'text/plain' );
+			if ( assetData ) {
+				try {
+					const asset = JSON.parse( assetData );
+					if ( asset.type === 'texture' ) {
+						// Load texture from asset path
+						loadTextureFromAsset( asset );
+						return;
+					}
+				} catch ( e ) {
+					// Not JSON, continue with file drop
+				}
+			}
+
+			// Fallback to file drop
+			if ( event.dataTransfer.files && event.dataTransfer.files.length > 0 ) {
+				loadFile( event.dataTransfer.files[ 0 ] );
+			}
 
 		} );
+
 		this.dom.appendChild( canvas );
 
 		async function loadFile( file ) {
@@ -202,6 +269,103 @@ class UITexture extends UISpan {
 
 		this.texture = null;
 		this.onChangeCallback = null;
+
+		// Helper function to load texture from asset
+		async function loadTextureFromAsset( asset ) {
+
+			const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
+
+			if ( isTauri && editor.storage && editor.storage.getProjectPath ) {
+				const projectPath = editor.storage.getProjectPath();
+				const assetPath = asset.path.startsWith( '/' ) ? asset.path.substring( 1 ) : asset.path;
+
+				try {
+					const assetBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
+						projectPath: projectPath,
+						assetPath: assetPath
+					} );
+
+					const uint8Array = new Uint8Array( assetBytes );
+					const blob = new Blob( [ uint8Array ] );
+					const blobUrl = URL.createObjectURL( blob );
+
+					const ext = asset.name.split( '.' ).pop()?.toLowerCase();
+
+					if ( ext === 'hdr' || ext === 'pic' ) {
+
+						const { HDRLoader } = await import( 'three/addons/loaders/HDRLoader.js' );
+						const loader = new HDRLoader();
+						loader.load( blobUrl, function ( hdrTexture ) {
+							hdrTexture.sourceFile = asset.name;
+							hdrTexture.assetPath = asset.path;
+							scope.setValue( hdrTexture );
+							if ( scope.onChangeCallback ) scope.onChangeCallback( hdrTexture );
+						} );
+
+					} else if ( ext === 'tga' ) {
+
+						const { TGALoader } = await import( 'three/addons/loaders/TGALoader.js' );
+						const loader = new TGALoader();
+						loader.load( blobUrl, function ( texture ) {
+							texture.colorSpace = THREE.SRGBColorSpace;
+							texture.sourceFile = asset.name;
+							texture.assetPath = asset.path;
+							scope.setValue( texture );
+							if ( scope.onChangeCallback ) scope.onChangeCallback( texture );
+						} );
+
+					} else if ( ext === 'ktx2' ) {
+
+						const { KTX2Loader } = await import( 'three/addons/loaders/KTX2Loader.js' );
+						const ktx2Loader = new KTX2Loader();
+						ktx2Loader.setTranscoderPath( '../../examples/jsm/libs/basis/' );
+						editor.signals.rendererDetectKTX2Support.dispatch( ktx2Loader );
+
+						ktx2Loader.load( blobUrl, function ( texture ) {
+							texture.colorSpace = THREE.SRGBColorSpace;
+							texture.sourceFile = asset.name;
+							texture.assetPath = asset.path;
+							texture.needsUpdate = true;
+							scope.setValue( texture );
+							if ( scope.onChangeCallback ) scope.onChangeCallback( texture );
+							ktx2Loader.dispose();
+						} );
+
+					} else if ( ext === 'exr' ) {
+
+						const { EXRLoader } = await import( 'three/addons/loaders/EXRLoader.js' );
+						const exrLoader = new EXRLoader();
+
+						exrLoader.load( blobUrl, function ( texture ) {
+							texture.sourceFile = asset.name;
+							texture.assetPath = asset.path;
+							texture.needsUpdate = true;
+							scope.setValue( texture );
+							if ( scope.onChangeCallback ) scope.onChangeCallback( texture );
+						} );
+
+					} else {
+
+						const img = new Image();
+						img.onload = function () {
+							const texture = new THREE.Texture( img );
+							texture.sourceFile = asset.name;
+							texture.assetPath = asset.path;
+							texture.colorSpace = THREE.SRGBColorSpace;
+							texture.needsUpdate = true;
+							scope.setValue( texture );
+							if ( scope.onChangeCallback ) scope.onChangeCallback( texture );
+						};
+						img.src = blobUrl;
+
+					}
+
+				} catch ( error ) {
+					console.error( '[UITexture] Failed to load texture from asset:', error );
+				}
+			}
+
+		}
 
 	}
 

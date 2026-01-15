@@ -28,7 +28,7 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 
 	if ( property === 'aoMap' ) {
 
-		intensity = new UINumber( 1 ).setWidth( '30px' ).setRange( 0, 1 ).onChange( onIntensityChange );
+		intensity = new UINumber( 1 ).setRange( 0, 1 ).onChange( onIntensityChange );
 		container.add( intensity );
 
 	}
@@ -37,7 +37,7 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 
 	if ( property === 'bumpMap' || property === 'displacementMap' ) {
 
-		scale = new UINumber().setWidth( '30px' ).onChange( onScaleChange );
+		scale = new UINumber().onChange( onScaleChange );
 		container.add( scale );
 
 	}
@@ -46,10 +46,10 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 
 	if ( property === 'normalMap' || property === 'clearcoatNormalMap' ) {
 
-		scaleX = new UINumber().setWidth( '30px' ).onChange( onScaleXYChange );
+		scaleX = new UINumber().onChange( onScaleXYChange );
 		container.add( scaleX );
 
-		scaleY = new UINumber().setWidth( '30px' ).onChange( onScaleXYChange );
+		scaleY = new UINumber().onChange( onScaleXYChange );
 		container.add( scaleY );
 
 	}
@@ -77,8 +77,8 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 		rangeMax = new UINumber().setWidth( '40px' ).onChange( onRangeChange );
 		rangeMaxRow.add( rangeMax );
 
-		// Additional settings for iridescenceThicknessMap
-		// Please add conditional if more maps are having a range property
+		
+		
 		rangeMin.setPrecision( 0 ).setRange( 0, Infinity ).setNudge( 1 ).setStep( 10 ).setUnit( 'nm' );
 		rangeMax.setPrecision( 0 ).setRange( 0, Infinity ).setNudge( 1 ).setStep( 10 ).setUnit( 'nm' );
 

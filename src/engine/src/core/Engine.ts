@@ -43,7 +43,12 @@ export class Engine {
         
         this.renderer.setPixelRatio(window.devicePixelRatio);
         
-        this.renderer.setClearColor(0x222222, 1);
+        let clearColor = 0xaaaaaa;
+        if (typeof window !== 'undefined' && window.matchMedia) {
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            clearColor = mediaQuery.matches ? 0x333333 : 0xaaaaaa;
+        }
+        this.renderer.setClearColor(clearColor, 1);
 
         this.updateSize();
         window.addEventListener('resize', () => this.updateSize());

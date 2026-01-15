@@ -91,11 +91,30 @@ impl WebSocketServer {
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async move {
-            let addr = "127.0.0.1:9001";
-            let listener = match TcpListener::bind(addr).await {
-                Ok(l) => l,
-                Err(e) => {
-                    eprintln!("Failed to bind WebSocket server: {}", e);
+            // Try ports 9001-9010
+            let mut listener = None;
+            let mut addr = String::new();
+            for port in 9001..=9010 {
+                let test_addr = format!("127.0.0.1:{}", port);
+                match TcpListener::bind(&test_addr).await {
+                    Ok(l) => {
+                        listener = Some(l);
+                        addr = test_addr;
+                        break;
+                    }
+                    Err(e) => {
+                        if port == 9001 {
+                            eprintln!("Failed to bind WebSocket server on {}: {}", test_addr, e);
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            let listener = match listener {
+                Some(l) => l,
+                None => {
+                    eprintln!("Failed to bind WebSocket server on any port (9001-9010)");
                     return;
                 }
             };

@@ -58,7 +58,7 @@ function SidebarSettingsHistory( editor ) {
 
 	container.add( new UIBreak() );
 
-	// Clear History
+	
 
 	const option = new UIButton( strings.getKey( 'sidebar/history/clear' ) );
 	option.onClick( function () {
@@ -125,7 +125,7 @@ function SidebarSettingsHistory( editor ) {
 
 	refreshUI();
 
-	// events
+	
 
 	signals.editorCleared.add( refreshUI );
 

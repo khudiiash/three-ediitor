@@ -10,7 +10,7 @@ function ViewportControls( editor ) {
 	container.setTop( '10px' );
 	container.setColor( '#ffffff' );
 
-	// camera
+	
 
 	const cameraSelect = new UISelect();
 	cameraSelect.setMarginLeft( '10px' );
@@ -34,7 +34,7 @@ function ViewportControls( editor ) {
 
 	} );
 
-	// shading
+	
 
 	const shadingSelect = new UISelect();
 	shadingSelect.setOptions( { 'realistic': 'realistic', 'solid': 'solid', 'normals': 'normals', 'wireframe': 'wireframe' } );

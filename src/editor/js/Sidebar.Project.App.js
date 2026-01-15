@@ -19,7 +19,7 @@ function SidebarProjectApp( editor ) {
 	headerRow.add( new UIText( strings.getKey( 'sidebar/project/app' ).toUpperCase() ) );
 	container.add( headerRow );
 
-	// Title
+	
 
 	const titleRow = new UIRow();
 	const title = new UIInput( config.getKey( 'project/title' ) ).setLeft( '100px' ).setWidth( '150px' ).onChange( function () {
@@ -33,10 +33,6 @@ function SidebarProjectApp( editor ) {
 
 	container.add( titleRow );
 
-	// Play/Stop button moved to viewport toolbar
-
-	// Publish
-
 	const publishButton = new UIButton( strings.getKey( 'sidebar/project/app/publish' ) );
 	publishButton.setWidth( '170px' );
 	publishButton.setMarginLeft( '120px' );
@@ -44,7 +40,7 @@ function SidebarProjectApp( editor ) {
 	publishButton.onClick( async function () {
 
 		const isTauri = typeof window !== 'undefined' && window.__TAURI__;
-		const invoke = isTauri ? window.__TAURI__.invoke : null;
+		const invoke = isTauri && window.__TAURI__.core && window.__TAURI__.core.invoke ? window.__TAURI__.core.invoke : null;
 		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 
 		if ( ! isTauri || ! invoke || ! projectPath ) {
@@ -221,7 +217,7 @@ function SidebarProjectApp( editor ) {
 	} );
 	container.add( publishButton );
 
-	// Signals
+	
 
 	signals.editorCleared.add( function () {
 
@@ -230,39 +226,28 @@ function SidebarProjectApp( editor ) {
 
 	} );
 
-	// Load project name from project.json when project is opened (Tauri mode)
+	
 	if ( typeof window !== 'undefined' && window.__TAURI__ ) {
-		const invoke = window.__TAURI__.invoke;
-		
-		// Listen for when project path is set
-		const checkProjectPath = setInterval( function () {
-			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
-			if ( projectPath ) {
-				clearInterval( checkProjectPath );
-				
-				// Load project.json and set the title
-				invoke( 'read_project_metadata', { projectPath: projectPath } )
-					.then( function ( content ) {
-						try {
-							const metadata = JSON.parse( content );
-							if ( metadata && metadata.name ) {
-								title.setValue( metadata.name );
-								config.setKey( 'project/title', metadata.name );
-							}
-						} catch ( error ) {
-							console.warn( '[Project] Failed to parse project.json:', error );
+		async function loadProjectMetadata() {
+			for (let i = 0; i < 50; i++) {
+				const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+				if (projectPath && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+					try {
+						const content = await window.__TAURI__.core.invoke('read_project_metadata', { projectPath: projectPath });
+						const metadata = JSON.parse(content);
+						if (metadata && metadata.name) {
+							title.setValue(metadata.name);
+							config.setKey('project/title', metadata.name);
 						}
-					} )
-					.catch( function ( error ) {
-						console.warn( '[Project] Failed to load project.json:', error );
-					} );
+					} catch (error) {
+						console.warn('[Project] Failed to load project.json:', error);
+					}
+					return;
+				}
+				await new Promise(resolve => setTimeout(resolve, 100));
 			}
-		}, 500 );
-		
-		// Stop checking after 10 seconds
-		setTimeout( function () {
-			clearInterval( checkProjectPath );
-		}, 10000 );
+		}
+		loadProjectMetadata();
 	}
 
 	return container;

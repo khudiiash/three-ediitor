@@ -14,7 +14,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// radius
+	
 
 	const radiusRow = new UIRow();
 	const radius = new UINumber( parameters.radius ).onChange( update );
@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radiusRow );
 
-	// detail
+	
 
 	const detailRow = new UIRow();
 	const detail = new UIInteger( parameters.detail ).setRange( 0, Infinity ).onChange( update );

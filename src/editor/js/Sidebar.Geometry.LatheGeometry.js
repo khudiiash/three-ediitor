@@ -15,7 +15,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// segments
+	
 
 	const segmentsRow = new UIRow();
 	const segments = new UIInteger( parameters.segments ).onChange( update );
@@ -25,7 +25,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( segmentsRow );
 
-	// phiStart
+	
 
 	const phiStartRow = new UIRow();
 	const phiStart = new UINumber( parameters.phiStart * THREE.MathUtils.RAD2DEG ).onChange( update );
@@ -35,7 +35,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( phiStartRow );
 
-	// phiLength
+	
 
 	const phiLengthRow = new UIRow();
 	const phiLength = new UINumber( parameters.phiLength * THREE.MathUtils.RAD2DEG ).onChange( update );
@@ -45,7 +45,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( phiLengthRow );
 
-	// points
+	
 
 	const pointsRow = new UIRow();
 	pointsRow.add( new UIText( strings.getKey( 'sidebar/geometry/lathe_geometry/points' ) ).setClass( 'Label' ) );

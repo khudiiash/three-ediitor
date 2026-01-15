@@ -24,7 +24,7 @@ function GeometryParametersPanel( editor, object ) {
 	options.bevelSegments = options.bevelSegments !== undefined ? options.bevelSegments : 3;
 
 
-	// curveSegments
+	
 
 	const curveSegmentsRow = new UIRow();
 	const curveSegments = new UIInteger( options.curveSegments ).onChange( update ).setRange( 1, Infinity );
@@ -34,7 +34,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( curveSegmentsRow );
 
-	// steps
+	
 
 	const stepsRow = new UIRow();
 	const steps = new UIInteger( options.steps ).onChange( update ).setRange( 1, Infinity );
@@ -44,7 +44,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( stepsRow );
 
-	// depth
+	
 
 	const depthRow = new UIRow();
 	const depth = new UINumber( options.depth ).onChange( update ).setRange( 1, Infinity );
@@ -54,7 +54,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( depthRow );
 
-	// enabled
+	
 
 	const enabledRow = new UIRow();
 	const enabled = new UICheckbox( options.bevelEnabled ).onChange( update );
@@ -64,7 +64,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( enabledRow );
 
-	// thickness
+	
 
 	const thicknessRow = new UIRow();
 	const thickness = new UINumber( options.bevelThickness ).onChange( update );
@@ -74,7 +74,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( thicknessRow );
 
-	// size
+	
 
 	const sizeRow = new UIRow();
 	const size = new UINumber( options.bevelSize ).onChange( update );
@@ -84,7 +84,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( sizeRow );
 
-	// offset
+	
 
 	const offsetRow = new UIRow();
 	const offset = new UINumber( options.bevelOffset ).onChange( update );
@@ -94,7 +94,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( offsetRow );
 
-	// segments
+	
 
 	const segmentsRow = new UIRow();
 	const segments = new UIInteger( options.bevelSegments ).onChange( update ).setRange( 0, Infinity );

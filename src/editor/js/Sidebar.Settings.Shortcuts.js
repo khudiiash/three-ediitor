@@ -10,7 +10,7 @@ function SidebarSettingsShortcuts( editor ) {
 
 	function isValidKeyBinding( key ) {
 
-		return key.match( /^[A-Za-z0-9]$/i ); // Can't use z currently due to undo/redo
+		return key.match( /^[A-Za-z0-9]$/i ); 
 
 	}
 
@@ -45,15 +45,15 @@ function SidebarSettingsShortcuts( editor ) {
 
 		} );
 
-		// Automatically highlight when selecting an input field
+		
 		shortcutInput.dom.addEventListener( 'click', function () {
 
 			shortcutInput.dom.select();
 
 		} );
 
-		// If the value of the input field is invalid, revert the input field
-		// to contain the key binding stored in config
+		
+		
 		shortcutInput.dom.addEventListener( 'blur', function () {
 
 			if ( ! isValidKeyBinding( shortcutInput.getValue() ) ) {
@@ -64,7 +64,7 @@ function SidebarSettingsShortcuts( editor ) {
 
 		} );
 
-		// If a valid key binding character is entered, blur the input field
+		
 		shortcutInput.dom.addEventListener( 'keyup', function ( event ) {
 
 			if ( isValidKeyBinding( event.key ) ) {
@@ -101,9 +101,9 @@ function SidebarSettingsShortcuts( editor ) {
 
 			case 'backspace':
 
-				event.preventDefault(); // prevent browser back
+				event.preventDefault(); 
 
-				// fall-through
+				
 
 			case 'delete':
 
@@ -138,7 +138,7 @@ function SidebarSettingsShortcuts( editor ) {
 
 				if ( IS_MAC ? event.metaKey : event.ctrlKey ) {
 
-					event.preventDefault(); // Prevent browser specific hotkeys
+					event.preventDefault(); 
 
 					if ( event.shiftKey ) {
 

@@ -68,7 +68,7 @@ function Viewport( editor ) {
 		return particleTexture;
 	}
 
-	// helpers
+	
 
 	const GRID_COLORS_LIGHT = [ 0x999999, 0x777777 ];
 	const GRID_COLORS_DARK = [ 0x555555, 0x888888 ];
@@ -88,12 +88,12 @@ function Viewport( editor ) {
 	const viewHelper = new ViewHelper( camera, container );
 	let isPlaying = false;
 
-	// Camera preview
+	
 	let previewCamera = null;
 	let previewRenderer = null;
 	const previewContainer = document.createElement( 'div' );
 	previewContainer.id = 'camera-preview';
-	previewContainer.style.cssText = 'position: absolute; bottom: 20px; right: 20px; width: 200px; height: 150px; border: 2px solid #08f; background: #000; display: none; cursor: pointer; z-index: 1000;';
+	previewContainer.style.cssText = 'position: absolute; top: 20px; left: 20px; width: 200px; height: 150px; border: 2px solid #08f; background: #000; display: none; cursor: pointer; z-index: 1000;';
 	previewContainer.title = 'Click to switch to this camera';
 	container.dom.appendChild( previewContainer );
 
@@ -127,8 +127,8 @@ function Viewport( editor ) {
 	let isTransformInProgress = false;
 	let transformObject = null;
 
-	// TransformControls requires domElement in constructor, but renderer doesn't exist yet
-	// Use container.dom as placeholder - will be reconnected when renderer is created
+	
+	
 	const transformControls = new TransformControls( camera, container.dom );
 	transformControls.addEventListener( 'axis-changed', function () {
 
@@ -303,13 +303,13 @@ function Viewport( editor ) {
 
 	editor.cancelTransform = cancelTransform;
 
-	// TransformControls helper - getHelper() was added in r169
-	// If it doesn't exist, the helper is part of the controls object itself
+	
+	
 	try {
 		if ( typeof transformControls.getHelper === 'function' ) {
 			sceneHelpers.add( transformControls.getHelper() );
 		} else {
-			// Fallback: add the controls object directly (it contains the helper mesh)
+			
 			sceneHelpers.add( transformControls );
 		}
 	} catch ( e ) {
@@ -319,9 +319,9 @@ function Viewport( editor ) {
 
 	//
 
-	const xr = new XR( editor, transformControls ); // eslint-disable-line no-unused-vars
+	const xr = new XR( editor, transformControls ); 
 
-	// events
+	
 
 	function updateAspectRatio() {
 
@@ -380,7 +380,7 @@ function Viewport( editor ) {
 
 	function onMouseDown( event ) {
 
-		// event.preventDefault();
+		
 
 		if ( event.target !== renderer.domElement ) return;
 
@@ -447,8 +447,8 @@ function Viewport( editor ) {
 	container.dom.addEventListener( 'touchstart', onTouchStart, { passive: false } );
 	container.dom.addEventListener( 'dblclick', onDoubleClick );
 
-	// controls need to be added *after* main logic,
-	// otherwise controls.enabled doesn't work.
+	
+	
 
 	const controls = new EditorControls( camera );
 	controls.addEventListener( 'change', function () {
@@ -461,7 +461,7 @@ function Viewport( editor ) {
 
 	editor.controls = controls;
 
-	// signals
+	
 
 	signals.editorCleared.add( function () {
 
@@ -525,8 +525,8 @@ function Viewport( editor ) {
 		}
 
 		controls.connect( newRenderer.domElement );
-		// Reconnect TransformControls to the actual renderer canvas
-		// TransformControls requires domElement in constructor, so we need to reconnect it
+		
+		
 		if ( transformControls.disconnect ) {
 			transformControls.disconnect();
 		}
@@ -534,7 +534,7 @@ function Viewport( editor ) {
 
 		renderer = newRenderer;
 
-		// Create preview renderer
+		
 		if ( previewRenderer !== null ) {
 			previewRenderer.dispose();
 		}
@@ -543,21 +543,31 @@ function Viewport( editor ) {
 		previewRenderer.setPixelRatio( window.devicePixelRatio );
 
 		renderer.setAnimationLoop( animate );
-		renderer.setClearColor( 0xaaaaaa );
+		
+		let clearColor = 0xaaaaaa;
+		if ( window.matchMedia ) {
+			const mediaQuery = window.matchMedia( '(prefers-color-scheme: dark)' );
+			clearColor = mediaQuery.matches ? 0x333333 : 0xaaaaaa;
+		}
+
+		
+		renderer.setClearColor( clearColor );
+		previewRenderer.setClearColor( clearColor );
 
 		if ( window.matchMedia ) {
 
 			const mediaQuery = window.matchMedia( '(prefers-color-scheme: dark)' );
 			mediaQuery.addEventListener( 'change', function ( event ) {
 
-				renderer.setClearColor( event.matches ? 0x333333 : 0xaaaaaa );
+				const newClearColor = event.matches ? 0x333333 : 0xaaaaaa;
+				renderer.setClearColor( newClearColor );
+				previewRenderer.setClearColor( newClearColor );
 				updateGridColors( grid1, grid2, event.matches ? GRID_COLORS_DARK : GRID_COLORS_LIGHT );
 
 				render();
 
 			} );
 
-			renderer.setClearColor( mediaQuery.matches ? 0x333333 : 0xaaaaaa );
 			updateGridColors( grid1, grid2, mediaQuery.matches ? GRID_COLORS_DARK : GRID_COLORS_LIGHT );
 
 		}
@@ -572,6 +582,90 @@ function Viewport( editor ) {
 
 		container.dom.appendChild( renderer.domElement );
 
+		
+		renderer.domElement.addEventListener( 'dragover', function ( event ) {
+			event.preventDefault();
+			event.stopPropagation();
+		} );
+
+		renderer.domElement.addEventListener( 'dragleave', function ( event ) {
+			event.preventDefault();
+			event.stopPropagation();
+		} );
+
+		renderer.domElement.addEventListener( 'drop', async function ( event ) {
+			event.preventDefault();
+			event.stopPropagation();
+
+			
+			const assetData = event.dataTransfer.getData( 'text/plain' );
+			if ( assetData ) {
+				try {
+					const asset = JSON.parse( assetData );
+					
+					
+					if ( asset.type === 'model' ) {
+						try {
+							const { AddObjectCommand } = await import( './commands/AddObjectCommand.js' );
+							const { ModelParser } = await import( './ModelParser.js' );
+							
+							const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
+							if ( isTauri && editor.storage && editor.storage.getProjectPath ) {
+								const projectPath = editor.storage.getProjectPath();
+								let modelPath = asset.modelPath;
+								
+								if ( !modelPath && asset.path && asset.path.endsWith( '.model' ) ) {
+									const baseName = asset.name.replace( /\.model$/, '' );
+									const folderPath = asset.path.substring( 0, asset.path.lastIndexOf( '/' ) );
+									const folderName = folderPath.substring( folderPath.lastIndexOf( '/' ) + 1 );
+									if ( /\.(glb|gltf|fbx|obj)$/i.test( folderName ) ) {
+										const ext = folderName.substring( folderName.lastIndexOf( '.' ) );
+										modelPath = folderPath + '/' + baseName + ext;
+									} else {
+										const possibleExtensions = [ '.glb', '.gltf', '.fbx', '.obj' ];
+										for ( const ext of possibleExtensions ) {
+											const testPath = folderPath + '/' + baseName + ext;
+											try {
+												const testAssetPath = testPath.startsWith( '/' ) ? testPath.substring( 1 ) : testPath;
+												await window.__TAURI__.core.invoke( 'read_asset_file', {
+													projectPath: projectPath,
+													assetPath: testAssetPath
+												} );
+												modelPath = testPath;
+												break;
+											} catch ( e ) {
+											}
+										}
+									}
+								}
+								
+								if ( !modelPath ) {
+									modelPath = asset.path;
+								}
+								
+								const model = await ModelParser.loadModelFromFile( asset, modelPath, projectPath );
+								editor.execute( new AddObjectCommand( editor, model ) );
+							}
+						} catch ( error ) {
+							console.error( '[Viewport] Failed to load model from asset:', error );
+						}
+						return;
+					}
+					
+					
+					
+					
+				} catch ( e ) {
+					
+				}
+			}
+
+			
+			if ( event.dataTransfer.files && event.dataTransfer.files.length > 0 ) {
+				editor.loader.loadFiles( Array.from( event.dataTransfer.files ) );
+			}
+		} );
+
 		render();
 
 	} );
@@ -582,13 +676,13 @@ function Viewport( editor ) {
 
 	} );
 
-	// Listen for play/stop signals to hide/show gizmos
+	
 	signals.startPlayer.add( function () {
 
 		isPlaying = true;
 		transformControls.visible = false;
 		viewHelper.visible = false;
-		// Hide camera preview when playing
+		
 		previewContainer.style.display = 'none';
 
 	} );
@@ -598,7 +692,7 @@ function Viewport( editor ) {
 		isPlaying = false;
 		transformControls.visible = true;
 		viewHelper.visible = true;
-		// Show camera preview again if a camera is selected
+		
 		if ( previewCamera !== null ) {
 
 			previewContainer.style.display = 'block';
@@ -666,7 +760,7 @@ function Viewport( editor ) {
 
 		const particleData = object.userData.particleSystem || {};
 
-		// Use the factory to create the particle system
+		
 		if ( !particleTexture ) {
 			particleTexture = ParticleSystemFactory.createParticleTexture();
 		}
@@ -753,7 +847,7 @@ function Viewport( editor ) {
 				currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
 			}
 
-			// Use the factory to create the particle system
+			
 			if ( !particleTexture ) {
 				particleTexture = ParticleSystemFactory.createParticleTexture();
 			}
@@ -767,7 +861,7 @@ function Viewport( editor ) {
 			
 			object.getWorldPosition( currentParticleSystem.emitter.position );
 			object.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
-			// Don't copy scale when worldSpace is true - particles should maintain consistent size
+			
 
 			scene.add( currentParticleSystem.emitter );
 			particleRenderer.addSystem( currentParticleSystem );
@@ -915,9 +1009,9 @@ function Viewport( editor ) {
 			}
 		}
 
-		// Only re-enable controls if TransformControls is not active
+		
 		if ( transformControls.object === null ) {
-			controls.enabled = true; // see #14180
+			controls.enabled = true; 
 		}
 
 	} );
@@ -929,7 +1023,7 @@ function Viewport( editor ) {
 
 	} );
 
-	// background
+	
 
 	signals.sceneBackgroundChanged.add( function ( backgroundType, backgroundColor, backgroundTexture, backgroundEquirectangularTexture, backgroundColorSpace, backgroundBlurriness, backgroundIntensity, backgroundRotation ) {
 
@@ -988,7 +1082,7 @@ function Viewport( editor ) {
 
 	} );
 
-	// environment
+	
 
 	let useBackgroundAsEnvironment = false;
 
@@ -1039,7 +1133,7 @@ function Viewport( editor ) {
 
 	} );
 
-	// fog
+	
 
 	signals.sceneFogChanged.add( function ( fogType, fogColor, fogNear, fogFar, fogDensity ) {
 
@@ -1091,8 +1185,8 @@ function Viewport( editor ) {
 
 		}
 
-		// disable EditorControls when setting a user camera
-		// but don't re-enable if TransformControls is currently active
+		
+		
 		if ( transformControls.object === null ) {
 			controls.enabled = ( viewportCamera === editor.camera );
 		}
@@ -1185,7 +1279,7 @@ function Viewport( editor ) {
 
 				{
 
-					// not a helper, skip.
+					
 
 				}
 
@@ -1200,11 +1294,11 @@ function Viewport( editor ) {
 
 	signals.cameraResetted.add( updateAspectRatio );
 
-	// animations
+	
 
 	let prevActionsInUse = 0;
 
-	const clock = new THREE.Clock(); // only used for animations
+	const clock = new THREE.Clock(); 
 
 	function animate() {
 
@@ -1324,7 +1418,7 @@ function Viewport( editor ) {
 		if ( currentParticleSystem && currentParticleSystem.emitter && editor.selected && editor.selected.userData && editor.selected.userData.isParticleSystem ) {
 			editor.selected.getWorldPosition( currentParticleSystem.emitter.position );
 			editor.selected.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
-			// Don't copy scale when worldSpace is true - particles should maintain consistent size
+			
 		}
 
 		renderer.setViewport( 0, 0, container.dom.offsetWidth, container.dom.offsetHeight );
@@ -1340,7 +1434,7 @@ function Viewport( editor ) {
 
 		}
 
-		// Render camera preview (only when not playing)
+		
 		if ( ! isPlaying && previewCamera !== null && previewRenderer !== null && previewContainer.style.display !== 'none' ) {
 
 			previewRenderer.render( scene, previewCamera );

@@ -8,7 +8,7 @@ function Toolbar( editor ) {
 	const container = new UIPanel();
 	container.setId( 'toolbar' );
 
-	// translate / rotate / scale
+	
 
 	const translateIcon = document.createElement( 'img' );
 	translateIcon.title = strings.getKey( 'toolbar/translate' );
@@ -77,7 +77,7 @@ function Toolbar( editor ) {
 
 	} );
 
-	// Play/Stop button
+	
 	let isPlaying = false;
 	const playButton = new UIButton( '▶' );
 	playButton.dom.title = strings.getKey( 'sidebar/project/app/play' ) || 'Play';
@@ -106,7 +106,7 @@ function Toolbar( editor ) {
 	} );
 	container.add( playButton );
 
-	// Update button state when player starts/stops externally
+	
 	signals.startPlayer.add( function () {
 
 		if ( ! isPlaying ) {

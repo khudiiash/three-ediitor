@@ -17,7 +17,7 @@ function MenubarView( editor ) {
 	options.setClass( 'options' );
 	container.add( options );
 
-	// Helpers
+	
 
 	const states = {
 
@@ -28,7 +28,7 @@ function MenubarView( editor ) {
 
 	};
 
-	// Grid Helper
+	
 
 	let option = new UIRow().addClass( 'option' ).addClass( 'toggle' ).setTextContent( strings.getKey( 'menubar/view/gridHelper' ) ).onClick( function () {
 
@@ -42,7 +42,7 @@ function MenubarView( editor ) {
 
 	options.add( option );
 
-	// Camera Helpers
+	
 
 	option = new UIRow().addClass( 'option' ).addClass( 'toggle' ).setTextContent( strings.getKey( 'menubar/view/cameraHelpers' ) ).onClick( function () {
 
@@ -56,7 +56,7 @@ function MenubarView( editor ) {
 
 	options.add( option );
 
-	// Light Helpers
+	
 
 	option = new UIRow().addClass( 'option' ).addClass( 'toggle' ).setTextContent( strings.getKey( 'menubar/view/lightHelpers' ) ).onClick( function () {
 
@@ -70,7 +70,7 @@ function MenubarView( editor ) {
 
 	options.add( option );
 
-	// Skeleton Helpers
+	
 
 	option = new UIRow().addClass( 'option' ).addClass( 'toggle' ).setTextContent( strings.getKey( 'menubar/view/skeletonHelpers' ) ).onClick( function () {
 
@@ -84,9 +84,9 @@ function MenubarView( editor ) {
 
 	options.add( option );
 
-	// new helpers are visible by default, the global visibility state
-	// of helpers is managed in this component. every time a helper is added,
-	// we request a viewport updated by firing the showHelpersChanged signal.
+	
+	
+	
 
 	signals.helperAdded.add( function () {
 
@@ -98,7 +98,7 @@ function MenubarView( editor ) {
 
 	options.add( new UIHorizontalRule() );
 
-	// Fullscreen
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -115,7 +115,7 @@ function MenubarView( editor ) {
 
 		}
 
-		// Safari
+		
 
 		if ( document.webkitFullscreenElement === null ) {
 
@@ -130,7 +130,7 @@ function MenubarView( editor ) {
 	} );
 	options.add( option );
 
-	// XR (Work in progress)
+	
 
 	if ( 'xr' in navigator ) {
 

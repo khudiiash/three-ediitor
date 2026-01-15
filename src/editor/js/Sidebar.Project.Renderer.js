@@ -14,8 +14,8 @@ function SidebarProjectRenderer( editor ) {
 	const container = new UIPanel();
 	container.setBorderTop( '0px' );
 
-	// Renderer settings have been moved to Settings/Rendering panel
-	// This component now only handles renderer creation
+	
+	
 
 	function createRenderer() {
 
@@ -31,7 +31,7 @@ function SidebarProjectRenderer( editor ) {
 		currentRenderer.toneMapping = toneMapping;
 		currentRenderer.toneMappingExposure = toneMappingExposure;
 
-		// Set shadowmap size from config
+		
 		const shadowMapSize = config.getKey( 'project/shadowMapSize' ) || 2048;
 		currentRenderer.shadowMap.width = shadowMapSize;
 		currentRenderer.shadowMap.height = shadowMapSize;
@@ -44,7 +44,7 @@ function SidebarProjectRenderer( editor ) {
 	createRenderer();
 
 
-	// Signals
+	
 
 	signals.editorCleared.add( function () {
 

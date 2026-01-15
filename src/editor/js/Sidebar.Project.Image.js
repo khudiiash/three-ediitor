@@ -11,12 +11,12 @@ function SidebarProjectImage( editor ) {
 	const container = new UIPanel();
 	container.setId( 'render' );
 
-	// Image
+	
 
 	container.add( new UIText( strings.getKey( 'sidebar/project/image' ) ).setTextTransform( 'uppercase' ) );
 	container.add( new UIBreak(), new UIBreak() );
 
-	// Shading
+	
 
 	const shadingRow = new UIRow();
 	container.add( shadingRow );
@@ -47,7 +47,7 @@ function SidebarProjectImage( editor ) {
 
 	refreshShadingRow();
 
-	// Resolution
+	
 
 	const resolutionRow = new UIRow();
 	container.add( resolutionRow );
@@ -62,7 +62,7 @@ function SidebarProjectImage( editor ) {
 	const imageHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' );
 	resolutionRow.add( imageHeight );
 
-	// Render
+	
 
 	const renderButton = new UIButton( strings.getKey( 'sidebar/project/render' ) );
 	renderButton.setWidth( '170px' );
@@ -129,7 +129,7 @@ function SidebarProjectImage( editor ) {
 		if ( project.toneMapping !== undefined ) renderer.toneMapping = project.toneMapping;
 		if ( project.toneMappingExposure !== undefined ) renderer.toneMappingExposure = project.toneMappingExposure;
 
-		// popup
+		
 
 		const width = imageWidth.getValue() / window.devicePixelRatio;
 		const height = imageHeight.getValue() / window.devicePixelRatio;

@@ -4,6 +4,9 @@
 		<title>three.js editor</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+		<meta http-equiv="Pragma" content="no-cache">
+		<meta http-equiv="Expires" content="0">
 		<link rel="apple-touch-icon" href="images/icon.png">
 		<link rel="manifest" href="manifest.json">
 		<link rel="shortcut icon" href="../files/favicon_white.ico" media="(prefers-color-scheme: dark)"/>
@@ -27,9 +30,6 @@
 			}
 		</script>
 
-		<!-- Draco encoder - optional, can be skipped for now -->
-		<!-- <script src="../examples/jsm/libs/draco/draco_encoder.js"></script> -->
-
 		<link rel="stylesheet" href="js/libs/codemirror/codemirror.css">
 		<link rel="stylesheet" href="js/libs/codemirror/theme/monokai.css">
 		<script src="js/libs/codemirror/codemirror.js"></script>
@@ -39,9 +39,6 @@
 		<script src="js/libs/esprima.js"></script>
 		<script src="js/libs/jsonlint.js"></script>
 		<script src="https://cdn.jsdelivr.net/npm/typescript@5.3.3/lib/typescript.js"></script>
-
-		<!-- FFmpeg removed - not needed for basic editor functionality -->
-		<!-- <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.11.6/dist/ffmpeg.min.js"></script> -->
 
 		<link rel="stylesheet" href="js/libs/codemirror/addon/dialog.css">
 		<link rel="stylesheet" href="js/libs/codemirror/addon/show-hint.css">
@@ -83,45 +80,6 @@
 			window.URL = window.URL || window.webkitURL;
 			window.BlobBuilder = window.BlobBuilder || window.WebKitBlobBuilder || window.MozBlobBuilder;
 
-			//
-
-			const editor = new Editor();
-
-			window.editor = editor; // Expose editor to Console
-			window.THREE = THREE; // Expose THREE to APP Scripts and Console
-
-			// PlayCanvas-style layout
-			// Left sidebar: Hierarchy (Scene)
-			const sidebarLeft = document.createElement( 'div' );
-			sidebarLeft.id = 'sidebar-left';
-			const sidebarScene = new SidebarScene( editor );
-			sidebarLeft.appendChild( sidebarScene.dom );
-			document.body.appendChild( sidebarLeft );
-
-			// Right sidebar: Inspector (Properties/Object)
-			const sidebarRight = document.createElement( 'div' );
-			sidebarRight.id = 'sidebar-right';
-			const sidebarProperties = new SidebarProperties( editor );
-			sidebarRight.appendChild( sidebarProperties.dom );
-			document.body.appendChild( sidebarRight );
-
-			// Bottom sidebar: Assets
-			const sidebarBottom = document.createElement( 'div' );
-			sidebarBottom.id = 'sidebar-bottom';
-			const sidebarAssets = new SidebarAssets( editor );
-			sidebarBottom.appendChild( sidebarAssets.dom );
-			document.body.appendChild( sidebarBottom );
-
-			// Viewport in center
-			const viewport = new Viewport( editor );
-			document.body.appendChild( viewport.dom );
-
-			// Toolbar above viewport
-			const toolbar = new Toolbar( editor );
-			document.body.appendChild( toolbar.dom );
-
-			// Loading overlay - shown while scene is loading
-			// Show it immediately from the start, hide only after scene is fully built
 			const loadingOverlay = document.createElement( 'div' );
 			loadingOverlay.id = 'loading-overlay';
 			loadingOverlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 30, 30, 0.9); display: flex; z-index: 10000; align-items: center; justify-content: center; flex-direction: column;';
@@ -130,156 +88,165 @@
 			loadingSpinner.style.cssText = 'width: 50px; height: 50px; border: 4px solid rgba(255, 255, 255, 0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite;';
 			
 			const loadingText = document.createElement( 'div' );
-			loadingText.textContent = 'Loading scene...';
+			loadingText.textContent = 'Loading editor...';
 			loadingText.style.cssText = 'color: #fff; margin-top: 20px; font-size: 16px; font-family: Helvetica, Arial, sans-serif;';
 			
 			loadingOverlay.appendChild( loadingSpinner );
 			loadingOverlay.appendChild( loadingText );
 			document.body.appendChild( loadingOverlay );
 			
-			// Add spinner animation
 			const style = document.createElement( 'style' );
 			style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
 			document.head.appendChild( style );
+
+			function checkTauriAPI() {
+				return typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke;
+			}
+
+			const editor = new Editor();
 			
-			// Track if we should hide the overlay
-			let shouldHideOverlay = false;
+			if (document.readyState !== 'complete') {
+				await new Promise(resolve => {
+					if (document.readyState === 'complete') {
+						resolve();
+					} else {
+						window.addEventListener('load', resolve, { once: true });
+					}
+				});
+			}
+
+			let tauriAvailable = checkTauriAPI();
+			if (!tauriAvailable) {
+				await new Promise(resolve => {
+					const checkInterval = setInterval(() => {
+						if (checkTauriAPI()) {
+							clearInterval(checkInterval);
+							tauriAvailable = true;
+							resolve();
+						}
+					}, 10);
+					setTimeout(() => {
+						clearInterval(checkInterval);
+						resolve();
+					}, 1000);
+				});
+			}
+
+			window.editor = editor; 
+			window.THREE = THREE;
+
+			function handleLoadError( error ) {
+				if ( error && typeof error === 'object' && error.type === 'error' && error.target && error.target.tagName === 'IMG' ) {
+					console.warn( '[Editor] Image loading error (non-critical):', error.target.src || error.target );
+				} else if ( error && typeof error === 'object' && error.type === 'error' ) {
+					console.warn( '[Editor] Resource loading error (non-critical):', error.target || error );
+				} else {
+					console.error( '[Editor] Error loading scene:', error );
+				}
+			}
+
+			async function loadSceneFromState( state, loadingOverlay ) {
+				try {
+					if ( state !== undefined && state.scene ) {
+						editor.clear();
+						
+						const onSceneGraphChanged = function () {
+							editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
+							loadingOverlay.style.display = 'none';
+						};
+						editor.signals.sceneGraphChanged.add( onSceneGraphChanged );
+						
+						await editor.fromJSON( state );
+					} else {
+						editor.clear();
+						loadingOverlay.style.display = 'none';
+					}
+					sceneLoaded = true;
+				} catch ( error ) {
+					handleLoadError( error );
+					loadingOverlay.style.display = 'none';
+				}
+			}
+
+			async function loadProject( projectPath, loadingOverlay ) {
+				if ( editor.storage.setProjectPath ) {
+					editor.storage.setProjectPath( projectPath );
+					sessionStorage.setItem( 'editor_project_path', projectPath );
+				}
+				
+				if ( editor.config && editor.config.loadProjectConfig ) {
+					await editor.config.loadProjectConfig();
+				}
+
+				try {
+					await new Promise((resolve, reject) => {
+						editor.storage.get( async function ( state ) {
+							try {
+								await loadSceneFromState( state, loadingOverlay );
+								sceneLoaded = true;
+								resolve();
+							} catch (error) {
+								reject(error);
+							}
+						} );
+					});
+				} catch ( error ) {
+					console.warn( 'Failed to load scene from project:', error );
+					editor.clear();
+					loadingOverlay.style.display = 'none';
+				}
+			} 
+
+			const sidebarLeft = document.createElement( 'div' );
+			sidebarLeft.id = 'sidebar-left';
+			const sidebarScene = new SidebarScene( editor );
+			sidebarLeft.appendChild( sidebarScene.dom );
+			document.body.appendChild( sidebarLeft );
+
+			const sidebarRight = document.createElement( 'div' );
+			sidebarRight.id = 'sidebar-right';
+			const sidebarProperties = new SidebarProperties( editor );
+			sidebarRight.appendChild( sidebarProperties.dom );
+			document.body.appendChild( sidebarRight );
+
+			const sidebarBottom = document.createElement( 'div' );
+			sidebarBottom.id = 'sidebar-bottom';
+			const sidebarAssets = new SidebarAssets( editor );
+			sidebarBottom.appendChild( sidebarAssets.dom );
+			document.body.appendChild( sidebarBottom );
+
+			const viewport = new Viewport( editor );
+			document.body.appendChild( viewport.dom );
+
+			const toolbar = new Toolbar( editor );
+			document.body.appendChild( toolbar.dom );
+
+			loadingText.textContent = 'Loading scene...';
 
 			const script = new Script( editor );
 			document.body.appendChild( script.dom );
 
 			const player = new Player( editor );
-			// Player now renders inside viewport, no need to append to body
 
-			// Legacy sidebar (hidden, kept for compatibility)
 			const sidebar = new Sidebar( editor );
 			sidebar.dom.style.display = 'none';
 			document.body.appendChild( sidebar.dom );
 
-			// Listen for project-opened event from Tauri
-			// Set this up immediately, before other initialization
-			if ( window.__TAURI__ ) {
-				
-				// Set up the listener as early as possible
+			if ( tauriAvailable && window.__TAURI__ ) {
 				window.__TAURI__.event.listen( 'project-opened', async ( event ) => {
-
-					const projectPath = event.payload;
-					shouldHideOverlay = false;
-					
-					// Set the project path in storage BEFORE loading
-					if ( editor.storage.setProjectPath ) {
-						editor.storage.setProjectPath( projectPath );
+					if ( event && event.payload ) {
+						await loadProject( event.payload, loadingOverlay );
 					}
-					
-					// Load project config
-					if ( editor.config && editor.config.loadProjectConfig ) {
-						editor.config.loadProjectConfig();
-					}
-
-					// Load the scene from the project directory
-					// Note: We use editor.storage.get() which handles path conversion
-					// This ensures consistency with the save path format
-					try {
-
-						// Use storage.get() which handles path conversion for Tauri
-						await new Promise( ( resolve, reject ) => {
-							
-							// Track when hierarchy is updated
-							let hierarchyUpdated = false;
-							const onSceneGraphChanged = function () {
-								hierarchyUpdated = true;
-								editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
-								
-								// Wait a bit more to ensure UI is fully updated
-								setTimeout( () => {
-									if ( shouldHideOverlay ) {
-										loadingOverlay.style.display = 'none';
-									}
-									resolve();
-								}, 100 );
-							};
-							
-							// Listen for hierarchy updates
-							editor.signals.sceneGraphChanged.add( onSceneGraphChanged );
-							
-							// Mark that we should hide overlay when done
-							shouldHideOverlay = true;
-							
-							editor.storage.get( async function ( state ) {
-								
-								try {
-									
-									if ( state !== undefined && state.scene ) {
-										
-										// Clear any existing scene before loading
-										editor.clear();
-										
-										await editor.fromJSON( state );
-										
-										// If hierarchy hasn't updated after a delay, hide overlay anyway
-										setTimeout( () => {
-											if ( ! hierarchyUpdated ) {
-												editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
-												if ( shouldHideOverlay ) {
-													loadingOverlay.style.display = 'none';
-												}
-												resolve();
-											}
-										}, 2000 );
-										
-									} else {
-										
-										editor.clear();
-										
-										// Remove listener and hide overlay for empty scene
-										editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
-										shouldHideOverlay = true;
-										loadingOverlay.style.display = 'none';
-										resolve();
-										
-									}
-									
-								} catch ( error ) {
-									
-									if ( error && typeof error === 'object' && error.type === 'error' && error.target && error.target.tagName === 'IMG' ) {
-										console.warn( '[Editor] Image loading error (non-critical):', error.target.src || error.target );
-									} else if ( error && typeof error === 'object' && error.type === 'error' ) {
-										console.warn( '[Editor] Resource loading error (non-critical):', error.target || error );
-									} else {
-										console.error( '[Editor] Error loading scene:', error );
-									}
-									
-									editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
-									shouldHideOverlay = true;
-									loadingOverlay.style.display = 'none';
-									
-									if ( error && typeof error === 'object' && error.type === 'error' ) {
-										resolve();
-									} else {
-										console.error( '[Editor] Critical error loading scene, not clearing scene to prevent data loss' );
-										resolve();
-									}
-									
-								}
-								
-							} );
-							
-						} );
-
-					} catch ( error ) {
-
-						console.warn( 'Failed to load scene from project:', error );
-						// Clear the editor to start fresh
-						editor.clear();
-						
-						// Hide loading overlay on error
-						shouldHideOverlay = true;
-						loadingOverlay.style.display = 'none';
-
-					}
-
 				} );
-
+				
+				const savedProjectPath = sessionStorage.getItem( 'editor_project_path' );
+				if ( savedProjectPath && !editor.storage.getProjectPath() ) {
+					editor.storage.setProjectPath( savedProjectPath );
+					loadProject( savedProjectPath, loadingOverlay ).catch( function ( error ) {
+						console.error( '[Editor] Error loading project from sessionStorage:', error );
+						loadingOverlay.style.display = 'none';
+					} );
+				}
 			}
 
 			const menubar = new Menubar( editor );
@@ -288,113 +255,125 @@
 			const resizer = new Resizer( editor );
 			document.body.appendChild( resizer.dom );
 			
-			// Declare isLoadingFromHash before it's used
 			let isLoadingFromHash = false;
 			
+			let timeout;
+
+			function saveState() {
+
+				if ( editor.config.getKey( 'autosave' ) === false ) {
+
+					return;
+
+				}
+
+				clearTimeout( timeout );
+
+				timeout = setTimeout( function () {
+
+					editor.signals.savingStarted.dispatch();
+
+					timeout = setTimeout( async function () {
+
+						try {
+							await editor.storage.set( editor.toJSON() );
+						} catch ( error ) {
+							console.error( '[Editor] Error saving scene:', error );
+						}
+
+						editor.signals.savingFinished.dispatch();
+
+					}, 100 );
+
+				}, 1000 );
+
+			}
+
+			const signals = editor.signals;
+
+			signals.geometryChanged.add( saveState );
+			signals.objectAdded.add( saveState );
+			signals.objectChanged.add( saveState );
+			signals.objectRemoved.add( saveState );
+			signals.materialChanged.add( saveState );
+			signals.sceneBackgroundChanged.add( saveState );
+			signals.sceneEnvironmentChanged.add( saveState );
+			signals.sceneFogChanged.add( saveState );
+			signals.sceneGraphChanged.add( saveState );
+			signals.scriptChanged.add( saveState );
+			signals.historyChanged.add( saveState );
+
+			let sceneLoaded = false;
+			
 			editor.storage.init( function () {
+				if ( tauriAvailable && window.__TAURI__ ) {
+					const savedProjectPath = sessionStorage.getItem( 'editor_project_path' );
+					if ( savedProjectPath ) {
+						if ( !editor.storage.getProjectPath() ) {
+							editor.storage.setProjectPath( savedProjectPath );
+						}
+						if ( !sceneLoaded ) {
+							editor.storage.get( async function ( state ) {
+								if ( !sceneLoaded ) {
+									await loadSceneFromState( state, loadingOverlay );
+									sceneLoaded = true;
+								}
+							} );
+						} else {
+							loadingOverlay.style.display = 'none';
+						}
+					} else {
+						loadingOverlay.style.display = 'none';
+					}
+					return;
+				}
 
 				editor.storage.get( async function ( state ) {
-
-					if ( isLoadingFromHash ) return;
-
-					// In Tauri mode, only load from storage if we have a project path
-					// Otherwise, wait for the project-opened event
-					if ( window.__TAURI__ ) {
-						if ( state === undefined ) {
-							return;
-						}
+					if ( isLoadingFromHash ) {
+						loadingOverlay.style.display = 'none';
+						return;
 					}
 
-					if ( state !== undefined ) {
-
-						await editor.fromJSON( state );
-
-					}
+					await loadSceneFromState( state, loadingOverlay );
+					sceneLoaded = true;
 
 					const selected = editor.config.getKey( 'selected' );
-
 					if ( selected !== undefined ) {
-
 						editor.selectByUuid( selected );
-
 					}
 
 				} );
 
-				//
-
-				let timeout;
-
-				function saveState() {
-
-					if ( editor.config.getKey( 'autosave' ) === false ) {
-
-						return;
-
-					}
-
-					clearTimeout( timeout );
-
-					timeout = setTimeout( function () {
-
-						editor.signals.savingStarted.dispatch();
-
-						timeout = setTimeout( function () {
-
-							editor.storage.set( editor.toJSON() );
-
-							editor.signals.savingFinished.dispatch();
-
-						}, 100 );
-
-					}, 1000 );
-
-				}
-
-				const signals = editor.signals;
-
-				signals.geometryChanged.add( saveState );
-				signals.objectAdded.add( saveState );
-				signals.objectChanged.add( saveState );
-				signals.objectRemoved.add( saveState );
-				signals.materialChanged.add( saveState );
-				signals.sceneBackgroundChanged.add( saveState );
-				signals.sceneEnvironmentChanged.add( saveState );
-				signals.sceneFogChanged.add( saveState );
-				signals.sceneGraphChanged.add( saveState );
-				signals.scriptChanged.add( saveState );
-				signals.historyChanged.add( saveState );
-
 			} );
 
-			//
 
 			document.addEventListener( 'dragover', function ( event ) {
-
+				const target = event.target;
+				const assetsPanel = target.closest && ( target.closest( '#assets-files' ) || target.closest( '#assets-files-table' ) || target.closest( '#assets-files-tbody' ) || target.closest( '#sidebar-bottom' ) );
+				if ( assetsPanel ) {
+					console.log('[Editor] Dragover over assets panel, skipping');
+					return;
+				}
 				event.preventDefault();
 				event.dataTransfer.dropEffect = 'copy';
-
-			} );
+			}, false );
 
 			document.addEventListener( 'drop', function ( event ) {
-
-				event.preventDefault();
-
-				if ( event.dataTransfer.types[ 0 ] === 'text/plain' ) return; // Outliner drop
-
-				if ( event.dataTransfer.items ) {
-
-					// DataTransferItemList supports folders
-
-					editor.loader.loadItemList( event.dataTransfer.items );
-
-				} else {
-
-					editor.loader.loadFiles( event.dataTransfer.files );
-
+				console.log('[Editor] Document drop', event.target, event.dataTransfer.files.length);
+				const target = event.target;
+				const assetsPanel = target.closest && ( target.closest( '#assets-files' ) || target.closest( '#assets-files-table' ) || target.closest( '#assets-files-tbody' ) || target.closest( '#sidebar-bottom' ) );
+				if ( assetsPanel ) {
+					console.log('[Editor] Drop over assets panel, skipping document handler');
+					return;
 				}
-
-			} );
+				event.preventDefault();
+				if ( event.dataTransfer.types[ 0 ] === 'text/plain' ) return;
+				if ( event.dataTransfer.items ) {
+					editor.loader.loadItemList( event.dataTransfer.items );
+				} else {
+					editor.loader.loadFiles( event.dataTransfer.files );
+				}
+			}, false );
 
 			function onWindowResize() {
 
@@ -406,9 +385,50 @@
 
 			onWindowResize();
 
-			//
+			window.addEventListener( 'keydown', function ( event ) {
+				if ( event.key === 'F5' || ( event.key === 'r' && ( event.ctrlKey || event.metaKey ) ) ) {
+					event.preventDefault();
+					if ( typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke ) {
+						window.__TAURI__.core.invoke( 'reload_window', { windowLabel: 'editor' } )
+							.catch( async err => {
+								console.warn( 'Failed to reload via Tauri, using fallback:', err );
+								if ( 'serviceWorker' in navigator ) {
+									const registrations = await navigator.serviceWorker.getRegistrations();
+									for ( let registration of registrations ) {
+										await registration.unregister();
+									}
+									const cacheNames = await caches.keys();
+									for ( let cacheName of cacheNames ) {
+										await caches.delete( cacheName );
+									}
+								}
+								const timestamp = Date.now();
+								const url = new URL( window.location.href );
+								url.searchParams.set( 't', timestamp.toString() );
+								window.location.href = url.toString();
+							} );
+					} else {
+						( async function () {
+							if ( 'serviceWorker' in navigator ) {
+								const registrations = await navigator.serviceWorker.getRegistrations();
+								for ( let registration of registrations ) {
+									await registration.unregister();
+								}
+								const cacheNames = await caches.keys();
+								for ( let cacheName of cacheNames ) {
+									await caches.delete( cacheName );
+								}
+							}
+							const timestamp = Date.now();
+							const url = new URL( window.location.href );
+							url.searchParams.set( 't', timestamp.toString() );
+							window.location.href = url.toString();
+						} )();
+					}
+				}
+			} );
 
-			// isLoadingFromHash is declared earlier, above editor.storage.init
+
 			const hash = window.location.hash;
 
 			if ( hash.slice( 1, 6 ) === 'file=' ) {
@@ -432,18 +452,17 @@
 
 			}
 
-			// ServiceWorker
-
-			if ( 'serviceWorker' in navigator ) {
-
+			if ( 'serviceWorker' in navigator && !window.__TAURI__ ) {
 				try {
-
 					navigator.serviceWorker.register( 'sw.js' );
-
 				} catch ( error ) {
-
 				}
-
+			} else if ( 'serviceWorker' in navigator && window.__TAURI__ ) {
+				navigator.serviceWorker.getRegistrations().then( function ( registrations ) {
+					for ( let registration of registrations ) {
+						registration.unregister();
+					}
+				} );
 			}
 
 		</script>

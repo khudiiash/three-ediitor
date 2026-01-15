@@ -15,7 +15,7 @@ function GeometryParametersPanel( editor, object ) {
 	const geometry = object.geometry;
 	const parameters = geometry.parameters;
 
-	// points
+	
 
 	const pointsRow = new UIRow();
 	pointsRow.add( new UIText( strings.getKey( 'sidebar/geometry/tube_geometry/path' ) ).setClass( 'Label' ) );
@@ -25,7 +25,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( pointsRow );
 
-	// radius
+	
 
 	const radiusRow = new UIRow();
 	const radius = new UINumber( parameters.radius ).onChange( update );
@@ -35,7 +35,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radiusRow );
 
-	// tubularSegments
+	
 
 	const tubularSegmentsRow = new UIRow();
 	const tubularSegments = new UIInteger( parameters.tubularSegments ).onChange( update );
@@ -45,7 +45,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( tubularSegmentsRow );
 
-	// radialSegments
+	
 
 	const radialSegmentsRow = new UIRow();
 	const radialSegments = new UIInteger( parameters.radialSegments ).onChange( update );
@@ -55,7 +55,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( radialSegmentsRow );
 
-	// closed
+	
 
 	const closedRow = new UIRow();
 	const closed = new UICheckbox( parameters.closed ).onChange( update );
@@ -65,7 +65,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( closedRow );
 
-	// curveType
+	
 
 	const curveTypeRow = new UIRow();
 	const curveType = new UISelect().setOptions( { centripetal: 'centripetal', chordal: 'chordal', catmullrom: 'catmullrom' } ).setValue( parameters.path.curveType ).onChange( update );
@@ -74,7 +74,7 @@ function GeometryParametersPanel( editor, object ) {
 
 	container.add( curveTypeRow );
 
-	// tension
+	
 
 	const tensionRow = new UIRow().setDisplay( curveType.getValue() == 'catmullrom' ? '' : 'none' );
 	const tension = new UINumber( parameters.path.tension ).setStep( 0.01 ).onChange( update );

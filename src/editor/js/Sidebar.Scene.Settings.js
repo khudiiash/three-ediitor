@@ -17,7 +17,7 @@ function SidebarSceneSettings( editor ) {
 	container.setBorderTop( '0' );
 	container.setPaddingTop( '20px' );
 
-	// Background
+	
 
 	const backgroundRow = new UIRow();
 
@@ -126,7 +126,7 @@ function SidebarSceneSettings( editor ) {
 
 	container.add( new UIBreak() );
 
-	// Environment
+	
 
 	const environmentRow = new UIRow();
 
@@ -177,7 +177,7 @@ function SidebarSceneSettings( editor ) {
 
 	container.add( new UIBreak() );
 
-	// Fog
+	
 
 	const fogTypeRow = new UIRow();
 	const fogType = new UISelect().setOptions( {
@@ -199,7 +199,7 @@ function SidebarSceneSettings( editor ) {
 
 	container.add( fogTypeRow );
 
-	// fog color
+	
 
 	const fogPropertiesRow = new UIRow();
 	fogPropertiesRow.setDisplay( 'none' );
@@ -210,17 +210,17 @@ function SidebarSceneSettings( editor ) {
 	fogColor.onInput( onFogSettingsChanged );
 	fogPropertiesRow.add( fogColor );
 
-	// fog near
+	
 
 	const fogNear = new UINumber( 0.1 ).setWidth( '40px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
 	fogPropertiesRow.add( fogNear );
 
-	// fog far
+	
 
 	const fogFar = new UINumber( 50 ).setWidth( '40px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
 	fogPropertiesRow.add( fogFar );
 
-	// fog density
+	
 
 	const fogDensity = new UINumber( 0.05 ).setWidth( '40px' ).setRange( 0, 0.1 ).setStep( 0.001 ).setPrecision( 3 ).onChange( onFogSettingsChanged );
 	fogPropertiesRow.add( fogDensity );

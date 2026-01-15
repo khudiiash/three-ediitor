@@ -18,6 +18,7 @@ import { SetOrthographicCameraSizeCommand } from './commands/SetOrthographicCame
 import { SidebarObjectAnimation } from './Sidebar.Object.Animation.js';
 import { SidebarGeometry } from './Sidebar.Geometry.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
+import { SidebarSceneSettings } from './Sidebar.Scene.Settings.js';
 
 function SidebarObject( editor ) {
 
@@ -30,6 +31,7 @@ function SidebarObject( editor ) {
 	const lightPanel = new UICollapsiblePanel( 'Light' );
 	const cameraPanel = new UICollapsiblePanel( 'Camera' );
 	const particlePanel = new UICollapsiblePanel( 'Particles' );
+	const scenePanel = new UICollapsiblePanel( 'Scene' );
 
 	const geometryPanel = new UICollapsiblePanel( 'Geometry' );
 	const materialPanel = new UICollapsiblePanel( 'Material' );
@@ -51,6 +53,10 @@ function SidebarObject( editor ) {
 	lightPanel.collapse();
 	cameraPanel.collapse();
 	particlePanel.collapse();
+	scenePanel.collapse();
+
+	const sceneContent = new SidebarSceneSettings( editor );
+	scenePanel.add( sceneContent );
 
 	const panelsContainer = new UIPanel();
 	panelsContainer.add( entityPanel );
@@ -58,6 +64,7 @@ function SidebarObject( editor ) {
 	panelsContainer.add( lightPanel );
 	panelsContainer.add( cameraPanel );
 	panelsContainer.add( particlePanel );
+	panelsContainer.add( scenePanel );
 
 	const objectTypeRow = new UIRow();
 	const objectType = new UIText();
@@ -1129,7 +1136,7 @@ function SidebarObject( editor ) {
 
 				}
 
-				// Shadow map size
+				
 				if ( object.shadow.mapSize !== undefined ) {
 
 					const mapSize = objectShadowMapSize.getValue();
@@ -1141,7 +1148,7 @@ function SidebarObject( editor ) {
 
 				}
 
-				// Shadow camera properties
+				
 				if ( object.shadow.camera !== undefined ) {
 
 					if ( object.shadow.camera.near !== undefined && Math.abs( object.shadow.camera.near - objectShadowCameraNear.getValue() ) >= 0.01 ) {
@@ -1156,7 +1163,7 @@ function SidebarObject( editor ) {
 
 					}
 
-					// Directional light camera properties - use single area control
+					
 					if ( object.shadow.camera.left !== undefined && object.shadow.camera.right !== undefined ) {
 
 						const area = objectShadowCameraArea.getValue();
@@ -1170,7 +1177,7 @@ function SidebarObject( editor ) {
 
 					}
 
-					// Spot light camera properties
+					
 					if ( object.shadow.camera.fov !== undefined && Math.abs( object.shadow.camera.fov - objectShadowCameraFov.getValue() ) >= 0.01 ) {
 
 						editor.execute( new SetShadowCameraCommand( editor, object, 'fov', objectShadowCameraFov.getValue() ) );
@@ -1191,11 +1198,13 @@ function SidebarObject( editor ) {
 		const isLight = object.isLight;
 		const isCamera = object.isCamera || object.isPerspectiveCamera || object.isOrthographicCamera;
 		const isParticleSystem = object.userData && object.userData.isParticleSystem;
+		const isScene = object.isScene;
 
 		meshPanel.setHidden( ! isMesh );
 		lightPanel.setHidden( ! isLight );
 		cameraPanel.setHidden( ! isCamera );
 		particlePanel.setHidden( ! isParticleSystem );
+		scenePanel.setHidden( ! isScene );
 
 		if ( isMesh ) {
 			geometryPanel.setHidden( ! object.geometry );
@@ -1297,7 +1306,7 @@ function SidebarObject( editor ) {
 
 	}
 
-	// events
+	
 
 	signals.objectSelected.add( function ( object ) {
 
@@ -1539,14 +1548,14 @@ function SidebarObject( editor ) {
 			objectShadowNormalBias.setValue( object.shadow.normalBias );
 			objectShadowRadius.setValue( object.shadow.radius );
 
-			// Shadow map size
+			
 			if ( object.shadow.mapSize !== undefined ) {
 
 				objectShadowMapSize.setValue( object.shadow.mapSize.width );
 
 			}
 
-			// Shadow camera properties
+			
 			if ( object.shadow.camera !== undefined ) {
 
 				if ( object.shadow.camera.near !== undefined ) {
@@ -1561,7 +1570,7 @@ function SidebarObject( editor ) {
 
 				}
 
-				// Directional light camera properties - calculate area from left/right/top/bottom
+				
 				if ( object.shadow.camera.left !== undefined && object.shadow.camera.right !== undefined ) {
 
 					const width = object.shadow.camera.right - object.shadow.camera.left;
@@ -1571,7 +1580,7 @@ function SidebarObject( editor ) {
 
 				}
 
-				// Spot light camera properties
+				
 				if ( object.shadow.camera.fov !== undefined ) {
 
 					objectShadowCameraFov.setValue( object.shadow.camera.fov );

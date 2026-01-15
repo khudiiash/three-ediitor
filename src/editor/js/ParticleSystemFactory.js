@@ -90,7 +90,7 @@ export class ParticleSystemFactory {
     static createBehaviors(particleData) {
         const behaviors = [];
 
-        // Process behaviors from the behaviors array
+        
         if (particleData.behaviors && Array.isArray(particleData.behaviors)) {
             particleData.behaviors.forEach((behaviorData) => {
                 if (behaviorData.enabled === false) return;
@@ -106,7 +106,7 @@ export class ParticleSystemFactory {
             });
         }
 
-        // Fallback: Add legacy behaviors if not in behaviors array
+        
         this.addLegacyBehaviors(behaviors, particleData);
 
         return behaviors;
@@ -265,7 +265,7 @@ export class ParticleSystemFactory {
      * Add legacy behaviors for backward compatibility
      */
     static addLegacyBehaviors(behaviors, particleData) {
-        // Legacy Gravity/ApplyForce
+        
         const hasGravityBehavior = particleData.behaviors?.some(b => 
             (b.type === 'Gravity' || b.type === 'ApplyForce') && b.enabled !== false
         );
@@ -286,7 +286,7 @@ export class ParticleSystemFactory {
             }
         }
 
-        // Legacy ColorOverLife
+        
         const hasColorBehavior = particleData.behaviors?.some(b => 
             b.type === 'ColorOverLife' && b.enabled !== false
         );
@@ -318,7 +318,7 @@ export class ParticleSystemFactory {
             behaviors.push(new ColorOverLife(colorGradient));
         }
 
-        // Legacy SizeOverLife
+        
         const hasSizeBehavior = particleData.behaviors?.some(b => 
             b.type === 'SizeOverLife' && b.enabled !== false
         );
@@ -365,7 +365,7 @@ export class ParticleSystemFactory {
      * Create a complete particle system from particle data
      */
     static createParticleSystem(particleData, texture) {
-        // Create emitter
+        
         const emitterShape = this.createEmitter(
             particleData.emitterShape || 'point',
             particleData.emitterSizeX !== undefined ? particleData.emitterSizeX : 1,
@@ -374,10 +374,10 @@ export class ParticleSystemFactory {
             particleData.spreadAngle !== undefined ? particleData.spreadAngle : 0
         );
 
-        // Create behaviors
+        
         const behaviors = this.createBehaviors(particleData);
 
-        // Create material
+        
         const material = new THREE.MeshBasicMaterial({
             map: texture,
             color: particleData.materialColor !== undefined ? particleData.materialColor : 0xffffff,
@@ -387,7 +387,7 @@ export class ParticleSystemFactory {
             depthWrite: false
         });
 
-        // Create particle system config
+        
         const config = {
             duration: particleData.duration !== undefined ? particleData.duration : 1,
             looping: particleData.looping !== undefined ? particleData.looping : true,
@@ -438,7 +438,7 @@ export class ParticleSystemFactory {
 
         const particleSystem = new ParticleSystem(config);
 
-        // Apply direction to emitter
+        
         this.applyDirectionToEmitter(
             particleSystem.emitter,
             particleData.directionX !== undefined ? particleData.directionX : 0,

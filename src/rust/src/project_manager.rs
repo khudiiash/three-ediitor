@@ -41,8 +41,17 @@ impl ProjectManager {
             .map_err(|e| format!("Failed to get current executable path: {}", e))?;
         
         let base_dir = if cfg!(debug_assertions) {
-            std::env::current_dir()
-                .map_err(|e| format!("Failed to get current directory: {}", e))? 
+            // In debug mode, we're running from src/rust, so go up to project root
+            let current_dir = std::env::current_dir()
+                .map_err(|e| format!("Failed to get current directory: {}", e))?;
+            if current_dir.ends_with("rust") {
+                current_dir.parent()
+                    .and_then(|p| p.parent())
+                    .ok_or("Failed to get project root directory")?
+                    .to_path_buf()
+            } else {
+                current_dir
+            }
         } else {
             exe_path.parent()
                 .ok_or("Failed to get executable parent directory")?
@@ -89,8 +98,7 @@ impl ProjectManager {
             if let Ok(entries) = fs::read_dir(&self.projects_dir) {
                 let mut entry_count = 0;
                 for entry in entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path();
+                    if let Ok(_entry) = entry {
                         entry_count += 1;
                     }
                 }
@@ -175,7 +183,24 @@ impl ProjectManager {
             "name": name,
             "created": now,
             "modified": now,
-            "version": "1.0.0"
+            "version": "1.0.0",
+            "settings": {
+                "title": "",
+                "editable": false,
+                "vr": false,
+                "renderer": {
+                    "antialias": true,
+                    "shadows": true,
+                    "shadowType": 1,
+                    "toneMapping": 0,
+                    "toneMappingExposure": 1
+                },
+                "defaults": {
+                    "castShadows": false,
+                    "receiveShadows": false,
+                    "material": null
+                }
+            }
         });
 
         let metadata_path = project_path.join("project.json");
@@ -187,6 +212,69 @@ impl ProjectManager {
         .map_err(|e| {
             eprintln!("[ProjectManager] Error writing metadata: {}", e);
             format!("Failed to write metadata: {}", e)
+        })?;
+
+        let scene_json = serde_json::json!({
+            "metadata": {},
+            "project": {
+                "shadows": true,
+                "shadowType": 1,
+                "toneMapping": 0,
+                "toneMappingExposure": 1
+            },
+            "camera": {
+                "metadata": {
+                    "version": 4.7,
+                    "type": "Object",
+                    "generator": "Object3D.toJSON"
+                },
+                "object": {
+                    "uuid": "",
+                    "type": "PerspectiveCamera",
+                    "name": "Camera",
+                    "layers": 1,
+                    "matrix": [1,0,0,0,0,0.8944271909999153,-0.44721359549995787,0,0,0.44721359549995787,0.8944271909999153,0,0,5,10,1],
+                    "fov": 50,
+                    "zoom": 1,
+                    "near": 0.01,
+                    "far": 1000,
+                    "focus": 10,
+                    "aspect": 1,
+                    "filmGauge": 35,
+                    "filmOffset": 0
+                }
+            },
+            "scene": {
+                "metadata": {
+                    "version": 4.5,
+                    "type": "Object",
+                    "generator": "Object3D.toJSON"
+                },
+                "object": {
+                    "uuid": "",
+                    "type": "Scene",
+                    "name": "Scene",
+                    "layers": 1,
+                    "matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+                    "children": []
+                }
+            },
+            "scripts": {},
+            "history": {
+                "undos": [],
+                "redos": []
+            },
+            "environment": null
+        });
+        let scene_path = project_path.join("scene.json");
+        fs::write(
+            &scene_path,
+            serde_json::to_string_pretty(&scene_json)
+                .map_err(|e| format!("Failed to serialize scene.json: {}", e))?
+        )
+        .map_err(|e| {
+            eprintln!("[ProjectManager] Error writing scene.json: {}", e);
+            format!("Failed to write scene.json: {}", e)
         })?;
 
         if !project_path.exists() {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 import { UIPanel, UIBreak, UIRow, UIColor, UISelect, UIText, UINumber, UIInput } from './libs/ui.js';
 import { UIOutliner, UITexture } from './libs/ui.three.js';
+import { SetValueCommand } from './commands/SetValueCommand.js';
 
 function SidebarScene( editor ) {
 
@@ -50,7 +51,7 @@ function SidebarScene( editor ) {
 			option.classList.add( 'system-entity' );
 		}
 
-		// opener
+		
 
 		if ( nodeStates.has( object ) ) {
 
@@ -65,15 +66,29 @@ function SidebarScene( editor ) {
 
 			}
 
-			opener.addEventListener( 'click', function () {
-
-				nodeStates.set( object, nodeStates.get( object ) === false ); // toggle
+			opener.addEventListener( 'click', function ( event ) {
+				event.stopPropagation();
+				nodeStates.set( object, nodeStates.get( object ) === false ); 
 				refreshUI();
-
 			} );
 
 			option.insertBefore( opener, option.firstChild );
 
+		}
+
+		
+		const visibilityToggle = option.querySelector( '.visibility-toggle' );
+		if ( visibilityToggle ) {
+			visibilityToggle.addEventListener( 'click', function ( event ) {
+				event.stopPropagation();
+				const objectId = parseInt( this.getAttribute( 'data-object-id' ) );
+				const targetObject = editor.scene.getObjectById( objectId );
+				if ( targetObject ) {
+					const newVisibility = !targetObject.visible;
+					editor.execute( new SetValueCommand( editor, targetObject, 'visible', newVisibility ) );
+					
+				}
+			} );
 		}
 
 		return option;
@@ -134,22 +149,10 @@ function SidebarScene( editor ) {
 		const isSystemEntity = isBatchedRenderer( object );
 		const typeClass = getObjectType( object );
 		const nameClass = isSystemEntity ? 'system-entity-name' : '';
-		let html = `<span class="type ${ typeClass }${ isSystemEntity ? ' system-entity-type' : '' }"></span> <span class="${ nameClass }">${ escapeHTML( objectName ) }</span>`;
-
-		if ( object.isMesh ) {
-
-			const geometry = object.geometry;
-			const material = object.material;
-
-			const geometryName = geometry && geometry.name ? geometry.name : '';
-			const materialName = material ? getMaterialName( material ) : '';
-
-			html += ` <span class="type Geometry"></span> ${ escapeHTML( geometryName ) }`;
-			html += ` <span class="type Material"></span> ${ escapeHTML( materialName ) }`;
-
-		}
-
-		html += getScript( object.uuid );
+		const isVisible = object.visible !== false;
+		const visibilityClass = isVisible ? 'visibility-visible' : 'visibility-hidden';
+		
+		let html = `<span class="type ${ typeClass }${ isSystemEntity ? ' system-entity-type' : '' }"></span> <span class="${ nameClass }">${ escapeHTML( objectName ) }</span> <span class="visibility-toggle ${ visibilityClass }" data-object-id="${ object.id }"></span>`;
 
 		return html;
 
@@ -172,7 +175,6 @@ function SidebarScene( editor ) {
 	outliner.dom.style.flex = '1';
 	outliner.dom.style.height = '100%';
 	
-	// Apply minimal scrollbar styling directly (only once)
 	if ( ! document.getElementById( 'outliner-scrollbar-style' ) ) {
 		const style = document.createElement( 'style' );
 		style.id = 'outliner-scrollbar-style';
@@ -183,6 +185,33 @@ function SidebarScene( editor ) {
 			#outliner::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.15) !important; }
 		`;
 		document.head.appendChild( style );
+	}
+	
+	if ( ! document.getElementById( 'outliner-visibility-style' ) ) {
+		const visibilityStyle = document.createElement( 'style' );
+		visibilityStyle.id = 'outliner-visibility-style';
+		visibilityStyle.textContent = `
+			.visibility-toggle {
+				display: inline-block;
+				width: 5px;
+				height: 5px;
+				border-radius: 50%;
+				margin-left: 8px;
+				cursor: pointer;
+				vertical-align: middle;
+				transition: background-color 0.2s ease;
+			}
+			.visibility-toggle.visibility-visible {
+				background-color: #ffffff;
+			}
+			.visibility-toggle.visibility-hidden {
+				background-color: #888888;
+			}
+			.visibility-toggle:hover {
+				opacity: 0.7;
+			}
+		`;
+		document.head.appendChild( visibilityStyle );
 	}
 	outliner.onChange( function () {
 
@@ -205,9 +234,100 @@ function SidebarScene( editor ) {
 		editor.focusById( parseInt( outliner.getValue() ) );
 
 	} );
+	
+	outliner.dom.addEventListener( 'dragover', function ( event ) {
+		const assetData = event.dataTransfer.getData( 'text/plain' );
+		if ( assetData ) {
+			try {
+				const asset = JSON.parse( assetData );
+				if ( asset.type ) {
+					event.preventDefault();
+					event.stopPropagation();
+					outliner.dom.style.outline = '2px dashed #ff8800';
+				}
+			} catch ( e ) {
+			}
+		}
+	} );
+	
+	outliner.dom.addEventListener( 'dragleave', function ( event ) {
+		outliner.dom.style.outline = '';
+	} );
+	
+	outliner.dom.addEventListener( 'drop', async function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		outliner.dom.style.outline = '';
+		
+		const assetData = event.dataTransfer.getData( 'text/plain' );
+		if ( assetData ) {
+			try {
+				const asset = JSON.parse( assetData );
+				
+				if ( asset.type === 'model' ) {
+					try {
+						const { AddObjectCommand } = await import( './commands/AddObjectCommand.js' );
+						const { ModelParser } = await import( './ModelParser.js' );
+						
+						const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
+						if ( isTauri && editor.storage && editor.storage.getProjectPath ) {
+							const projectPath = editor.storage.getProjectPath();
+							let modelPath = asset.modelPath;
+							
+							if ( !modelPath && asset.path && asset.path.endsWith( '.model' ) ) {
+								const baseName = asset.name.replace( /\.model$/, '' );
+								const folderPath = asset.path.substring( 0, asset.path.lastIndexOf( '/' ) );
+								const folderName = folderPath.substring( folderPath.lastIndexOf( '/' ) + 1 );
+								if ( /\.(glb|gltf|fbx|obj)$/i.test( folderName ) ) {
+									const ext = folderName.substring( folderName.lastIndexOf( '.' ) );
+									modelPath = folderPath + '/' + baseName + ext;
+								} else {
+									const possibleExtensions = [ '.glb', '.gltf', '.fbx', '.obj' ];
+									for ( const ext of possibleExtensions ) {
+										const testPath = folderPath + '/' + baseName + ext;
+										try {
+											const testAssetPath = testPath.startsWith( '/' ) ? testPath.substring( 1 ) : testPath;
+											await window.__TAURI__.core.invoke( 'read_asset_file', {
+												projectPath: projectPath,
+												assetPath: testAssetPath
+											} );
+											modelPath = testPath;
+											break;
+										} catch ( e ) {
+										}
+									}
+								}
+							}
+							
+							if ( !modelPath ) {
+								modelPath = asset.path;
+							}
+							
+							const fileObj = {
+								path: asset.path,
+								name: asset.name,
+								modelPath: modelPath,
+								modelName: asset.modelName,
+								type: asset.type
+							};
+							
+							const model = await ModelParser.loadModelFromFile( fileObj, modelPath, projectPath );
+							editor.execute( new AddObjectCommand( editor, model ) );
+						}
+					} catch ( error ) {
+						console.error( '[Hierarchy] Failed to load model from asset:', error );
+					}
+					return;
+				}
+				
+				console.log( '[Hierarchy] Dropped asset type:', asset.type, asset );
+				
+			} catch ( e ) {
+			}
+		}
+	} );
+	
 	container.add( outliner );
-
-	// Background, Environment, and Fog moved to Inspector tab
 
 	function matchesFilter( object ) {
 		if ( !searchFilter ) return true;
@@ -299,7 +419,7 @@ function SidebarScene( editor ) {
 
 	refreshUI();
 
-	// events
+	
 
 	signals.editorCleared.add( refreshUI );
 
@@ -322,6 +442,21 @@ function SidebarScene( editor ) {
 				const openerHTML = openerElement ? openerElement.outerHTML : '';
 
 				option.innerHTML = openerHTML + buildHTML( object );
+
+				
+				const visibilityToggle = option.querySelector( '.visibility-toggle' );
+				if ( visibilityToggle ) {
+					visibilityToggle.addEventListener( 'click', function ( event ) {
+						event.stopPropagation();
+						const objectId = parseInt( this.getAttribute( 'data-object-id' ) );
+						const targetObject = editor.scene.getObjectById( objectId );
+						if ( targetObject ) {
+							const newVisibility = !targetObject.visible;
+							editor.execute( new SetValueCommand( editor, targetObject, 'visible', newVisibility ) );
+							
+						}
+					} );
+				}
 
 				return;
 

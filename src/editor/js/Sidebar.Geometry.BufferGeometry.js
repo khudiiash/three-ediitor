@@ -10,7 +10,7 @@ function SidebarGeometryBufferGeometry( editor ) {
 
 	function update( object ) {
 
-		if ( object === null ) return; // objectSelected.dispatch( null )
+		if ( object === null ) return; 
 		if ( object === undefined ) return;
 
 		const geometry = object.geometry;
@@ -20,7 +20,7 @@ function SidebarGeometryBufferGeometry( editor ) {
 			container.clear();
 			container.setDisplay( 'block' );
 
-			// attributes
+			
 
 			const attributesRow = new UIRow();
 
@@ -54,14 +54,14 @@ function SidebarGeometryBufferGeometry( editor ) {
 
 			container.add( attributesRow );
 
-			// morph targets
+			
 
 			const morphAttributes = geometry.morphAttributes;
 			const hasMorphTargets = Object.keys( morphAttributes ).length > 0;
 
 			if ( hasMorphTargets === true ) {
 
-				// morph attributes
+				
 
 				const rowMorphAttributes = new UIRow();
 
@@ -83,7 +83,7 @@ function SidebarGeometryBufferGeometry( editor ) {
 
 				container.add( rowMorphAttributes );
 
-				// morph relative
+				
 
 				const rowMorphRelative = new UIRow();
 

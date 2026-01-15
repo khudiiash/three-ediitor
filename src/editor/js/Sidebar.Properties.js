@@ -31,14 +31,14 @@ function SidebarProperties( editor ) {
 	inspectorPanel.add( objectPanels );
 	inspectorPanel.add( scriptPanel );
 
-	// Project tab
+	
 	const projectPanel = new UIPanel();
 	projectPanel.setBorderTop( '0' );
 	projectPanel.setPaddingTop( '20px' );
 	const projectContent = new SidebarProject( editor );
 	projectPanel.add( projectContent );
 
-	// Settings tab
+	
 	const settingsPanel = new UIPanel();
 	settingsPanel.setBorderTop( '0' );
 	settingsPanel.setPaddingTop( '4px' );
@@ -46,7 +46,7 @@ function SidebarProperties( editor ) {
 	const editorSettingsContent = new SidebarSettings( editor );
 	settingsPanel.add( editorSettingsContent );
 
-	// Add tabs
+	
 	container.addTab( 'inspector', 'Inspector', inspectorPanel );
 	container.addTab( 'project', 'Project', projectPanel );
 	container.addTab( 'settings', 'Settings', settingsPanel );

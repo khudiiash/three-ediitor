@@ -23,7 +23,7 @@ function MenubarEdit( editor ) {
 	options.setClass( 'options' );
 	container.add( options );
 
-	// Undo
+	
 
 	const undo = new UIRow();
 	undo.setClass( 'option' );
@@ -36,7 +36,7 @@ function MenubarEdit( editor ) {
 	} );
 	options.add( undo );
 
-	// Redo
+	
 
 	const redo = new UIRow();
 	redo.setClass( 'option' );
@@ -73,11 +73,11 @@ function MenubarEdit( editor ) {
 	editor.signals.historyChanged.add( onHistoryChanged );
 	onHistoryChanged();
 
-	// ---
+	
 
 	options.add( new UIHorizontalRule() );
 
-	// Center
+	
 
 	let option = new UIRow();
 	option.setClass( 'option' );
@@ -86,7 +86,7 @@ function MenubarEdit( editor ) {
 
 		const object = editor.selected;
 
-		if ( object === null || object.parent === null ) return; // avoid centering the camera or scene
+		if ( object === null || object.parent === null ) return; 
 
 		const aabb = new Box3().setFromObject( object );
 		const center = aabb.getCenter( new Vector3() );
@@ -101,7 +101,7 @@ function MenubarEdit( editor ) {
 	} );
 	options.add( option );
 
-	// Clone
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -110,7 +110,7 @@ function MenubarEdit( editor ) {
 
 		let object = editor.selected;
 
-		if ( object === null || object.parent === null ) return; // avoid cloning the camera or scene
+		if ( object === null || object.parent === null ) return; 
 
 		object = clone( object );
 
@@ -119,7 +119,7 @@ function MenubarEdit( editor ) {
 	} );
 	options.add( option );
 
-	// Delete
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );

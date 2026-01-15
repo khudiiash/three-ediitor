@@ -10,10 +10,10 @@ export default defineConfig({
       formats: ['es']
     },
     rollupOptions: {
-      // Don't bundle three - it will be provided by the editor via importmap
+      
       external: ['three'],
       output: {
-        // Preserve the 'three' import so it resolves via importmap
+        
         preserveModules: false,
         format: 'es'
       }

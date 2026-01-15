@@ -20,7 +20,7 @@ function MenubarAdd( editor ) {
 	options.setClass( 'options' );
 	container.add( options );
 
-	// Group
+	
 
 	let option = new UIRow();
 	option.setClass( 'option' );
@@ -35,7 +35,7 @@ function MenubarAdd( editor ) {
 	} );
 	options.add( option );
 
-	// Mesh
+	
 
 	const meshSubmenuTitle = new UIRow().setTextContent( strings.getKey( 'menubar/add/mesh' ) ).addClass( 'option' ).addClass( 'submenu-title' );
 	meshSubmenuTitle.onMouseOver( function () {
@@ -109,7 +109,7 @@ function MenubarAdd( editor ) {
 		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
 	} );
 
-	// Mesh / Box
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -125,7 +125,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Capsule
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -142,7 +142,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Circle
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -158,7 +158,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Cylinder
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -174,7 +174,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Dodecahedron
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -190,7 +190,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Icosahedron
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -206,7 +206,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Lathe
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -222,7 +222,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Octahedron
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -238,7 +238,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Plane
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -255,7 +255,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Ring
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -271,7 +271,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Sphere
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -287,7 +287,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Sprite
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -302,7 +302,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Tetrahedron
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -318,7 +318,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Torus
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -334,7 +334,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / TorusKnot
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -350,7 +350,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Mesh / Tube
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -373,7 +373,7 @@ function MenubarAdd( editor ) {
 	} );
 	meshSubmenu.add( option );
 
-	// Light
+	
 
 	const lightSubmenuTitle = new UIRow().setTextContent( strings.getKey( 'menubar/add/light' ) ).addClass( 'option' ).addClass( 'submenu-title' );
 	lightSubmenuTitle.onMouseOver( function () {
@@ -448,7 +448,7 @@ function MenubarAdd( editor ) {
 		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
 	} );
 
-	// Light / Ambient
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -465,7 +465,7 @@ function MenubarAdd( editor ) {
 	} );
 	lightSubmenu.add( option );
 
-	// Light / Directional
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -487,7 +487,7 @@ function MenubarAdd( editor ) {
 	} );
 	lightSubmenu.add( option );
 
-	// Light / Hemisphere
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -508,7 +508,7 @@ function MenubarAdd( editor ) {
 	} );
 	lightSubmenu.add( option );
 
-	// Light / Point
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -527,7 +527,7 @@ function MenubarAdd( editor ) {
 	} );
 	lightSubmenu.add( option );
 
-	// Light / Spot
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -552,7 +552,7 @@ function MenubarAdd( editor ) {
 	} );
 	lightSubmenu.add( option );
 
-	// Camera
+	
 
 	const cameraSubmenuTitle = new UIRow().setTextContent( strings.getKey( 'menubar/add/camera' ) ).addClass( 'option' ).addClass( 'submenu-title' );
 	cameraSubmenuTitle.onMouseOver( function () {
@@ -627,7 +627,7 @@ function MenubarAdd( editor ) {
 		if ( bottomResizer ) bottomResizer.style.pointerEvents = 'auto';
 	} );
 
-	// Camera / Orthographic
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -643,7 +643,7 @@ function MenubarAdd( editor ) {
 	} );
 	cameraSubmenu.add( option );
 
-	// Camera / Perspective
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -658,7 +658,7 @@ function MenubarAdd( editor ) {
 	} );
 	cameraSubmenu.add( option );
 
-	// Particle System
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );

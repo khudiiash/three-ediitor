@@ -1,33 +1,80 @@
 let invoke;
 
 function initTauriAPI() {
-	if (window.__TAURI__ && window.__TAURI__.invoke) {
-		invoke = window.__TAURI__.invoke;
-		return true;
-	} else {
-		return false;
+	try {
+		if (window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke) {
+			invoke = window.__TAURI__.core.invoke;
+			return true;
+		}
+		if (window.__TAURI_INTERNALS__ && window.__TAURI_INTERNALS__.core && window.__TAURI_INTERNALS__.core.invoke) {
+			invoke = window.__TAURI_INTERNALS__.core.invoke;
+			return true;
+		}
+	} catch (e) {
+		console.warn('Error checking for Tauri API:', e);
 	}
+	return false;
 }
 
 let projects = [];
 let sortColumn = 'modified';
 let sortDirection = 'desc';
 
-document.addEventListener('DOMContentLoaded', async () => {
+async function waitForTauriAPI() {
 	let retries = 0;
-	while (!initTauriAPI() && retries < 10) {
+	const maxRetries = 100;
+	
+	while (!initTauriAPI() && retries < maxRetries) {
 		await new Promise(resolve => setTimeout(resolve, 100));
 		retries++;
 	}
 	
-	if (!invoke) {
-		document.getElementById('projects-loading').textContent = 'Error: Tauri API not available';
+	return invoke !== undefined;
+}
+
+async function initialize() {
+	if (document.readyState === 'loading') {
+		await new Promise(resolve => {
+			if (document.readyState === 'loading') {
+				document.addEventListener('DOMContentLoaded', resolve);
+			} else {
+				resolve();
+			}
+		});
+	}
+	
+	await new Promise(resolve => {
+		if (document.readyState === 'complete') {
+			resolve();
+		} else {
+			window.addEventListener('load', resolve);
+		}
+	});
+	
+	const tauriAvailable = await waitForTauriAPI();
+	
+	if (!tauriAvailable) {
+		const loadingEl = document.getElementById('projects-loading');
+		if (loadingEl) {
+			loadingEl.textContent = 'Error: Tauri API not available. Make sure you are running this in a Tauri application.';
+		}
+		console.error('Tauri API not available after waiting');
 		return;
 	}
 	
-	await loadProjects();
-	setupEventListeners();
-});
+	try {
+		await loadProjects();
+		setupEventListeners();
+	} catch (error) {
+		console.error('Failed to initialize hub:', error);
+		const loadingEl = document.getElementById('projects-loading');
+		if (loadingEl) {
+			loadingEl.textContent = 'Error: ' + (error.message || String(error));
+		}
+	}
+}
+
+initialize();
 
 async function loadProjects() {
 	try {

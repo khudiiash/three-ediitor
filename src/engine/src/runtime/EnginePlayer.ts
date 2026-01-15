@@ -15,15 +15,15 @@ export class EnginePlayer {
     private height: number = 500;
 
     constructor() {
-        // Create canvas and container
+        
         this.canvas = document.createElement('canvas');
         this.dom = document.createElement('div');
         this.dom.appendChild(this.canvas);
         
-        // Set initial size
+        
         this.canvas.width = this.width;
         this.canvas.height = this.height;
-        // Ensure canvas fills the container
+        
         this.canvas.style.width = '100%';
         this.canvas.style.height = '100%';
     }
@@ -74,13 +74,13 @@ export class EnginePlayer {
         this.canvas.style.width = width + 'px';
         this.canvas.style.height = height + 'px';
         
-        // Update renderer size
+        
         const renderer = pc.renderer;
         if (renderer) {
             renderer.setSize(width, height, false);
         }
 
-        // Update camera aspect ratio
+        
         if (this.app) {
             const camera = this.app.camera;
             if (camera) {
@@ -128,7 +128,7 @@ export class EnginePlayer {
             this.app = null;
         }
 
-        // Clean up engine
+        
         pc.destroy();
     }
 }

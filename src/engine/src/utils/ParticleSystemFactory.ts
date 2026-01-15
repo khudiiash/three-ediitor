@@ -77,7 +77,7 @@ export class ParticleSystemFactory {
     static createBehaviors(particleData: any): any[] {
         const behaviors: any[] = [];
 
-        // Process behaviors from the behaviors array
+        
         if (particleData.behaviors && Array.isArray(particleData.behaviors)) {
             particleData.behaviors.forEach((behaviorData: any) => {
                 if (behaviorData.enabled === false) return;
@@ -93,7 +93,7 @@ export class ParticleSystemFactory {
             });
         }
 
-        // Fallback: Add legacy behaviors if not in behaviors array
+        
         this.addLegacyBehaviors(behaviors, particleData);
 
         return behaviors;
@@ -108,19 +108,19 @@ export class ParticleSystemFactory {
         switch (behaviorData.type) {
             case 'Gravity':
             case 'ApplyForce': {
-                // Create direction vector
+                
                 const x = behaviorData.gravityX !== undefined ? behaviorData.gravityX : (behaviorData.forceX !== undefined ? behaviorData.forceX : 0);
                 const y = behaviorData.gravityY !== undefined ? behaviorData.gravityY : (behaviorData.forceY !== undefined ? behaviorData.forceY : -9.81);
                 const z = behaviorData.gravityZ !== undefined ? behaviorData.gravityZ : (behaviorData.forceZ !== undefined ? behaviorData.forceZ : 0);
                 
                 const magnitude = Math.sqrt(x * x + y * y + z * z);
                 if (magnitude > 0) {
-                    // Normalize and create direction using quarks Vector3 constructor
+                    
                     const dirX = x / magnitude;
                     const dirY = y / magnitude;
                     const dirZ = z / magnitude;
                     
-                    // Use quarks.core Vector3 by creating it from components
+                    
                     const direction = { x: dirX, y: dirY, z: dirZ } as any;
                     return new ApplyForce(direction, new ConstantValue(magnitude));
                 }
@@ -138,7 +138,7 @@ export class ParticleSystemFactory {
                 const endColorB = behaviorData.endColorB !== undefined ? behaviorData.endColorB : (particleData.endColorB || 1);
                 const endColorA = behaviorData.endColorA !== undefined ? behaviorData.endColorA : (particleData.endColorA || 1);
 
-                // Create gradient using plain objects instead of THREE.Vector3
+                
                 const colorGradient = new Gradient(
                     [
                         [{ x: startColorR, y: startColorG, z: startColorB } as any, 0],
@@ -162,7 +162,7 @@ export class ParticleSystemFactory {
      * Add legacy behaviors for backward compatibility
      */
     static addLegacyBehaviors(behaviors: any[], particleData: any): void {
-        // Legacy Gravity/ApplyForce
+        
         const hasGravityBehavior = particleData.behaviors?.some((b: any) => 
             (b.type === 'Gravity' || b.type === 'ApplyForce') && b.enabled !== false
         );
@@ -185,7 +185,7 @@ export class ParticleSystemFactory {
             }
         }
 
-        // Legacy ColorOverLife
+        
         const hasColorBehavior = particleData.behaviors?.some((b: any) => 
             b.type === 'ColorOverLife' && b.enabled !== false
         );
@@ -245,7 +245,7 @@ export class ParticleSystemFactory {
      * Create a complete particle system from particle data
      */
     static createParticleSystem(particleData: any, texture: THREE.Texture): ParticleSystem {
-        // Create emitter
+        
         const emitterShape = this.createEmitter(
             particleData.emitterShape || 'point',
             particleData.emitterSizeX !== undefined ? particleData.emitterSizeX : 1,
@@ -254,10 +254,10 @@ export class ParticleSystemFactory {
             particleData.spreadAngle !== undefined ? particleData.spreadAngle : 0
         );
 
-        // Create behaviors
+        
         const behaviors = this.createBehaviors(particleData);
 
-        // Create material
+        
         const material = new THREE.MeshBasicMaterial({
             map: texture,
             color: particleData.materialColor !== undefined ? particleData.materialColor : 0xffffff,
@@ -267,7 +267,7 @@ export class ParticleSystemFactory {
             depthWrite: false
         });
 
-        // Create particle system config
+        
         const config = {
             duration: particleData.duration !== undefined ? particleData.duration : 1,
             looping: particleData.looping !== undefined ? particleData.looping : true,
@@ -318,7 +318,7 @@ export class ParticleSystemFactory {
 
         const particleSystem = new ParticleSystem(config);
 
-        // Apply direction to emitter
+        
         this.applyDirectionToEmitter(
             particleSystem.emitter,
             particleData.directionX !== undefined ? particleData.directionX : 0,

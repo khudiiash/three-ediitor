@@ -19,7 +19,7 @@ function MenubarFile( editor ) {
 	options.setClass( 'options' );
 	container.add( options );
 
-	// New Project
+	
 
 	const newProjectSubmenuTitle = new UIRow().setTextContent( strings.getKey( 'menubar/file/new' ) ).addClass( 'option' ).addClass( 'submenu-title' );
 	newProjectSubmenuTitle.onMouseOver( function () {
@@ -41,7 +41,7 @@ function MenubarFile( editor ) {
 	const newProjectSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
 	newProjectSubmenuTitle.add( newProjectSubmenu );
 
-	// New Project / Empty
+	
 
 	let option = new UIRow().setTextContent( strings.getKey( 'menubar/file/new/empty' ) ).setClass( 'option' );
 	option.onClick( function () {
@@ -59,7 +59,7 @@ function MenubarFile( editor ) {
 
 	newProjectSubmenu.add( new UIHorizontalRule() );
 
-	// New Project / ...
+	
 
 	const examples = [
 		{ title: 'menubar/file/new/Arkanoid', file: 'arkanoid.app.json' },
@@ -100,7 +100,7 @@ function MenubarFile( editor ) {
 
 	}
 
-	// Open
+	
 
 	const openProjectForm = document.createElement( 'form' );
 	openProjectForm.style.display = 'none';
@@ -162,7 +162,7 @@ function MenubarFile( editor ) {
 
 	options.add( option );
 
-	// Save
+	
 
 	option = new UIRow()
 		.addClass( 'option' )
@@ -181,7 +181,7 @@ function MenubarFile( editor ) {
 
 	options.add( new UIHorizontalRule() );
 
-	// Import
+	
 
 	const form = document.createElement( 'form' );
 	form.style.display = 'none';
@@ -208,7 +208,7 @@ function MenubarFile( editor ) {
 	} );
 	options.add( option );
 
-	// Export
+	
 
 	const fileExportSubmenuTitle = new UIRow().setTextContent( strings.getKey( 'menubar/file/export' ) ).addClass( 'option' ).addClass( 'submenu-title' );
 	fileExportSubmenuTitle.onMouseOver( function () {
@@ -230,7 +230,7 @@ function MenubarFile( editor ) {
 	const fileExportSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
 	fileExportSubmenuTitle.add( fileExportSubmenu );
 
-	// Export DRC
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -260,14 +260,14 @@ function MenubarFile( editor ) {
 			exportColor: object.geometry.hasAttribute( 'color' )
 		};
 
-		// TODO: Change to DRACOExporter's parse( geometry, onParse )?
+		
 		const result = exporter.parse( object, options );
 		saveArrayBuffer( result, 'model.drc' );
 
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export GLB
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -298,7 +298,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export GLTF
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -330,7 +330,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export OBJ
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -355,7 +355,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export PLY (ASCII)
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -375,7 +375,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export PLY (BINARY)
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -395,7 +395,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export STL (ASCII)
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -411,7 +411,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export STL (BINARY)
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
@@ -427,7 +427,7 @@ function MenubarFile( editor ) {
 	} );
 	fileExportSubmenu.add( option );
 
-	// Export USDZ
+	
 
 	option = new UIRow();
 	option.setClass( 'option' );
