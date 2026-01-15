@@ -7,6 +7,21 @@ dist/
 target/
 Cargo.lock
 
+# Tauri
+.tauri-backup/
+src/rust/gen/
+
+# Vite
+.vite/
+**/.vite/
+
+# Build artifacts
+*.pdb
+*.exe
+*.d.ts.map
+*.d.ts
+*.wasm.map
+
 # projects
 # Projects are excluded from the public repository
 # For internal company use, set THREE_ENGINE_PROJECTS_DIR to point to a separate Git repository
