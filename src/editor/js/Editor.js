@@ -991,19 +991,30 @@ Editor.prototype = {
 		
 		if ( result.scene && result.scene.images && Array.isArray( result.scene.images ) ) {
 			result.scene.images = result.scene.images.map( function( image ) {
-				if ( image && image.url && image.url.startsWith( 'data:' ) ) {
+				if ( image && image.url && ( image.url.startsWith( 'data:' ) || image.url.startsWith( 'blob:' ) ) ) {
 					
 					const imageUuid = image.uuid;
-					
 					
 					let assetPath = null;
 					if ( result.scene.textures && Array.isArray( result.scene.textures ) ) {
 						for ( const texture of result.scene.textures ) {
-							if ( texture.image === imageUuid && texture.userData && texture.userData.assetPath ) {
-								assetPath = texture.userData.assetPath;
-								break;
+							if ( texture.userData && texture.userData.assetPath ) {
+								let textureImageUuid = null;
+								if ( typeof texture.image === 'string' ) {
+									textureImageUuid = texture.image;
+								} else if ( typeof texture.image === 'object' && texture.image.uuid ) {
+									textureImageUuid = texture.image.uuid;
+								}
+								if ( textureImageUuid === imageUuid ) {
+									assetPath = texture.userData.assetPath;
+									break;
+								}
 							}
 						}
+					}
+					
+					if ( assetPath && assetPath.startsWith( '/' ) ) {
+						assetPath = assetPath.slice( 1 );
 					}
 					
 					return {
@@ -1049,18 +1060,26 @@ Editor.prototype = {
 					if ( ! textureJson.userData ) {
 						textureJson.userData = {};
 					}
-					textureJson.userData.assetPath = texture.assetPath;
+					let normalizedAssetPath = texture.assetPath;
+					if ( normalizedAssetPath.startsWith( '/' ) ) {
+						normalizedAssetPath = normalizedAssetPath.slice( 1 );
+					}
+					textureJson.userData.assetPath = normalizedAssetPath;
 					
 					
+					let imageUuid = null;
 					if ( textureJson.image && typeof textureJson.image === 'string' ) {
-						
+						imageUuid = textureJson.image;
 					} else if ( textureJson.image && typeof textureJson.image === 'object' ) {
-						
-						const imageUuid = textureJson.image.uuid;
-						if ( result.scene.images ) {
-							const imageIndex = result.scene.images.findIndex( img => img.uuid === imageUuid );
-							if ( imageIndex >= 0 ) {
-								result.scene.images[ imageIndex ].url = texture.assetPath;
+						imageUuid = textureJson.image.uuid;
+					}
+					
+					if ( imageUuid && result.scene.images ) {
+						const imageIndex = result.scene.images.findIndex( img => img.uuid === imageUuid );
+						if ( imageIndex >= 0 ) {
+							const currentUrl = result.scene.images[ imageIndex ].url;
+							if ( !currentUrl || currentUrl.startsWith( 'data:' ) || currentUrl.startsWith( 'blob:' ) || currentUrl.includes( imageUuid + '.png' ) ) {
+								result.scene.images[ imageIndex ].url = normalizedAssetPath;
 							}
 						}
 					}

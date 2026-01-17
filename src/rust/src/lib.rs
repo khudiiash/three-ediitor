@@ -293,6 +293,79 @@ async fn write_build_file(project_path: String, file_path: String, content: Vec<
 }
 
 #[tauri::command]
+async fn read_editor_template_file(file_path: String) -> Result<String, String> {
+    let current_dir = std::env::current_dir()
+        .map_err(|e| format!("Failed to get current directory: {}", e))?;
+    
+    let editor_dir = current_dir
+        .parent()
+        .ok_or("Failed to get parent directory")?
+        .join("editor");
+    
+    let full_path = editor_dir.join(&file_path);
+    
+    tokio::fs::read_to_string(&full_path).await
+        .map_err(|e| format!("Failed to read template file: {}", e))
+}
+
+#[tauri::command]
+async fn copy_assets_to_build(project_path: String) -> Result<(), String> {
+    use std::path::PathBuf;
+    use tokio::fs;
+    
+    let assets_dir = PathBuf::from(&project_path).join("assets");
+    let build_assets_dir = PathBuf::from(&project_path).join("build").join("assets");
+    
+    if !assets_dir.exists() {
+        return Ok(());
+    }
+    
+    fs::create_dir_all(&build_assets_dir).await
+        .map_err(|e| format!("Failed to create build/assets directory: {}", e))?;
+    
+    async fn copy_dir(src: PathBuf, dst: PathBuf) -> Result<(), String> {
+        use tokio::fs;
+        
+        fs::create_dir_all(&dst).await
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+        
+        let mut entries = fs::read_dir(&src).await
+            .map_err(|e| format!("Failed to read directory: {}", e))?;
+        
+        while let Some(entry) = entries.next_entry().await
+            .map_err(|e| format!("Failed to read directory entry: {}", e))? {
+            let path = entry.path();
+            let file_name = path.file_name()
+                .ok_or("Invalid file name")?
+                .to_str()
+                .ok_or("Invalid UTF-8 file name")?;
+            
+            let dst_path = dst.join(file_name);
+            
+            if path.is_dir() {
+                Box::pin(copy_dir(path, dst_path)).await?;
+            } else {
+                if let Some(ext) = path.extension() {
+                    if let Some(ext_str) = ext.to_str() {
+                        if ext_str == "ts" || ext_str == "tsx" {
+                            continue;
+                        }
+                    }
+                }
+                fs::copy(&path, &dst_path).await
+                    .map_err(|e| format!("Failed to copy file: {}", e))?;
+            }
+        }
+        
+        Ok(())
+    }
+    
+    copy_dir(assets_dir, build_assets_dir).await?;
+    
+    Ok(())
+}
+
+#[tauri::command]
 fn read_project_metadata(project_path: String) -> Result<String, String> {
     use std::fs;
     use std::path::PathBuf;
@@ -884,6 +957,8 @@ pub fn run() {
             open_file_in_editor,
             list_assets_directory,
             write_build_file,
+            read_editor_template_file,
+            copy_assets_to_build,
             read_editor_config,
             write_editor_config,
             read_project_config,

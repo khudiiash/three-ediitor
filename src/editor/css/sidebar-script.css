@@ -1,0 +1,102 @@
+/* Script Sidebar Styles */
+
+.script-sidebar-container {
+	border-top: 0;
+	padding-top: var(--space-1);
+}
+
+.script-add-row {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 0;
+}
+
+.script-add-select {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--font-size-sm);
+}
+
+.script-add-button {
+	width: var(--button-height-base);
+	height: var(--button-height-base);
+	flex-shrink: 0;
+	padding: 0;
+}
+
+.script-item-row {
+	margin-bottom: var(--space-3);
+	padding-bottom: var(--space-3);
+	border-bottom: 1px solid var(--border-default);
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	flex-wrap: nowrap;
+}
+
+.script-item-name {
+	flex: 1;
+	min-width: 0;
+	font-weight: var(--font-weight-semibold);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.script-item-toggle {
+	cursor: pointer;
+	margin-right: var(--space-1);
+	user-select: none;
+	display: inline-block;
+	transform: rotate(-90deg);
+	transition: transform var(--transition-base);
+	color: var(--text-tertiary);
+	font-size: var(--font-size-xs);
+}
+
+.script-item-toggle.expanded {
+	transform: rotate(0deg);
+}
+
+.script-edit-button {
+	width: 50px;
+	font-size: var(--font-size-xs);
+	flex-shrink: 0;
+}
+
+.script-remove-button {
+	width: 24px;
+	flex-shrink: 0;
+}
+
+.script-attributes-container {
+	display: none;
+	margin-left: var(--space-5);
+}
+
+.script-attributes-container.expanded {
+	display: block;
+}
+
+.script-attribute-row {
+	margin-left: var(--space-5);
+	margin-top: var(--space-1);
+}
+
+.script-attribute-label {
+	width: 90px;
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+}
+
+.script-attribute-input {
+	width: 60px;
+}
+
+.script-attribute-input-string {
+	width: 120px;
+}

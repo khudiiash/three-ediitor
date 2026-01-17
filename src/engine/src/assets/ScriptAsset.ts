@@ -136,8 +136,20 @@ export class ScriptAsset extends Asset {
                     throw new Error(`Project path not available for script: ${this.name}`);
                 }
             } else {
-                console.warn(`[ScriptAsset] Tauri not available, cannot load script: ${this.name}`);
-                throw new Error(`Tauri not available, cannot load script: ${this.name}`);
+                let fetchUrl = scriptUrl;
+                if (!fetchUrl.startsWith('./') && !fetchUrl.startsWith('/') && !fetchUrl.startsWith('http')) {
+                    fetchUrl = './' + fetchUrl;
+                }
+                try {
+                    const response = await fetch(fetchUrl);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    compiledCode = await response.text();
+                } catch (fetchError) {
+                    console.warn(`[ScriptAsset] Failed to load script via fetch (${this.name}) from ${fetchUrl}:`, fetchError);
+                    throw new Error(`Failed to load script: ${this.name} - ${fetchError}`);
+                }
             }
 
             if (typeof window !== 'undefined') {

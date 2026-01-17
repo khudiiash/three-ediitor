@@ -7,7 +7,7 @@ function Resizer( editor ) {
 	
 	const leftResizer = document.createElement( 'div' );
 	leftResizer.id = 'resizer-left';
-	leftResizer.style.cssText = 'position: absolute; z-index: 1001; top: 32px; left: 250px; width: 5px; bottom: 200px; transform: translatex(-2.5px); cursor: col-resize; pointer-events: auto; background: transparent;';
+	leftResizer.className = 'resizer resizer-left';
 
 	function onLeftPointerDown( event ) {
 
@@ -63,7 +63,7 @@ function Resizer( editor ) {
 	
 	const rightResizer = document.createElement( 'div' );
 	rightResizer.id = 'resizer';
-	rightResizer.style.cssText = 'position: absolute; z-index: 1001; top: 32px; right: 350px; width: 5px; bottom: 200px; transform: translatex(2.5px); cursor: col-resize; pointer-events: auto; background: transparent;';
+	rightResizer.className = 'resizer resizer-right';
 
 	function onRightPointerDown( event ) {
 
@@ -129,13 +129,15 @@ function Resizer( editor ) {
 	function updateBottomResizerPosition() {
 		const sidebarLeft = document.getElementById( 'sidebar-left' );
 		const sidebarRight = document.getElementById( 'sidebar-right' );
-		if ( sidebarLeft && sidebarRight ) {
+		const sidebarBottom = document.getElementById( 'sidebar-bottom' );
+		if ( sidebarLeft && sidebarRight && sidebarBottom ) {
 			bottomResizer.style.left = sidebarLeft.offsetWidth + 'px';
 			bottomResizer.style.right = sidebarRight.offsetWidth + 'px';
+			bottomResizer.style.bottom = sidebarBottom.offsetHeight + 'px';
 		}
 	}
 	
-	bottomResizer.style.cssText = 'position: absolute; bottom: 200px; height: 5px; z-index: 1001; cursor: row-resize; transform: translatey(2.5px); pointer-events: auto; background: transparent;';
+	bottomResizer.className = 'resizer resizer-bottom';
 	updateBottomResizerPosition();
 
 	function onBottomPointerDown( event ) {
@@ -188,9 +190,7 @@ function Resizer( editor ) {
 
 			sidebarBottom.style.height = height + 'px';
 			viewport.style.bottom = height + 'px';
-			
 			bottomResizer.style.bottom = height + 'px';
-			
 			
 			const sidebarLeft = document.getElementById( 'sidebar-left' );
 			const sidebarRight = document.getElementById( 'sidebar-right' );
@@ -238,6 +238,10 @@ function Resizer( editor ) {
 	document.body.appendChild( leftResizer );
 	document.body.appendChild( rightResizer );
 	document.body.appendChild( bottomResizer );
+
+	signals.windowResize.add( function () {
+		updateBottomResizerPosition();
+	} );
 
 	
 	return new UIElement( document.createElement( 'div' ) );

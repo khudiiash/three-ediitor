@@ -1,4 +1,4 @@
-import { UIPanel, UIRow, UISelect, UIText, UINumber, UIButton } from './libs/ui.js';
+import { UIPanel, UIRow, UISelect, UIText, UINumber, UIButton, UIColor, UIDiv } from './libs/ui.js';
 import { UIBoolean } from './libs/ui.three.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 import { AssetSelector } from './AssetSelector.js';
@@ -104,10 +104,7 @@ function SidebarSettings( editor ) {
 		toneMappingSelect.setValue( THREE.NoToneMapping.toString() );
 
 	}
-	toneMappingRow.add( new UIText( 'Tone Mapping' ).setClass( 'Label' ) );
-	toneMappingRow.add( toneMappingSelect );
-
-	const toneMappingExposure = new UINumber( config.getKey( 'project/renderer/toneMappingExposure' ) || 1 ).setWidth( '30px' ).setMarginLeft( '10px' ).setRange( 0, 10 ).onChange( function () {
+	const toneMappingExposure = new UINumber( config.getKey( 'project/renderer/toneMappingExposure' ) || 1 ).setWidth( '30px' ).setRange( 0, 10 ).onChange( function () {
 
 		if ( currentRenderer ) {
 
@@ -119,7 +116,14 @@ function SidebarSettings( editor ) {
 
 	} );
 	toneMappingExposure.setDisplay( toneMappingSelect.getValue() === THREE.NoToneMapping.toString() ? 'none' : '' );
-	toneMappingRow.add( toneMappingExposure );
+	
+	const toneMappingInputsContainer = new UIDiv();
+	toneMappingInputsContainer.addClass( 'input-group' );
+	toneMappingInputsContainer.add( toneMappingSelect );
+	toneMappingInputsContainer.add( toneMappingExposure );
+	
+	toneMappingRow.add( new UIText( 'Tone Mapping' ).setClass( 'Label' ) );
+	toneMappingRow.add( toneMappingInputsContainer );
 	renderingPanel.add( toneMappingRow );
 
 	
@@ -287,7 +291,7 @@ function SidebarSettings( editor ) {
 	const defaultCastShadows = new UIBoolean( config.getKey( 'project/defaults/castShadows' ) === true ).onChange( function () {
 		config.setKey( 'project/defaults/castShadows', this.getValue() );
 	} );
-	defaultCastShadowsRow.add( new UIText( 'Default Cast Shadows' ).setClass( 'Label' ) );
+	defaultCastShadowsRow.add( new UIText( 'Cast Shadows' ).setClass( 'Label' ) );
 	defaultCastShadowsRow.add( defaultCastShadows );
 	defaultsPanel.add( defaultCastShadowsRow );
 
@@ -295,7 +299,7 @@ function SidebarSettings( editor ) {
 	const defaultReceiveShadows = new UIBoolean( config.getKey( 'project/defaults/receiveShadows' ) === true ).onChange( function () {
 		config.setKey( 'project/defaults/receiveShadows', this.getValue() );
 	} );
-	defaultReceiveShadowsRow.add( new UIText( 'Default Receive Shadows' ).setClass( 'Label' ) );
+	defaultReceiveShadowsRow.add( new UIText( 'Receive Shadows' ).setClass( 'Label' ) );
 	defaultReceiveShadowsRow.add( defaultReceiveShadows );
 	defaultsPanel.add( defaultReceiveShadowsRow );
 
@@ -405,6 +409,13 @@ function SidebarSettings( editor ) {
 				if ( editor.config && editor.config.loadProjectConfig ) {
 					editor.config.loadProjectConfig().then( function () {
 						updateDefaultsUI();
+						// Update accent color picker when config loads
+						const loadedAccentColor = config.getKey( 'project/appearance/accentColor' ) || config.getKey( 'editor/appearance/accentColor' );
+						if ( loadedAccentColor ) {
+							const colorWithHash = loadedAccentColor.startsWith( '#' ) ? loadedAccentColor : '#' + loadedAccentColor;
+							accentColor.setValue( colorWithHash );
+							document.documentElement.style.setProperty( '--accent-primary', colorWithHash );
+						}
 					} ).catch( function ( error ) {
 						console.warn( '[Settings] Failed to load project config:', error );
 						updateDefaultsUI();
@@ -421,6 +432,30 @@ function SidebarSettings( editor ) {
 	}
 
 	container.add( defaultsPanel );
+
+	
+	const appearancePanel = new UICollapsiblePanel( 'Appearance' );
+	appearancePanel.collapse();
+
+	const accentColorRow = new UIRow();
+	const savedAccentColor = config.getKey( 'project/appearance/accentColor' ) || config.getKey( 'editor/appearance/accentColor' );
+	const defaultAccentColor = savedAccentColor || '#4a9eff';
+	
+	if ( savedAccentColor ) {
+		document.documentElement.style.setProperty( '--accent-primary', savedAccentColor.startsWith( '#' ) ? savedAccentColor : '#' + savedAccentColor );
+	}
+	
+	const accentColor = new UIColor().setValue( defaultAccentColor.startsWith( '#' ) ? defaultAccentColor : '#' + defaultAccentColor ).onInput( function () {
+		const color = this.getValue();
+		const colorWithHash = color.startsWith( '#' ) ? color : '#' + color;
+		config.setKey( 'project/appearance/accentColor', colorWithHash );
+		document.documentElement.style.setProperty( '--accent-primary', colorWithHash );
+	} );
+	accentColorRow.add( new UIText( 'Accent Color' ).setClass( 'Label' ) );
+	accentColorRow.add( accentColor );
+	appearancePanel.add( accentColorRow );
+
+	container.add( appearancePanel );
 
 	signals.rendererCreated.add( function ( renderer ) {
 

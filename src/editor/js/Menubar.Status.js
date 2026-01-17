@@ -8,7 +8,8 @@ function MenubarStatus( editor ) {
 	const strings = editor.strings;
 
 	const container = new UIPanel();
-	container.setClass( 'menu right' );
+	container.addClass( 'menu' );
+	container.addClass( 'right' );
 
 	const autosave = new UIBoolean( editor.config.getKey( 'autosave' ), strings.getKey( 'menubar/status/autosave' ) );
 	autosave.text.setColor( '#888' );

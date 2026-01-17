@@ -153,6 +153,108 @@ function SidebarGeometry( editor ) {
 		'LatheGeometry': THREE.LatheGeometry
 	};
 
+	// Helper function to handle geometry selection
+	async function handleGeometrySelection( assetData ) {
+		if ( ! assetData ) return;
+
+		const object = editor.selected;
+		if ( ! object ) return;
+
+		let newGeometry = null;
+
+		if ( assetData.type === 'default-geometry' && assetData.geometryType ) {
+			const GeometryClass = defaultGeometries[ assetData.geometryType ];
+			if ( GeometryClass ) {
+				if ( assetData.geometryType === 'BoxGeometry' ) {
+					newGeometry = new GeometryClass( 1, 1, 1 );
+				} else if ( assetData.geometryType === 'SphereGeometry' ) {
+					newGeometry = new GeometryClass( 1, 32, 16 );
+				} else if ( assetData.geometryType === 'CylinderGeometry' ) {
+					newGeometry = new GeometryClass( 1, 1, 1, 32 );
+				} else if ( assetData.geometryType === 'PlaneGeometry' ) {
+					newGeometry = new GeometryClass( 1, 1 );
+				} else if ( assetData.geometryType === 'ConeGeometry' ) {
+					newGeometry = new GeometryClass( 1, 1, 32 );
+				} else if ( assetData.geometryType === 'TorusGeometry' ) {
+					newGeometry = new GeometryClass( 1, 0.4, 16, 100 );
+				} else if ( assetData.geometryType === 'TorusKnotGeometry' ) {
+					newGeometry = new GeometryClass( 1, 0.3, 100, 16 );
+				} else if ( assetData.geometryType === 'CapsuleGeometry' ) {
+					newGeometry = new GeometryClass( 1, 1, 4, 8 );
+				} else if ( assetData.geometryType === 'CircleGeometry' ) {
+					newGeometry = new GeometryClass( 1, 32 );
+				} else if ( assetData.geometryType === 'RingGeometry' ) {
+					newGeometry = new GeometryClass( 0.5, 1, 32 );
+				} else {
+					newGeometry = new GeometryClass();
+				}
+				newGeometry.name = assetData.geometryType;
+			}
+		} else if ( assetData && assetData.isGeometry ) {
+			newGeometry = assetData;
+		}
+
+		if ( newGeometry ) {
+			newGeometry.uuid = object.geometry.uuid;
+			editor.execute( new SetGeometryCommand( editor, object, newGeometry ) );
+			build();
+		}
+	}
+
+	// Add drag and drop support
+	geometrySelectorButton.dom.addEventListener( 'dragover', function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		geometrySelectorButton.dom.style.opacity = '0.7';
+	} );
+
+	geometrySelectorButton.dom.addEventListener( 'dragleave', function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		geometrySelectorButton.dom.style.opacity = '1';
+	} );
+
+	geometrySelectorButton.dom.addEventListener( 'drop', async function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		geometrySelectorButton.dom.style.opacity = '1';
+
+		const assetData = event.dataTransfer.getData( 'text/plain' );
+		if ( assetData ) {
+			try {
+				const asset = JSON.parse( assetData );
+				// Check if it's a geometry asset (including file type with geometry extension)
+				const isGeometryAsset = asset.type === 'geometry' || 
+				                      ( asset.type === 'file' && asset.name && 
+				                        ( asset.name.endsWith( '.geometry' ) || 
+				                          [ 'json', 'glb', 'gltf', 'fbx', 'obj' ]
+				                            .includes( asset.name.split( '.' ).pop()?.toLowerCase() ) ) );
+				
+				if ( isGeometryAsset ) {
+					// Handle geometry drop
+					if ( ! editor.selected ) {
+						alert( 'Please select an object first' );
+						return;
+					}
+
+					if ( ! editor.assetSelector ) {
+						editor.assetSelector = new AssetSelector( editor );
+					}
+
+					// Use AssetSelector's selectGeometry method
+					await editor.assetSelector.selectGeometry( asset, async function ( geometry ) {
+						if ( geometry ) {
+							await handleGeometrySelection( geometry );
+						}
+					} );
+					return;
+				}
+			} catch ( e ) {
+				// Not JSON, continue with button click handler
+			}
+		}
+	} );
+
 	geometrySelectorButton.onClick( function () {
 		if ( ! editor.selected ) {
 			alert( 'Please select an object first' );
@@ -163,55 +265,7 @@ function SidebarGeometry( editor ) {
 			editor.assetSelector = new AssetSelector( editor );
 		}
 
-		editor.assetSelector.show( async function ( assetData ) {
-			if ( ! assetData ) return;
-
-			const object = editor.selected;
-			if ( ! object ) return;
-
-			let newGeometry = null;
-
-			
-			if ( assetData.type === 'default-geometry' && assetData.geometryType ) {
-				const GeometryClass = defaultGeometries[ assetData.geometryType ];
-				if ( GeometryClass ) {
-					
-					if ( assetData.geometryType === 'BoxGeometry' ) {
-						newGeometry = new GeometryClass( 1, 1, 1 );
-					} else if ( assetData.geometryType === 'SphereGeometry' ) {
-						newGeometry = new GeometryClass( 1, 32, 16 );
-					} else if ( assetData.geometryType === 'CylinderGeometry' ) {
-						newGeometry = new GeometryClass( 1, 1, 1, 32 );
-					} else if ( assetData.geometryType === 'PlaneGeometry' ) {
-						newGeometry = new GeometryClass( 1, 1 );
-					} else if ( assetData.geometryType === 'ConeGeometry' ) {
-						newGeometry = new GeometryClass( 1, 1, 32 );
-					} else if ( assetData.geometryType === 'TorusGeometry' ) {
-						newGeometry = new GeometryClass( 1, 0.4, 16, 100 );
-					} else if ( assetData.geometryType === 'TorusKnotGeometry' ) {
-						newGeometry = new GeometryClass( 1, 0.3, 100, 16 );
-					} else if ( assetData.geometryType === 'CapsuleGeometry' ) {
-						newGeometry = new GeometryClass( 1, 1, 4, 8 );
-					} else if ( assetData.geometryType === 'CircleGeometry' ) {
-						newGeometry = new GeometryClass( 1, 32 );
-					} else if ( assetData.geometryType === 'RingGeometry' ) {
-						newGeometry = new GeometryClass( 0.5, 1, 32 );
-					} else {
-						newGeometry = new GeometryClass();
-					}
-					newGeometry.name = assetData.geometryType;
-				}
-			} else if ( assetData && assetData.isGeometry ) {
-				
-				newGeometry = assetData;
-			}
-
-			if ( newGeometry ) {
-				newGeometry.uuid = object.geometry.uuid;
-				editor.execute( new SetGeometryCommand( editor, object, newGeometry ) );
-				build();
-			}
-		}, null, 'geometry' );
+		editor.assetSelector.show( handleGeometrySelection, null, 'geometry' );
 	} );
 
 	geometrySelectorRow.add( new UIText( 'Geometry' ).setClass( 'Label' ) );

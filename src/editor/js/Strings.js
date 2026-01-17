@@ -398,6 +398,7 @@ function Strings( config ) {
 			'viewport/info/sample': 'نمونه',
 			'viewport/info/samples': 'نمونه ها',
 			'viewport/info/rendertime': 'زمان رندر',
+			'viewport/info/fps': 'فریم بر ثانیه',
 
 			'script/title/vertexShader': 'شیدر راس',
 			'script/title/fragmentShader': 'شیدر فرگمنت',
@@ -800,6 +801,7 @@ function Strings( config ) {
 			'viewport/info/sample': 'Sample',
 			'viewport/info/samples': 'Samples',
 			'viewport/info/rendertime': 'Render time',
+			'viewport/info/fps': 'FPS',
 
 			'script/title/vertexShader': 'Vertex Shader',
 			'script/title/fragmentShader': 'Fragment Shader',
@@ -1203,6 +1205,7 @@ function Strings( config ) {
 			'viewport/info/sample': 'Échantillon',
 			'viewport/info/samples': 'Échantillons',
 			'viewport/info/rendertime': 'Temps de rendu',
+			'viewport/info/fps': 'FPS',
 
 			'script/title/vertexShader': 'Vertex Shader',
 			'script/title/fragmentShader': 'Fragment Shader',
@@ -1606,8 +1609,8 @@ function Strings( config ) {
 			'viewport/info/sample': '样本',
 			'viewport/info/samples': '样本',
 			'viewport/info/rendertime': '渲染时间',
+			'viewport/info/fps': '帧每秒',
 
-			'script/title/vertexShader': '顶点着色器',
 			'script/title/fragmentShader': '片段着色器',
 			'script/title/programInfo': '程序属性'
 
@@ -2009,6 +2012,7 @@ function Strings( config ) {
 			'viewport/info/sample': 'サンプル',
 			'viewport/info/samples': 'サンプル',
 			'viewport/info/rendertime': 'レンダリング時間',
+			'viewport/info/fps': 'フレームレート',
 
 			'script/title/vertexShader': '頂点シェーダー',
 			'script/title/fragmentShader': 'フラグメントシェーダ',
@@ -2411,6 +2415,7 @@ function Strings( config ) {
 			'viewport/info/sample': '샘플',
 			'viewport/info/samples': '샘플',
 			'viewport/info/rendertime': '렌더링 시간',
+			'viewport/info/fps': '프레임 속도',
 
 			'script/title/vertexShader': '버텍스 셰이더',
 			'script/title/fragmentShader': '프래그먼트 셰이더',

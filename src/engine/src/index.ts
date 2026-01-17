@@ -22,6 +22,7 @@ export type { AttributeOptions } from './core/decorators';
 
 export { Asset, AssetState } from './core/Asset';
 export { AssetRegistry } from './core/AssetRegistry';
+export { AssetManager, assetManager } from './core/AssetManager';
 export { ScriptAsset } from './assets/ScriptAsset';
 
 export type { ComponentConstructor } from './core/Component';

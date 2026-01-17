@@ -13,7 +13,14 @@
 		<link rel="shortcut icon" href="../files/favicon.ico" media="(prefers-color-scheme: light)" />
 	</head>
 	<body>
-		<link rel="stylesheet" href="css/main.css">
+		<link rel="stylesheet" href="css/design-system.css">
+		<link rel="stylesheet" href="css/ui-base.css">
+		<link rel="stylesheet" href="css/sidebar.css">
+		<link rel="stylesheet" href="css/sidebar-script.css">
+		<link rel="stylesheet" href="css/menubar.css">
+		<link rel="stylesheet" href="css/viewport.css">
+		<link rel="stylesheet" href="css/resizer.css">
+		<link rel="stylesheet" href="css/asset-selector.css">
 
 		<script type="importmap">
 			{
@@ -147,6 +154,36 @@
 
 			async function loadSceneFromState( state, loadingOverlay ) {
 				try {
+					if ( state && state.error ) {
+						loadErrorOccurred = true;
+						loadingOverlay.style.display = 'none';
+						
+						const errorMessage = state.isJsonError 
+							? 'Scene file contains invalid JSON. The file may be corrupted.'
+							: 'Failed to load scene from file: ' + ( state.message || 'Unknown error' );
+						
+						const userChoice = confirm( 
+							errorMessage + '\n\n' +
+							'Continuing will clear the current scene and may result in data loss.\n' +
+							'Click OK to continue, or Cancel to close the editor and fix the issue.'
+						);
+						
+						if ( userChoice ) {
+							userChoseToContinue = true;
+							editor.clear();
+						} else {
+							if ( typeof window !== 'undefined' && window.__TAURI__ ) {
+								const { exit } = window.__TAURI__.process;
+								if ( exit ) {
+									exit( 1 );
+								}
+							} else {
+								window.close();
+							}
+						}
+						return;
+					}
+					
 					if ( state !== undefined && state.scene ) {
 						editor.clear();
 						
@@ -163,8 +200,29 @@
 					}
 					sceneLoaded = true;
 				} catch ( error ) {
-					handleLoadError( error );
+					loadErrorOccurred = true;
 					loadingOverlay.style.display = 'none';
+					
+					const errorMessage = error.message || String( error ) || 'Unknown error';
+					const userChoice = confirm( 
+						'Error loading scene: ' + errorMessage + '\n\n' +
+						'Continuing will clear the current scene and may result in data loss.\n' +
+						'Click OK to continue, or Cancel to close the editor and fix the issue.'
+					);
+					
+					if ( userChoice ) {
+						userChoseToContinue = true;
+						editor.clear();
+					} else {
+						if ( typeof window !== 'undefined' && window.__TAURI__ ) {
+							const { exit } = window.__TAURI__.process;
+							if ( exit ) {
+								exit( 1 );
+							}
+						} else {
+							window.close();
+						}
+					}
 				}
 			}
 
@@ -191,9 +249,29 @@
 						} );
 					});
 				} catch ( error ) {
-					console.warn( 'Failed to load scene from project:', error );
-					editor.clear();
+					loadErrorOccurred = true;
 					loadingOverlay.style.display = 'none';
+					
+					const errorMessage = error.message || String( error ) || 'Unknown error';
+					const userChoice = confirm( 
+						'Failed to load scene from project: ' + errorMessage + '\n\n' +
+						'Continuing will clear the current scene and may result in data loss.\n' +
+						'Click OK to continue, or Cancel to close the editor and fix the issue.'
+					);
+					
+					if ( userChoice ) {
+						userChoseToContinue = true;
+						editor.clear();
+					} else {
+						if ( typeof window !== 'undefined' && window.__TAURI__ ) {
+							const { exit } = window.__TAURI__.process;
+							if ( exit ) {
+								exit( 1 );
+							}
+						} else {
+							window.close();
+						}
+					}
 				}
 			} 
 
@@ -215,11 +293,10 @@
 			sidebarBottom.appendChild( sidebarAssets.dom );
 			document.body.appendChild( sidebarBottom );
 
-			const viewport = new Viewport( editor );
-			document.body.appendChild( viewport.dom );
-
 			const toolbar = new Toolbar( editor );
-			document.body.appendChild( toolbar.dom );
+			const viewport = new Viewport( editor );
+			viewport.dom.appendChild( toolbar.dom );
+			document.body.appendChild( viewport.dom );
 
 			loadingText.textContent = 'Loading scene...';
 
@@ -258,10 +335,18 @@
 			let isLoadingFromHash = false;
 			
 			let timeout;
+			let loadErrorOccurred = false;
+			let userChoseToContinue = false;
 
 			function saveState() {
 
 				if ( editor.config.getKey( 'autosave' ) === false ) {
+
+					return;
+
+				}
+
+				if ( loadErrorOccurred && !userChoseToContinue ) {
 
 					return;
 

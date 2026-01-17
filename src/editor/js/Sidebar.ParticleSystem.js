@@ -33,9 +33,7 @@ function SidebarParticleSystem( editor ) {
 	function createMinMaxRow( label, minControl, maxControl ) {
 		const row = new UIRow();
 		row.add( new UIText( label ).setWidth( '120px' ).setClass( 'Label' ) );
-		row.add( new UIText( 'Min' ).setWidth( '30px' ).setClass( 'Label' ) );
 		row.add( minControl );
-		row.add( new UIText( 'Max' ).setWidth( '30px' ).setClass( 'Label' ) );
 		row.add( maxControl );
 		return row;
 	}
@@ -43,11 +41,8 @@ function SidebarParticleSystem( editor ) {
 	function createVectorRow( label, xControl, yControl, zControl ) {
 		const row = new UIRow();
 		row.add( new UIText( label ).setWidth( '120px' ).setClass( 'Label' ) );
-		row.add( new UIText( 'X' ).setWidth( '20px' ).setClass( 'Label' ) );
 		row.add( xControl );
-		row.add( new UIText( 'Y' ).setWidth( '20px' ).setClass( 'Label' ) );
 		row.add( yControl );
-		row.add( new UIText( 'Z' ).setWidth( '20px' ).setClass( 'Label' ) );
 		row.add( zControl );
 		return row;
 	}

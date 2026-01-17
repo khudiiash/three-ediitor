@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { ModelParser } from './ModelParser.js';
+import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
+import { assetManager } from '@engine/three-engine.js';
 
 class AssetSelector {
 
@@ -19,154 +21,121 @@ class AssetSelector {
 			material: [ 'json' ] 
 		};
 
+		// Create overlay
 		const overlay = document.createElement( 'div' );
-		overlay.id = 'asset-selector-overlay';
-		overlay.style.cssText = `
-			position: fixed;
-			top: 0;
-			left: 0;
-			right: 0;
-			bottom: 0;
-			background: rgba(0, 0, 0, 0.7);
-			z-index: 10000;
-			display: none;
-			align-items: center;
-			justify-content: center;
-		`;
+		overlay.className = 'asset-selector-overlay';
 		document.body.appendChild( overlay );
 
+		// Create modal
 		const modal = document.createElement( 'div' );
-		modal.id = 'asset-selector-modal';
-		modal.style.cssText = `
-			background: #2a2a2a;
-			border: 1px solid #444;
-			border-radius: 4px;
-			width: 80%;
-			max-width: 900px;
-			height: 80%;
-			max-height: 700px;
-			display: flex;
-			flex-direction: column;
-			box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-		`;
+		modal.className = 'asset-selector-modal';
 		overlay.appendChild( modal );
 
+		// Create header
 		const header = document.createElement( 'div' );
-		header.style.cssText = `
-			padding: 12px 16px;
-			border-bottom: 1px solid #444;
-			display: flex;
-			align-items: center;
-			justify-content: space-between;
-		`;
+		header.className = 'asset-selector-header';
 
 		const title = document.createElement( 'h3' );
+		title.className = 'asset-selector-title';
 		title.textContent = 'Select Asset';
-		title.style.cssText = 'margin: 0; color: #aaa; font-size: 14px; font-weight: 600;';
 		header.appendChild( title );
 
 		const closeBtn = document.createElement( 'button' );
+		closeBtn.className = 'asset-selector-close';
 		closeBtn.textContent = '×';
-		closeBtn.style.cssText = `
-			background: none;
-			border: none;
-			color: #aaa;
-			font-size: 24px;
-			cursor: pointer;
-			padding: 0;
-			width: 24px;
-			height: 24px;
-			line-height: 24px;
-			text-align: center;
-		`;
 		closeBtn.addEventListener( 'click', () => this.hide() );
 		header.appendChild( closeBtn );
 
 		modal.appendChild( header );
 
+		// Create toolbar
 		const toolbar = document.createElement( 'div' );
-		toolbar.style.cssText = `
-			padding: 8px 16px;
-			border-bottom: 1px solid #444;
-			display: flex;
-			gap: 8px;
-			align-items: center;
-		`;
+		toolbar.className = 'asset-selector-toolbar';
+
+		const leftToolbar = document.createElement( 'div' );
+		leftToolbar.className = 'asset-selector-toolbar-left';
 
 		const searchInput = document.createElement( 'input' );
 		searchInput.type = 'text';
 		searchInput.placeholder = 'Search assets...';
-		searchInput.style.cssText = `
-			flex: 1;
-			padding: 6px 12px;
-			background: #1e1e1e;
-			border: 1px solid #444;
-			border-radius: 3px;
-			color: #aaa;
-			font-size: 12px;
-		`;
+		searchInput.className = 'asset-selector-search';
 		searchInput.addEventListener( 'input', () => this.filterAssets( searchInput.value ) );
-		toolbar.appendChild( searchInput );
+		leftToolbar.appendChild( searchInput );
 
 		const importBtn = document.createElement( 'button' );
 		importBtn.textContent = 'Import from File';
-		importBtn.style.cssText = `
-			padding: 6px 12px;
-			background: #0088ff;
-			border: none;
-			border-radius: 3px;
-			color: white;
-			font-size: 12px;
-			cursor: pointer;
-			font-weight: 500;
-		`;
-		importBtn.addEventListener( 'mouseenter', () => {
-			importBtn.style.background = '#0099ff';
-		} );
-		importBtn.addEventListener( 'mouseleave', () => {
-			importBtn.style.background = '#0088ff';
-		} );
+		importBtn.className = 'asset-selector-btn primary';
 		importBtn.addEventListener( 'click', () => this.importAsset() );
-		toolbar.appendChild( importBtn );
+		leftToolbar.appendChild( importBtn );
 
 		const clearBtn = document.createElement( 'button' );
 		clearBtn.textContent = 'Clear';
-		clearBtn.style.cssText = `
-			padding: 6px 12px;
-			background: #444;
-			border: none;
-			border-radius: 3px;
-			color: #aaa;
-			font-size: 12px;
-			cursor: pointer;
-		`;
-		clearBtn.addEventListener( 'mouseenter', () => {
-			clearBtn.style.background = '#555';
-		} );
-		clearBtn.addEventListener( 'mouseleave', () => {
-			clearBtn.style.background = '#444';
-		} );
+		clearBtn.className = 'asset-selector-btn';
 		clearBtn.addEventListener( 'click', () => {
 			if ( this.onSelectCallback ) {
 				this.onSelectCallback( null );
 			}
 			this.hide();
 		} );
-		toolbar.appendChild( clearBtn );
+		leftToolbar.appendChild( clearBtn );
+
+		toolbar.appendChild( leftToolbar );
+
+		// View mode buttons
+		const viewModeButtons = document.createElement( 'div' );
+		viewModeButtons.className = 'asset-selector-toolbar-right';
+
+		const viewListBtn = document.createElement( 'button' );
+		viewListBtn.innerHTML = '☰';
+		viewListBtn.title = 'List View';
+		viewListBtn.className = 'asset-selector-view-btn';
+
+		const viewGridBtn = document.createElement( 'button' );
+		viewGridBtn.innerHTML = '⊞';
+		viewGridBtn.title = 'Grid View';
+		viewGridBtn.className = 'asset-selector-view-btn active';
+
+		const viewLargeBtn = document.createElement( 'button' );
+		viewLargeBtn.innerHTML = '⊟';
+		viewLargeBtn.title = 'Large Grid View';
+		viewLargeBtn.className = 'asset-selector-view-btn';
+
+		this.viewMode = 'grid';
+
+		viewListBtn.addEventListener( 'click', () => {
+			this.viewMode = 'list';
+			viewListBtn.classList.add( 'active' );
+			viewGridBtn.classList.remove( 'active' );
+			viewLargeBtn.classList.remove( 'active' );
+			this.loadAssets();
+		} );
+
+		viewGridBtn.addEventListener( 'click', () => {
+			this.viewMode = 'grid';
+			viewListBtn.classList.remove( 'active' );
+			viewGridBtn.classList.add( 'active' );
+			viewLargeBtn.classList.remove( 'active' );
+			this.loadAssets();
+		} );
+
+		viewLargeBtn.addEventListener( 'click', () => {
+			this.viewMode = 'large';
+			viewListBtn.classList.remove( 'active' );
+			viewGridBtn.classList.remove( 'active' );
+			viewLargeBtn.classList.add( 'active' );
+			this.loadAssets();
+		} );
+
+		viewModeButtons.appendChild( viewListBtn );
+		viewModeButtons.appendChild( viewGridBtn );
+		viewModeButtons.appendChild( viewLargeBtn );
+		toolbar.appendChild( viewModeButtons );
 
 		modal.appendChild( toolbar );
 
+		// Create grid container
 		const gridContainer = document.createElement( 'div' );
-		gridContainer.id = 'asset-selector-grid';
-		gridContainer.style.cssText = `
-			flex: 1;
-			overflow-y: auto;
-			padding: 16px;
-			display: grid;
-			grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-			gap: 12px;
-			align-content: start;
-		`;
+		gridContainer.className = 'asset-selector-grid';
 		modal.appendChild( gridContainer );
 
 		this.overlay = overlay;
@@ -175,6 +144,9 @@ class AssetSelector {
 		this.searchInput = searchInput;
 		this.title = title;
 		this.importBtn = importBtn;
+		this.viewListBtn = viewListBtn;
+		this.viewGridBtn = viewGridBtn;
+		this.viewLargeBtn = viewLargeBtn;
 
 		overlay.addEventListener( 'click', ( e ) => {
 			if ( e.target === overlay ) {
@@ -236,7 +208,7 @@ class AssetSelector {
 
 	}
 
-	loadAssets() {
+	async loadAssets() {
 
 		this.gridContainer.innerHTML = '';
 
@@ -251,44 +223,17 @@ class AssetSelector {
 
 			defaultGeometries.forEach( geoType => {
 				const defaultItem = document.createElement( 'div' );
-				defaultItem.className = 'asset-item';
-				defaultItem.style.cssText = `
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					padding: 8px;
-					background: #1e1e1e;
-					border: 2px solid transparent;
-					border-radius: 4px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-				`;
+				defaultItem.className = 'asset-item asset-item-default';
 
 				const thumbnail = document.createElement( 'div' );
-				thumbnail.textContent = '📦';
-				thumbnail.style.cssText = `
-					width: 100%;
-					aspect-ratio: 1;
-					background: #2a2a2a;
-					border-radius: 3px;
-					overflow: hidden;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					margin-bottom: 6px;
-					font-size: 32px;
-				`;
+				thumbnail.className = 'asset-item-default-thumbnail';
+				const badge = this.createFileBadge( geoType + '.geometry', 120 );
+				thumbnail.appendChild( badge );
 				defaultItem.appendChild( thumbnail );
 
 				const name = document.createElement( 'div' );
+				name.className = 'asset-item-default-name';
 				name.textContent = geoType;
-				name.style.cssText = `
-					font-size: 11px;
-					color: #aaa;
-					text-align: center;
-					word-break: break-word;
-					width: 100%;
-				`;
 				defaultItem.appendChild( name );
 
 				defaultItem.addEventListener( 'click', () => {
@@ -314,44 +259,36 @@ class AssetSelector {
 
 			defaultMaterials.forEach( matType => {
 				const defaultItem = document.createElement( 'div' );
-				defaultItem.className = 'asset-item';
-				defaultItem.style.cssText = `
-					display: flex;
-					flex-direction: column;
-					align-items: center;
-					padding: 8px;
-					background: #1e1e1e;
-					border: 2px solid transparent;
-					border-radius: 4px;
-					cursor: pointer;
-					transition: all 0.15s ease;
-				`;
+				defaultItem.className = 'asset-item asset-item-default';
 
 				const thumbnail = document.createElement( 'div' );
-				thumbnail.textContent = '🎨';
-				thumbnail.style.cssText = `
-					width: 100%;
-					aspect-ratio: 1;
-					background: #2a2a2a;
-					border-radius: 3px;
-					overflow: hidden;
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					margin-bottom: 6px;
-					font-size: 32px;
-				`;
+				thumbnail.className = 'asset-item-default-thumbnail';
+				
+				// Render preview for default material
+				(async () => {
+					try {
+						const previewRenderer = getAssetPreviewRenderer();
+						const material = assetManager.getMaterial(`default/${matType}`);
+						if (material) {
+							const dataUrl = await previewRenderer.renderMaterialPreview(material, 120, 120);
+							const img = document.createElement('img');
+							img.src = dataUrl;
+							thumbnail.appendChild(img);
+						} else {
+							const badge = this.createFileBadge(matType + '.material', 120);
+							thumbnail.appendChild(badge);
+						}
+					} catch (error) {
+						const badge = this.createFileBadge(matType + '.material', 120);
+						thumbnail.appendChild(badge);
+					}
+				})();
+				
 				defaultItem.appendChild( thumbnail );
 
 				const name = document.createElement( 'div' );
+				name.className = 'asset-item-default-name';
 				name.textContent = matType;
-				name.style.cssText = `
-					font-size: 11px;
-					color: #aaa;
-					text-align: center;
-					word-break: break-word;
-					width: 100%;
-				`;
 				defaultItem.appendChild( name );
 
 				defaultItem.addEventListener( 'click', () => {
@@ -367,25 +304,56 @@ class AssetSelector {
 		}
 
 		const assets = this.getAllAssetsFromProject( this.assetType );
+		
+		console.log('[AssetSelector] loadAssets - assetType:', this.assetType, 'assets count:', assets.length);
+		if (assets.length > 0) {
+			console.log('[AssetSelector] First asset:', assets[0]);
+		}
+		console.log('[AssetSelector] AssetManager stats:', assetManager.getStats());
+		
+		await this.ensureModelsInCache(assets);
 
 		if ( assets.length === 0 && this.assetType !== 'geometry' && this.assetType !== 'material' ) {
 			const emptyMessage = document.createElement( 'div' );
+			emptyMessage.className = 'asset-selector-empty-message';
 			emptyMessage.textContent = `No ${this.assetType} assets found in project. Import some files to get started.`;
-			emptyMessage.style.cssText = `
-				grid-column: 1 / -1;
-				text-align: center;
-				color: #888;
-				padding: 40px 20px;
-				font-size: 13px;
-			`;
 			this.gridContainer.appendChild( emptyMessage );
 			return;
 		}
 
-		assets.forEach( asset => {
-			const item = this.createAssetItem( asset );
-			this.gridContainer.appendChild( item );
-		} );
+		if (this.viewMode === 'list') {
+			console.log('[AssetSelector] Rendering list view');
+			// Set list view class
+			this.gridContainer.className = 'asset-selector-grid view-list';
+			
+			// Create table structure like in assets panel
+			const table = document.createElement('table');
+			table.className = 'asset-selector-table';
+			
+			// Add table body
+			const tbody = document.createElement('tbody');
+			tbody.id = 'asset-selector-tbody';
+			
+			assets.forEach( asset => {
+				const row = this.createListRow( asset );
+				tbody.appendChild( row );
+			} );
+			
+			table.appendChild( tbody );
+			this.gridContainer.appendChild( table );
+			console.log('[AssetSelector] List view rendered, rows:', assets.length);
+		} else {
+			// Set grid view class based on mode
+			this.gridContainer.className = this.viewMode === 'large' 
+				? 'asset-selector-grid view-large' 
+				: 'asset-selector-grid view-grid';
+			
+			const itemSize = this.viewMode === 'large' ? 200 : 120;
+			assets.forEach( asset => {
+				const item = this.createAssetItem( asset, itemSize );
+				this.gridContainer.appendChild( item );
+			} );
+		}
 
 	}
 
@@ -404,62 +372,71 @@ class AssetSelector {
 			folder.files.forEach( file => {
 				const ext = file.name.split( '.' ).pop()?.toLowerCase();
 				
+				// Handle virtual model files (.geometry, .material, .model, .texture)
+				if ( assetType === 'geometry' && file.type === 'geometry' && file.name.endsWith('.geometry') ) {
+					console.log('[AssetSelector] Found geometry file:', file.name, file);
+					assets.push( {
+						name: file.name,
+						path: file.path,
+						type: 'geometry',
+						extension: 'geometry',
+						modelGeometry: file.modelGeometry,
+						modelPath: file.modelPath,
+						isModelContent: true
+					} );
+					return;
+				}
 				
-				if ( file.isModelContainer && file.modelContents ) {
-					
-					if ( assetType === 'geometry' && file.modelContents.geometries ) {
-						file.modelContents.geometries.forEach( geo => {
-							assets.push( {
-								name: geo.name,
-								path: file.path + '/Geometries/' + geo.name,
-								type: 'geometry',
-								extension: 'geometry',
-								modelFile: file,
-								modelGeometry: geo,
-								isModelContent: true
-							} );
-						} );
-					}
-					if ( assetType === 'texture' && file.modelContents.textures ) {
-						file.modelContents.textures.forEach( tex => {
-							assets.push( {
-								name: tex.name,
-								path: file.path + '/Textures/' + tex.name,
-								type: 'texture',
-								extension: 'texture',
-								modelFile: file,
-								modelTexture: tex,
-								isModelContent: true
-							} );
-						} );
-					}
-					if ( assetType === 'material' && file.modelContents.materials ) {
-						file.modelContents.materials.forEach( mat => {
-							assets.push( {
-								name: mat.name,
-								path: file.path + '/Materials/' + mat.name,
-								type: 'material',
-								extension: 'material',
-								modelFile: file,
-								modelMaterial: mat,
-								isModelContent: true
-							} );
-						} );
-					}
-					if ( assetType === 'model' && file.modelContents.model ) {
-						const ext = file.name.split( '.' ).pop()?.toLowerCase();
-						assets.push( {
-							name: file.name.replace( /\.(glb|gltf|fbx|obj)$/i, '' ),
-							path: file.path + '/' + file.name.replace( /\.(glb|gltf|fbx|obj)$/i, '.model' ),
-							type: 'model',
-							extension: 'model',
-							modelFile: file,
-							modelObject: file.modelContents.model,
-							isModelContent: true
-						} );
-					}
-				} else if ( extensions.includes( ext ) ) {
-					
+				if ( assetType === 'material' && file.type === 'material' && file.name.endsWith('.material') ) {
+					console.log('[AssetSelector] Found material file:', file.name, file);
+					console.log('[AssetSelector] Material data:', {
+						hasModelMaterial: !!file.modelMaterial,
+						modelMaterialName: file.modelMaterial?.name,
+						hasMaterialObject: !!(file.modelMaterial?.material),
+						modelPath: file.modelPath
+					});
+					assets.push( {
+						name: file.name,
+						path: file.path,
+						type: 'material',
+						extension: 'material',
+						modelMaterial: file.modelMaterial,
+						modelPath: file.modelPath,
+						isModelContent: true
+					} );
+					return;
+				}
+				
+				if ( assetType === 'model' && file.type === 'model' && file.name.endsWith('.model') ) {
+					console.log('[AssetSelector] Found model file:', file.name, file);
+					assets.push( {
+						name: file.name,
+						path: file.path,
+						type: 'model',
+						extension: 'model',
+						modelObject: file.modelObject,
+						modelContents: file.modelContents,
+						modelPath: file.modelPath,
+						isModelContent: true
+					} );
+					return;
+				}
+				
+				if ( assetType === 'texture' && file.type === 'texture' && file.modelTexture ) {
+					assets.push( {
+						name: file.name,
+						path: file.path,
+						type: 'texture',
+						extension: 'texture',
+						modelTexture: file.modelTexture,
+						modelPath: file.modelPath,
+						isModelContent: true
+					} );
+					return;
+				}
+				
+				// Handle regular files
+				if ( extensions.includes( ext ) ) {
 					assets.push( {
 						name: file.name,
 						path: file.path,
@@ -508,97 +485,218 @@ class AssetSelector {
 		const item = document.createElement( 'div' );
 		item.className = 'asset-item';
 		item.draggable = true;
-		item.style.cssText = `
-			display: flex;
-			flex-direction: column;
-			align-items: center;
-			padding: 8px;
-			background: #1e1e1e;
-			border: 2px solid transparent;
-			border-radius: 4px;
-			cursor: pointer;
-			transition: all 0.15s ease;
-		`;
-
 		
 		item.dataset.assetPath = asset.path;
 		item.dataset.assetName = asset.name;
 		item.dataset.assetType = asset.type;
 
 		const thumbnail = document.createElement( 'div' );
-		thumbnail.style.cssText = `
-			width: 100%;
-			aspect-ratio: 1;
-			background: #2a2a2a;
-			border-radius: 3px;
-			overflow: hidden;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			margin-bottom: 6px;
-		`;
+		thumbnail.className = 'asset-item-thumbnail';
 
-		
-		if ( asset.type === 'texture' && ( asset.url || asset.content ) ) {
-			const img = document.createElement( 'img' );
-			img.src = asset.url || asset.content;
-			img.style.cssText = `
-				width: 100%;
-				height: 100%;
-				object-fit: cover;
-			`;
-			img.onerror = () => {
-				thumbnail.textContent = '🖼️';
-				thumbnail.style.fontSize = '32px';
-			};
-			thumbnail.appendChild( img );
-		} else if ( asset.type === 'audio' ) {
-			thumbnail.textContent = '🔊';
-			thumbnail.style.fontSize = '32px';
-		} else if ( asset.type === 'model' ) {
-			thumbnail.textContent = '📦';
-			thumbnail.style.fontSize = '32px';
-		} else if ( asset.type === 'geometry' ) {
-			thumbnail.textContent = '📐';
-			thumbnail.style.fontSize = '32px';
-		} else if ( asset.type === 'material' ) {
-			thumbnail.textContent = '🎨';
-			thumbnail.style.fontSize = '32px';
-		} else {
+		(async () => {
+			const previewRenderer = getAssetPreviewRenderer();
+
+			if ( asset.type === 'texture' && asset.modelTexture && asset.modelTexture.texture ) {
+				const texture = asset.modelTexture.texture;
+				if ( texture.image ) {
+					const img = document.createElement( 'img' );
+					if ( texture.image instanceof Image || texture.image instanceof HTMLImageElement ) {
+						img.src = texture.image.src;
+					} else if ( texture.image instanceof HTMLCanvasElement ) {
+						img.src = texture.image.toDataURL();
+					} else {
+						try {
+							const tempCanvas = document.createElement( 'canvas' );
+							tempCanvas.width = texture.image.width || 128;
+							tempCanvas.height = texture.image.height || 128;
+							const tempCtx = tempCanvas.getContext( '2d' );
+							tempCtx.drawImage( texture.image, 0, 0 );
+							img.src = tempCanvas.toDataURL();
+						} catch ( e ) {
+							const badge = this.createFileBadge( asset.name, 128 );
+							thumbnail.appendChild( badge );
+							return;
+						}
+					}
+					img.onerror = () => {
+						thumbnail.innerHTML = '';
+						const badge = this.createFileBadge( asset.name, 128 );
+						thumbnail.appendChild( badge );
+					};
+					thumbnail.appendChild( img );
+					return;
+				}
+			}
+			
+			const ext = asset.name ? asset.name.split( '.' ).pop()?.toLowerCase() : '';
+			const isImageFile = asset.type === 'texture' || 
+			                   asset.type === 'image' || 
+			                   [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ].includes( ext );
+			
+			if ( isImageFile && ( asset.url || asset.content ) ) {
+				const img = document.createElement( 'img' );
+				img.src = asset.url || asset.content;
+				img.onerror = () => {
+					thumbnail.innerHTML = '';
+					const badge = this.createFileBadge( asset.name, 128 );
+					thumbnail.appendChild( badge );
+				};
+				thumbnail.appendChild( img );
+				return;
+			}
+
+			if ( asset.type === 'material' ) {
+				try {
+					console.log('[AssetSelector Grid] Material asset:', {
+						name: asset.name,
+						hasModelMaterial: !!asset.modelMaterial,
+						modelMaterialName: asset.modelMaterial?.name,
+						hasMaterialDirect: !!(asset.modelMaterial && asset.modelMaterial.material),
+						modelPath: asset.modelPath,
+						assetManagerStats: assetManager.getStats()
+					});
+					
+					let material = asset.modelMaterial && asset.modelMaterial.material ? asset.modelMaterial.material : null;
+					
+					if ( !material && asset.modelPath ) {
+						const materialName = asset.name.replace('.material', '');
+						const matId = `${asset.modelPath}/${materialName}`;
+						material = assetManager.getMaterial(matId);
+						console.log('[AssetSelector Grid] Looking up material:', matId, 'Found:', !!material);
+						
+						if (!material) {
+							if (asset.modelMaterial && asset.modelMaterial.name) {
+								const altMatId = `${asset.modelPath}/${asset.modelMaterial.name}`;
+								material = assetManager.getMaterial(altMatId);
+								console.log('[AssetSelector Grid] Trying alternate material ID:', altMatId, 'Found:', !!material);
+							}
+						}
+					}
+					
+					if ( material ) {
+						console.log('[AssetSelector Grid] Rendering material preview');
+						const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
+					} else {
+						console.log('[AssetSelector Grid] No material found for preview');
+					}
+					
+					const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
+					if ( projectPath && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke ) {
+						let assetPath = asset.path;
+						if ( assetPath.startsWith( '/' ) ) assetPath = assetPath.slice( 1 );
+						
+						const fileBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
+							projectPath: projectPath,
+							assetPath: assetPath
+						} );
+						const materialContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+						
+						const dataUrl = await previewRenderer.renderMaterialPreview( materialContent, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
+					}
+				} catch ( error ) {
+					console.warn( '[AssetSelector] Failed to render material preview:', error );
+				}
+			}
+
+			if ( asset.type === 'geometry' ) {
+				try {
+					let geometry = asset.modelGeometry && asset.modelGeometry.geometry ? asset.modelGeometry.geometry : null;
+					
+					if ( !geometry && asset.modelPath ) {
+						const geometryName = asset.name.replace('.geometry', '');
+						const geoId = `${asset.modelPath}/${geometryName}`;
+						geometry = assetManager.getGeometry(geoId);
+					}
+					
+					if ( geometry ) {
+						const dataUrl = await previewRenderer.renderGeometryPreview( geometry, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
+					}
+					
+					const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
+					if ( projectPath && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke ) {
+						let assetPath = asset.path;
+						if ( assetPath.startsWith( '/' ) ) assetPath = assetPath.slice( 1 );
+						
+						const fileBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
+							projectPath: projectPath,
+							assetPath: assetPath
+						} );
+						const geometryContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+						
+						const dataUrl = await previewRenderer.renderGeometryPreview( geometryContent, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
+					}
+				} catch ( error ) {
+					console.warn( '[AssetSelector] Failed to render geometry preview:', error );
+				}
+			}
+
+			if ( asset.type === 'model' ) {
+				try {
+					let model = null;
+					
+					if ( asset.modelObject ) {
+						model = asset.modelObject;
+					} else if ( asset.modelContents && asset.modelContents.model ) {
+						model = asset.modelContents.model;
+					} else if ( asset.modelPath ) {
+						model = assetManager.getModel(asset.modelPath);
+					}
+					
+					if ( model ) {
+						const dataUrl = await previewRenderer.renderModelPreview( model, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
+					}
+				} catch ( error ) {
+					console.warn( '[AssetSelector] Failed to render model preview:', error );
+				}
+				
+				const badge = this.createFileBadge( asset.name, 128 );
+				thumbnail.appendChild( badge );
+				return;
+			}
+
+			if ( asset.type === 'audio' ) {
+				thumbnail.textContent = '🔊';
+				thumbnail.classList.add( 'asset-icon-large' );
+				return;
+			}
+
 			thumbnail.textContent = '📄';
-			thumbnail.style.fontSize = '32px';
-		}
+			thumbnail.classList.add( 'asset-icon-large' );
+		})();
 
 		item.appendChild( thumbnail );
 
 		const name = document.createElement( 'div' );
+		name.className = 'asset-item-name';
 		name.textContent = asset.name;
-		name.style.cssText = `
-			font-size: 11px;
-			color: #aaa;
-			text-align: center;
-			word-break: break-word;
-			width: 100%;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			display: -webkit-box;
-			-webkit-line-clamp: 2;
-			-webkit-box-orient: vertical;
-		`;
 		name.title = asset.name;
 		item.appendChild( name );
 
-		item.addEventListener( 'mouseenter', () => {
-			item.style.background = '#333';
-			item.style.borderColor = '#0088ff';
-		} );
-
-		item.addEventListener( 'mouseleave', () => {
-			item.style.background = '#1e1e1e';
-			item.style.borderColor = 'transparent';
-		} );
-
 		item.addEventListener( 'click', () => {
+			// Remove selected class from all items
+			this.gridContainer.querySelectorAll( '.asset-item' ).forEach( i => i.classList.remove( 'selected' ) );
+			// Add selected class to clicked item
+			item.classList.add( 'selected' );
 			this.selectAsset( asset );
 		} );
 
@@ -759,6 +857,10 @@ class AssetSelector {
 					const img = new Image();
 					img.onload = () => {
 						const texture = new THREE.Texture( img );
+						// Ensure texture matrix is initialized
+						if ( ! texture.matrix ) {
+							texture.matrix = new THREE.Matrix3();
+						}
 						texture.sourceFile = textureData.name;
 						texture.assetPath = textureData.path;
 						texture.colorSpace = THREE.SRGBColorSpace;
@@ -780,7 +882,18 @@ class AssetSelector {
 		}
 
 		
+		const isInBrowser = typeof window !== 'undefined' && window.location && window.location.protocol === 'http:';
 		let textureUrl = textureData.url || textureData.content;
+		
+		if ( ! textureUrl && isExistingAsset && isInBrowser && textureData.path ) {
+			const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
+			if ( projectPath ) {
+				const projectName = projectPath.split( /[/\\]/ ).pop();
+				let assetPath = textureData.path.startsWith( '/' ) ? textureData.path.slice( 1 ) : textureData.path;
+				textureUrl = `/api/projects/${projectName}/assets/${assetPath}`;
+			}
+		}
+		
 		if ( ! textureUrl ) {
 			console.warn( 'No texture URL available for', textureData.name );
 			this.isProcessing = false;
@@ -799,6 +912,10 @@ class AssetSelector {
 			
 			if ( isExistingAsset ) {
 				const texture = new THREE.Texture( image );
+				// Ensure texture matrix is initialized
+				if ( ! texture.matrix ) {
+					texture.matrix = new THREE.Matrix3();
+				}
 				texture.sourceFile = textureData.name;
 				texture.assetPath = textureData.path;
 				texture.colorSpace = THREE.SRGBColorSpace;
@@ -831,6 +948,10 @@ class AssetSelector {
 				const newImage = new Image();
 				newImage.onload = () => {
 					const texture = new THREE.Texture( newImage );
+					// Ensure texture matrix is initialized
+					if ( ! texture.matrix ) {
+						texture.matrix = new THREE.Matrix3();
+					}
 					texture.sourceFile = textureData.name;
 					texture.colorSpace = THREE.SRGBColorSpace;
 					texture.needsUpdate = true;
@@ -1282,9 +1403,9 @@ class AssetSelector {
 		items.forEach( item => {
 			const name = item.querySelector( 'div:last-child' ).textContent.toLowerCase();
 			if ( name.includes( term ) ) {
-				item.style.display = 'flex';
+				item.classList.remove( 'hidden' );
 			} else {
-				item.style.display = 'none';
+				item.classList.add( 'hidden' );
 			}
 		} );
 
@@ -1371,6 +1492,207 @@ class AssetSelector {
 		document.body.appendChild( fileInput );
 		fileInput.click();
 
+	}
+
+	createListRow( asset ) {
+		const row = document.createElement( 'tr' );
+		row.className = 'asset-selector-table-row';
+
+		const nameCell = document.createElement( 'td' );
+		
+		const nameWrapper = document.createElement('div');
+		nameWrapper.className = 'asset-list-name-cell';
+		
+		const thumbnailContainer = document.createElement( 'span' );
+		thumbnailContainer.className = 'asset-list-thumbnail';
+		
+		// Add placeholder badge first
+		const badge = this.createFileBadge(asset.name, 24);
+		thumbnailContainer.appendChild(badge);
+
+		// Asynchronously load preview
+		(async () => {
+			try {
+				const previewRenderer = getAssetPreviewRenderer();
+				let previewImg = null;
+
+				const ext = asset.name ? asset.name.split('.').pop()?.toLowerCase() : '';
+				const isImageFile = asset.type === 'texture' || asset.type === 'image' || 
+				                   ['jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2'].includes(ext);
+				
+				if (isImageFile && (asset.url || asset.content)) {
+					previewImg = document.createElement('img');
+					previewImg.src = asset.url || asset.content;
+					previewImg.className = 'asset-preview-image';
+				} else if (asset.type === 'material') {
+					let material = asset.modelMaterial?.material;
+					if (!material && asset.modelPath) {
+						const materialName = asset.name.replace('.material', '');
+						material = assetManager.getMaterial(`${asset.modelPath}/${materialName}`);
+					}
+					if (material) {
+						const dataUrl = await previewRenderer.renderMaterialPreview(material, 24, 24);
+						previewImg = document.createElement('img');
+						previewImg.src = dataUrl;
+						previewImg.className = 'asset-preview-image-contain';
+					}
+				} else if (asset.type === 'geometry') {
+					let geometry = asset.modelGeometry?.geometry;
+					if (!geometry && asset.modelPath) {
+						const geometryName = asset.name.replace('.geometry', '');
+						geometry = assetManager.getGeometry(`${asset.modelPath}/${geometryName}`);
+					}
+					if (geometry) {
+						const dataUrl = await previewRenderer.renderGeometryPreview(geometry, 24, 24);
+						previewImg = document.createElement('img');
+						previewImg.src = dataUrl;
+						previewImg.className = 'asset-preview-image-contain';
+					}
+				} else if (asset.type === 'model') {
+					let model = asset.modelObject || asset.modelContents?.model || assetManager.getModel(asset.modelPath);
+					if (model) {
+						const dataUrl = await previewRenderer.renderModelPreview(model, 24, 24);
+						previewImg = document.createElement('img');
+						previewImg.src = dataUrl;
+						previewImg.className = 'asset-preview-image-contain';
+					}
+				}
+
+				if (previewImg) {
+					thumbnailContainer.innerHTML = '';
+					thumbnailContainer.appendChild(previewImg);
+				}
+			} catch (error) {
+				console.error('[AssetSelector] Failed to create list preview for', asset.name, error);
+			}
+		})();
+		
+		const nameSpan = document.createElement('span');
+		nameSpan.className = 'asset-list-name';
+		nameSpan.textContent = asset.name;
+		
+		nameWrapper.appendChild(thumbnailContainer);
+		nameWrapper.appendChild(nameSpan);
+		nameCell.appendChild(nameWrapper);
+
+		const typeCell = document.createElement('td');
+		typeCell.className = 'asset-list-type-cell';
+		typeCell.textContent = asset.type || 'File';
+
+		const sizeCell = document.createElement('td');
+		sizeCell.className = 'asset-list-size-cell';
+		sizeCell.textContent = '';
+
+		row.appendChild(nameCell);
+		row.appendChild(typeCell);
+		row.appendChild(sizeCell);
+
+		row.addEventListener('click', () => {
+			if (this.onSelectCallback) {
+				this.onSelectCallback(asset);
+			}
+			this.hide();
+		});
+
+		return row;
+	}
+
+	async ensureModelsInCache( assets ) {
+		if (!window.modelCache || !window.ModelParser) return;
+		
+		const modelPaths = new Set();
+		assets.forEach(asset => {
+			if (asset.modelPath && !window.modelCache.has(asset.modelPath)) {
+				modelPaths.add(asset.modelPath);
+			}
+		});
+		
+		if (modelPaths.size === 0) return;
+		
+		console.log('[AssetSelector] Loading models into cache:', Array.from(modelPaths));
+		
+		const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
+		
+		for (const modelPath of modelPaths) {
+			try {
+				const modelContents = await window.ModelParser.parseModel(modelPath, null, projectPath);
+				if (modelContents) {
+					window.modelCache.set(modelPath, modelContents);
+					console.log('[AssetSelector] Loaded model into cache:', modelPath);
+				}
+			} catch (error) {
+				console.warn('[AssetSelector] Failed to load model:', modelPath, error);
+			}
+		}
+		
+		console.log('[AssetSelector] Cache size after loading:', window.modelCache.size);
+	}
+
+	async ensureModelsInCache( assets ) {
+		if (!window.assetManager || !ModelParser) return;
+		
+		const modelPaths = new Set();
+		assets.forEach(asset => {
+			if (asset.modelPath && !assetManager.hasParsedModel(asset.modelPath)) {
+				modelPaths.add(asset.modelPath);
+			}
+		});
+		
+		if (modelPaths.size === 0) return;
+		
+		console.log('[AssetSelector] Loading models into AssetManager:', Array.from(modelPaths));
+		
+		const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
+		
+		for (const modelPath of modelPaths) {
+			try {
+				const modelContents = await ModelParser.parseModel(modelPath, null, projectPath);
+				if (modelContents) {
+					assetManager.registerParsedModel(modelPath, modelContents);
+					console.log('[AssetSelector] Loaded model into AssetManager:', modelPath);
+				}
+			} catch (error) {
+				console.warn('[AssetSelector] Failed to load model:', modelPath, error);
+			}
+		}
+		
+		console.log('[AssetSelector] AssetManager stats:', assetManager.getStats());
+	}
+
+	createFileBadge( filename, size = 60 ) {
+		const ext = (filename.split('.').pop() || 'FILE').toUpperCase();
+		
+		const colorMap = {
+			'GLB': '#667eea', 'GLTF': '#667eea', 'FBX': '#764ba2', 'OBJ': '#f093fb',
+			'JPG': '#4facfe', 'JPEG': '#4facfe', 'PNG': '#43e97b', 'GIF': '#fa709a',
+			'WEBP': '#30cfd0', 'MP3': '#a8edea', 'WAV': '#fed6e3', 'OGG': '#c471ed',
+			'MP4': '#f77062', 'WEBM': '#fe5196', 'JSON': '#ffa726', 'JS': '#ffd93d',
+			'TS': '#3b82f6', 'CSS': '#ec4899', 'HTML': '#f97316', 'TXT': '#94a3b8'
+		};
+		
+		const color1 = colorMap[ext] || '#667eea';
+		const color2 = color1;
+		
+		const width = size * 0.7;
+		const height = size;
+		
+		const container = document.createElement('div');
+		container.className = 'file-badge-container';
+		container.style.width = `${width}px`;
+		container.style.height = `${height}px`;
+		container.style.background = `linear-gradient(135deg, ${color1} 0%, ${color2} 100%)`;
+		container.style.borderRadius = `${width * 0.12}px`;
+		
+		const extBadge = document.createElement('div');
+		extBadge.className = 'file-badge-ext-label';
+		extBadge.style.bottom = `${height * 0.08}px`;
+		extBadge.style.padding = `${height * 0.03}px ${width * 0.15}px`;
+		extBadge.style.borderRadius = `${width * 0.15}px`;
+		extBadge.style.fontSize = `${height * 0.12}px`;
+		extBadge.textContent = ext.length > 3 ? ext.substring(0, 3) : ext;
+		
+		container.appendChild(extBadge);
+		return container;
 	}
 
 }

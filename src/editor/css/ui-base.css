@@ -1,0 +1,321 @@
+.Panel {
+	display: flex;
+	flex-direction: column;
+}
+
+.Row {
+	display: grid;
+	grid-template-columns: 90px 1fr;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 0;
+}
+
+.Row > *:first-child {
+	grid-column: 1;
+	justify-self: start;
+}
+
+.Row > *:not(:first-child) {
+	grid-column: 2;
+	display: inline-flex;
+	gap: var(--space-1);
+	align-items: center;
+}
+
+.input-group {
+	display: flex;
+	gap: var(--space-1);
+	align-items: center;
+}
+
+.Text {
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	cursor: default;
+	display: inline-block;
+	vertical-align: middle;
+	padding-left: var(--space-2);
+}
+
+.Number,
+.Integer {
+	width: 60px;
+	padding: 0 var(--space-2);
+	height: var(--input-height);
+	background: var(--bg-tertiary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-base);
+	color: var(--text-primary);
+	font-size: var(--font-size-sm);
+	outline: none;
+	text-align: center;
+}
+
+.Number:focus,
+.Integer:focus {
+	border-color: var(--border-focus);
+	background: var(--bg-elevated);
+}
+
+.Number:hover,
+.Integer:hover {
+	border-color: var(--border-strong);
+}
+
+.String,
+.Textarea {
+	width: 100%;
+	padding: 0 var(--space-2);
+	height: var(--input-height);
+	background: var(--bg-tertiary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-base);
+	color: var(--text-primary);
+	font-size: var(--font-size-sm);
+	outline: none;
+}
+
+.String:focus,
+.Textarea:focus {
+	border-color: var(--border-focus);
+	background: var(--bg-elevated);
+}
+
+.String:hover,
+.Textarea:hover {
+	border-color: var(--border-strong);
+}
+
+.Checkbox {
+	width: 14px;
+	height: 14px;
+	cursor: pointer;
+	accent-color: var(--accent-primary);
+}
+
+.Color {
+	width: 28px;
+	height: 28px;
+	background: none;
+	border: none;
+	border-radius: 100%;
+	cursor: pointer;
+}
+
+.Color:hover {
+	border-color: var(--border-strong);
+}
+
+.Select {
+	padding: 0 var(--space-2);
+	height: var(--input-height);
+	background: var(--bg-tertiary);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-base);
+	color: var(--text-primary);
+	font-size: var(--font-size-sm);
+	outline: none;
+	cursor: pointer;
+}
+
+.Select:focus {
+	border-color: var(--border-focus);
+}
+
+.Select:hover {
+	border-color: var(--border-strong);
+	background: var(--bg-elevated);
+}
+
+.Button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--space-2);
+	padding: 0 var(--space-3);
+	height: var(--button-height-base);
+	background: var(--bg-elevated);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-base);
+	color: var(--text-primary);
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	cursor: pointer;
+	user-select: none;
+}
+
+.Button:hover {
+	background: var(--bg-hover);
+	border-color: var(--border-strong);
+}
+
+.Button:active {
+	background: var(--bg-active);
+}
+
+.Button.selected {
+	background: var(--accent-primary);
+	border-color: var(--accent-primary);
+	color: white;
+}
+
+.Button img {
+	width: 16px;
+	height: 16px;
+	filter: brightness(0.8);
+}
+
+.Button.selected img {
+	filter: brightness(1) invert(1);
+}
+
+.Outliner {
+	flex: 1;
+	overflow-y: auto;
+	padding: var(--space-1);
+}
+
+.Outliner option {
+	padding: var(--space-1) var(--space-2);
+	cursor: pointer;
+}
+
+.ListItem {
+	padding: var(--space-2);
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+	transition: background var(--transition-fast);
+}
+
+.ListItem:hover {
+	background: var(--bg-elevated);
+}
+
+.ListItem.selected {
+	background: var(--accent-primary);
+	color: white;
+}
+
+.Break {
+	height: 1px;
+	background: var(--border-subtle);
+	margin: var(--space-2) 0;
+}
+
+.HorizontalRule {
+	height: 1px;
+	background: var(--border-subtle);
+	margin: var(--space-4) 0;
+	border: none;
+}
+
+.TabbedPanel {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+}
+
+.Tabs {
+	display: flex;
+	background: var(--bg-tertiary);
+	border-bottom: 1px solid var(--border-subtle);
+	overflow-x: auto;
+}
+
+.Tabs::-webkit-scrollbar {
+	height: 0;
+}
+
+.Tab {
+	padding: var(--space-2) var(--space-4);
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	cursor: pointer;
+	border-bottom: 2px solid transparent;
+	transition: all var(--transition-base);
+	user-select: none;
+	white-space: nowrap;
+}
+
+.Tab:hover {
+	color: var(--text-primary);
+	background: var(--bg-elevated);
+}
+
+.Tab.selected {
+	color: var(--text-primary);
+	border-bottom-color: var(--accent-primary);
+	background: var(--bg-secondary);
+}
+
+.Panels {
+	flex: 1;
+	overflow-y: auto;
+	position: relative;
+}
+
+.Panels > div[id] {
+	display: none !important;
+}
+
+.Panels > div[id].TabPanel,
+.Panels > div[id][style*="display: block"] {
+	display: block !important;
+}
+
+.CollapsiblePanel {
+	border-bottom: 1px solid var(--border-subtle);
+}
+
+.CollapsiblePanel[hidden] {
+	display: none !important;
+}
+
+.CollapsiblePanelHeader {
+	display: flex;
+	align-items: center;
+	padding: var(--space-2) var(--space-3);
+	background: var(--bg-tertiary);
+	cursor: pointer;
+	user-select: none;
+	transition: background var(--transition-base);
+}
+
+.CollapsiblePanelHeader:hover {
+	background: var(--bg-elevated);
+}
+
+.CollapsiblePanelToggle {
+	margin-right: var(--space-2);
+	display: inline-block;
+	transition: transform 0.2s;
+	color: var(--text-tertiary);
+	font-size: 10px;
+}
+
+.CollapsiblePanelContent {
+	display: block;
+	padding: var(--space-3);
+}
+
+.Label {
+	font-size: var(--font-size-sm);
+	font-weight: var(--font-weight-medium);
+	color: var(--text-secondary);
+}
+
+#properties .Label {
+	padding-left: var(--space-2);
+}
+
+#properties {
+	height: 100%;
+	overflow: hidden;
+}
+
+#assets-container {
+	height: 100%;
+	display: flex;
+	flex-direction: column;
+}

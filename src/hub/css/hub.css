@@ -223,6 +223,10 @@ body {
 	padding: 40px;
 }
 
+#projects-loading.loading-hidden {
+	display: none;
+}
+
 #projects-table {
 	width: 100%;
 	border-collapse: collapse;
@@ -476,4 +480,145 @@ body {
 .empty-state-text {
 	font-size: 14px;
 	margin-bottom: 24px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	z-index: 10000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+/* Dialog */
+.dialog {
+	background: #252526;
+	border: 1px solid #3e3e42;
+	border-radius: 4px;
+	padding: 20px;
+	min-width: 300px;
+	max-width: 500px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.dialog-error {
+	border-color: #c72e2e;
+}
+
+/* Dialog Title */
+.dialog-title {
+	font-size: 16px;
+	font-weight: 600;
+	color: #cccccc;
+	margin-bottom: 12px;
+}
+
+.dialog-title-error {
+	color: #c72e2e;
+}
+
+/* Dialog Message */
+.dialog-message {
+	color: #cccccc;
+	margin-bottom: 20px;
+	line-height: 1.5;
+}
+
+/* Dialog Buttons Container */
+.dialog-buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+/* Dialog Button */
+.dialog-btn {
+	padding: 6px 16px;
+	border: none;
+	color: #ffffff;
+	cursor: pointer;
+	border-radius: 2px;
+	transition: background 0.2s;
+}
+
+.dialog-btn-cancel {
+	background: transparent;
+	border: 1px solid #3e3e42;
+	color: #cccccc;
+}
+
+.dialog-btn-cancel:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+.dialog-btn-delete {
+	background: #c72e2e;
+}
+
+.dialog-btn-delete:hover {
+	background: #d73a3a;
+}
+
+.dialog-btn-ok {
+	background: #007acc;
+	float: right;
+}
+
+.dialog-btn-ok:hover {
+	background: #0086d1;
+}
+
+/* Context Menu */
+.context-menu {
+	position: fixed;
+	background: #252526;
+	border: 1px solid #3e3e42;
+	border-radius: 4px;
+	padding: 4px;
+	z-index: 1000;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+	min-width: 120px;
+}
+
+.context-menu-btn {
+	display: block;
+	width: 100%;
+	padding: 8px 16px;
+	background: transparent;
+	border: none;
+	color: #cccccc;
+	text-align: left;
+	cursor: pointer;
+	font-size: 13px;
+	transition: background 0.2s;
+}
+
+.context-menu-btn:hover {
+	background: rgba(255, 255, 255, 0.1);
+}
+
+/* Table Row Hidden */
+.table-row-hidden {
+	display: none;
+}
+
+/* Loading/Table Display */
+.loading-hidden {
+	display: none;
+}
+
+.table-visible {
+	display: table;
+}
+
+/* Icon Colors */
+.icon-muted {
+	color: #858585;
+	cursor: pointer;
 }

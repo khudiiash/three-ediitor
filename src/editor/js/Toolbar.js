@@ -15,7 +15,7 @@ function Toolbar( editor ) {
 	translateIcon.src = 'images/translate.svg';
 
 	const translate = new UIButton();
-	translate.dom.className = 'Button selected';
+	translate.addClass( 'toolbar-button selected' );
 	translate.dom.appendChild( translateIcon );
 	translate.onClick( function () {
 
@@ -29,6 +29,7 @@ function Toolbar( editor ) {
 	rotateIcon.src = 'images/rotate.svg';
 
 	const rotate = new UIButton();
+	rotate.addClass( 'toolbar-button' );
 	rotate.dom.appendChild( rotateIcon );
 	rotate.onClick( function () {
 
@@ -42,6 +43,7 @@ function Toolbar( editor ) {
 	scaleIcon.src = 'images/scale.svg';
 
 	const scale = new UIButton();
+	scale.addClass( 'toolbar-button' );
 	scale.dom.appendChild( scaleIcon );
 	scale.onClick( function () {
 
@@ -80,11 +82,8 @@ function Toolbar( editor ) {
 	
 	let isPlaying = false;
 	const playButton = new UIButton( '▶' );
+	playButton.addClass( 'toolbar-button' );
 	playButton.dom.title = strings.getKey( 'sidebar/project/app/play' ) || 'Play';
-	playButton.dom.style.width = '24px';
-	playButton.dom.style.height = '24px';
-	playButton.dom.style.fontSize = '12px';
-	playButton.dom.style.marginLeft = '8px';
 	playButton.onClick( function () {
 
 		if ( isPlaying === false ) {

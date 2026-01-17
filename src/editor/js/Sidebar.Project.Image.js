@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { UIBreak, UIButton, UIInteger, UIPanel, UIRow, UISelect, UIText } from './libs/ui.js';
+import { UIBreak, UIButton, UIDiv, UIInteger, UIPanel, UIRow, UISelect, UIText } from './libs/ui.js';
 
 import { ViewportPathtracer } from './Viewport.Pathtracer.js';
 
@@ -14,7 +14,7 @@ function SidebarProjectImage( editor ) {
 	
 
 	container.add( new UIText( strings.getKey( 'sidebar/project/image' ) ).setTextTransform( 'uppercase' ) );
-	container.add( new UIBreak(), new UIBreak() );
+	container.add( new UIBreak());
 
 	
 
@@ -54,13 +54,14 @@ function SidebarProjectImage( editor ) {
 
 	resolutionRow.add( new UIText( strings.getKey( 'sidebar/project/resolution' ) ).setClass( 'Label' ) );
 
+	const resolutionInputsContainer = new UIDiv();
+	resolutionInputsContainer.addClass( 'input-group' );
 	const imageWidth = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' );
-	resolutionRow.add( imageWidth );
-
-	resolutionRow.add( new UIText( '×' ).setTextAlign( 'center' ).setFontSize( '12px' ).setWidth( '12px' ) );
-
+	resolutionInputsContainer.add( imageWidth );
+	resolutionInputsContainer.add( new UIText( '×' ).setTextAlign( 'center' ).setFontSize( '12px' ).setWidth( '12px' ) );
 	const imageHeight = new UIInteger( 1024 ).setTextAlign( 'center' ).setWidth( '64px' );
-	resolutionRow.add( imageHeight );
+	resolutionInputsContainer.add( imageHeight );
+	resolutionRow.add( resolutionInputsContainer );
 
 	
 

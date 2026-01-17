@@ -8,6 +8,19 @@ export class ProjectLoader {
             return decodeURIComponent(projectPath);
         }
         
+        // Check window.__editorProjectPath (set by editor in play mode)
+        if (typeof window !== 'undefined' && (window as any).__editorProjectPath) {
+            return (window as any).__editorProjectPath;
+        }
+        
+        // Check sessionStorage (set by Tauri when opening project)
+        if (typeof sessionStorage !== 'undefined') {
+            const sessionPath = sessionStorage.getItem('editor_project_path');
+            if (sessionPath) {
+                return sessionPath;
+            }
+        }
+        
         const storedPath = localStorage.getItem('projectPath');
         if (storedPath) {
             return storedPath;
@@ -22,7 +35,8 @@ export class ProjectLoader {
         }
 
         const projectName = projectPath.split(/[/\\]/).pop();
-        const apiPath = `/api/projects/${projectName}/scene.json`;
+        const encodedProjectName = encodeURIComponent(projectName || '');
+        const apiPath = `/api/projects/${encodedProjectName}/scene.json`;
         
         try {
             const response = await fetch(apiPath);
@@ -51,7 +65,9 @@ export class ProjectLoader {
         }
 
         const projectName = projectPath.split(/[/\\]/).pop();
-        const apiPath = `/api/projects/${projectName}/assets/${assetPath}`;
+        const encodedProjectName = encodeURIComponent(projectName || '');
+        const encodedAssetPath = encodeURIComponent(assetPath);
+        const apiPath = `/api/projects/${encodedProjectName}/assets/${encodedAssetPath}`;
         
         try {
             const response = await fetch(apiPath);

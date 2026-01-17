@@ -94,7 +94,12 @@ class UITexture extends UISpan {
 			if ( assetData ) {
 				try {
 					const asset = JSON.parse( assetData );
-					if ( asset.type === 'texture' ) {
+					// Check if it's a texture asset or a file that looks like a texture
+					const isTextureAsset = asset.type === 'texture' || 
+					                      ( asset.type === 'file' && asset.name && 
+					                        [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ]
+					                          .includes( asset.name.split( '.' ).pop()?.toLowerCase() ) );
+					if ( isTextureAsset ) {
 						// Load texture from asset path
 						loadTextureFromAsset( asset );
 						return;
@@ -553,20 +558,40 @@ class UIOutliner extends UIDiv {
 
 			if ( this === currentDrag ) return;
 
+			const hasSceneTreeItem = this.classList.contains( 'scene-tree-item' );
+			const treeIndent = this.style.getPropertyValue( '--tree-indent' );
+
 			const area = event.offsetY / this.clientHeight;
+
+			this.classList.remove( 'dragTop', 'dragBottom', 'drag' );
 
 			if ( area < 0.25 ) {
 
-				this.className = 'option dragTop';
+				this.classList.add( 'dragTop' );
 
 			} else if ( area > 0.75 ) {
 
-				this.className = 'option dragBottom';
+				this.classList.add( 'dragBottom' );
 
 			} else {
 
-				this.className = 'option drag';
+				this.classList.add( 'drag' );
 
+			}
+
+			// Ensure scene-tree-item class is preserved
+			if ( hasSceneTreeItem && !this.classList.contains( 'scene-tree-item' ) ) {
+				this.classList.add( 'scene-tree-item' );
+			}
+
+			// Ensure option class is present
+			if ( !this.classList.contains( 'option' ) ) {
+				this.classList.add( 'option' );
+			}
+
+			// Restore tree indent if it was set
+			if ( treeIndent ) {
+				this.style.setProperty( '--tree-indent', treeIndent );
 			}
 
 		}
@@ -575,7 +600,27 @@ class UIOutliner extends UIDiv {
 
 			if ( this === currentDrag ) return;
 
-			this.className = 'option';
+			// Preserve existing classes and styles
+			const hasSceneTreeItem = this.classList.contains( 'scene-tree-item' );
+			const treeIndent = this.style.getPropertyValue( '--tree-indent' );
+
+			// Remove drag classes
+			this.classList.remove( 'dragTop', 'dragBottom', 'drag' );
+
+			// Ensure scene-tree-item class is preserved
+			if ( hasSceneTreeItem && !this.classList.contains( 'scene-tree-item' ) ) {
+				this.classList.add( 'scene-tree-item' );
+			}
+
+			// Ensure option class is present
+			if ( !this.classList.contains( 'option' ) ) {
+				this.classList.add( 'option' );
+			}
+
+			// Restore tree indent if it was set
+			if ( treeIndent ) {
+				this.style.setProperty( '--tree-indent', treeIndent );
+			}
 
 		}
 
@@ -583,7 +628,27 @@ class UIOutliner extends UIDiv {
 
 			if ( this === currentDrag || currentDrag === undefined ) return;
 
-			this.className = 'option';
+			// Preserve existing classes and styles
+			const hasSceneTreeItem = this.classList.contains( 'scene-tree-item' );
+			const treeIndent = this.style.getPropertyValue( '--tree-indent' );
+
+			// Remove drag classes
+			this.classList.remove( 'dragTop', 'dragBottom', 'drag' );
+
+			// Ensure scene-tree-item class is preserved
+			if ( hasSceneTreeItem && !this.classList.contains( 'scene-tree-item' ) ) {
+				this.classList.add( 'scene-tree-item' );
+			}
+
+			// Ensure option class is present
+			if ( !this.classList.contains( 'option' ) ) {
+				this.classList.add( 'option' );
+			}
+
+			// Restore tree indent if it was set
+			if ( treeIndent ) {
+				this.style.setProperty( '--tree-indent', treeIndent );
+			}
 
 			const scene = scope.scene;
 			const object = scene.getObjectById( currentDrag.value );
@@ -653,7 +718,10 @@ class UIOutliner extends UIDiv {
 		for ( let i = 0; i < options.length; i ++ ) {
 
 			const div = options[ i ];
-			div.className = 'option';
+			// Preserve existing classes (like 'scene-tree-item') and add 'option'
+			if ( !div.classList.contains( 'option' ) ) {
+				div.classList.add( 'option' );
+			}
 			scope.dom.appendChild( div );
 
 			scope.options.push( div );
@@ -693,6 +761,7 @@ class UIOutliner extends UIDiv {
 			if ( element.value === value ) {
 
 				element.classList.add( 'active' );
+				element.classList.add( 'selected' );
 
 				// scroll into view
 
@@ -715,6 +784,7 @@ class UIOutliner extends UIDiv {
 			} else {
 
 				element.classList.remove( 'active' );
+				element.classList.remove( 'selected' );
 
 			}
 

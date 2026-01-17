@@ -93,6 +93,11 @@ function Config( storage ) {
 							projectStorage[ key ] = data.settings[ key ];
 						}
 					}
+					
+					if ( data.settings.appearance && data.settings.appearance.accentColor ) {
+						const accentColor = data.settings.appearance.accentColor;
+						document.documentElement.style.setProperty( '--accent-primary', accentColor.startsWith( '#' ) ? accentColor : '#' + accentColor );
+					}
 				}
 			}
 		} catch ( error ) {

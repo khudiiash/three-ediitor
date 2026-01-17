@@ -34,8 +34,8 @@ function SidebarProjectApp( editor ) {
 	container.add( titleRow );
 
 	const publishButton = new UIButton( strings.getKey( 'sidebar/project/app/publish' ) );
-	publishButton.setWidth( '170px' );
-	publishButton.setMarginLeft( '120px' );
+	publishButton.setWidth( '160px' );
+	publishButton.setMarginLeft( '90px' );
 	publishButton.setMarginBottom( '10px' );
 	publishButton.onClick( async function () {
 
@@ -109,7 +109,6 @@ function SidebarProjectApp( editor ) {
 
 		async function writeBuildFiles() {
 			try {
-				console.log( '[Publish] Writing build files to project/build folder...' );
 				
 				for ( const filePath in buildFiles ) {
 					const content = buildFiles[ filePath ];
@@ -122,10 +121,10 @@ function SidebarProjectApp( editor ) {
 						filePath: filePath,
 						content: bytes
 					} );
-					console.log( '[Publish] Written:', filePath );
 				}
 				
-				console.log( '[Publish] Build complete! Files saved to project/build folder' );
+				await invoke( 'copy_assets_to_build', { projectPath: projectPath } );
+				
 				alert( 'Build published successfully to project/build folder!' );
 			} catch ( error ) {
 				console.error( '[Publish] Failed to write build files:', error );
@@ -155,45 +154,50 @@ function SidebarProjectApp( editor ) {
 		checkComplete();
 
 		const title = config.getKey( 'project/title' );
+		
+		invoke( 'read_editor_template_file', { filePath: 'js/libs/app/index.html' } )
+			.then( function ( content ) {
+				content = content.replace( /<script[^>]*src=["']\/@vite\/client["'][^>]*><\/script>\s*/gi, '' );
+				content = content.replace( /<script[^>]*src=["'][^"']*html-proxy[^"']*["'][^>]*><\/script>\s*/gi, '' );
+				
+				content = content.replace( '<!-- title -->', title );
+				let editButton = '';
+				content = content.replace( '\t\t\t/* edit button */', editButton );
+				buildFiles[ 'index.html' ] = content;
+				checkComplete();
+			} )
+			.catch( function ( error ) {
+				console.error( '[Publish] Failed to load HTML template:', error );
+				checkComplete();
+			} );
+		
 		const loader = new THREE.FileLoader();
-		
-		loader.load( 'js/libs/app/index.html', function ( content ) {
-			content = content.replace( '<!-- title -->', title );
-			let editButton = '';
-			content = content.replace( '\t\t\t/* edit button */', editButton );
-			buildFiles[ 'index.html' ] = content;
-			checkComplete();
-		} );
-		
 		loader.load( 'js/libs/app.js', function ( content ) {
 			buildFiles[ 'js/app.js' ] = content;
 			checkComplete();
 		} );
 		
-		fetch( './build/three.core.min.js' )
-			.then( response => {
-				if ( ! response.ok ) throw new Error( `HTTP ${response.status}` );
-				return response.text();
-			} )
-			.then( content => {
+		// Read files directly from filesystem to avoid Vite transformations
+		invoke( 'read_editor_template_file', { filePath: 'build/three.core.min.js' } )
+			.then( function ( content ) {
 				buildFiles[ 'js/three.core.min.js' ] = content;
 				checkComplete();
 			} )
-			.catch( error => {
+			.catch( function ( error ) {
 				console.error( '[Publish] Failed to load three.core.min.js:', error );
 				checkComplete();
 			} );
 		
-		fetch( './build/three.module.min.js' )
-			.then( response => {
-				if ( ! response.ok ) throw new Error( `HTTP ${response.status}` );
-				return response.text();
-			} )
-			.then( content => {
+		invoke( 'read_editor_template_file', { filePath: 'build/three.module.min.js' } )
+			.then( function ( content ) {
+				// Fix absolute import path to relative path
+				// Replace from "/editor/build/three.core.min.js" with from "./three.core.min.js"
+				content = content.replace( /from\s+["']\/editor\/build\/three\.core\.min\.js["']/g, 'from "./three.core.min.js"' );
+				content = content.replace( /from\s+["']editor\/build\/three\.core\.min\.js["']/g, 'from "./three.core.min.js"' );
 				buildFiles[ 'js/three.module.min.js' ] = content;
 				checkComplete();
 			} )
-			.catch( error => {
+			.catch( function ( error ) {
 				console.error( '[Publish] Failed to load three.module.min.js:', error );
 				checkComplete();
 			} );
@@ -204,6 +208,10 @@ function SidebarProjectApp( editor ) {
 				return response.text();
 			} )
 			.then( content => {
+				// Fix Vite dependency paths to use importmap
+				// Replace .vite/deps/three.js with bare import 'three' (will be resolved by importmap)
+				content = content.replace( /from\s+["']\.vite\/deps\/three\.js[^"']*["']/gi, 'from "three"' );
+				content = content.replace( /from\s+["']\/\.vite\/deps\/three\.js[^"']*["']/gi, 'from "three"' );
 				buildFiles[ 'js/three-engine.js' ] = content;
 				checkComplete();
 			} )
@@ -211,8 +219,6 @@ function SidebarProjectApp( editor ) {
 				console.error( '[Publish] Failed to load three-engine.js:', error );
 				checkComplete();
 			} );
-
-		console.log(buildFiles);
 
 	} );
 	container.add( publishButton );

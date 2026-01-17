@@ -14,11 +14,13 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 	const container = new UIRow();
 	container.add( new UIText( name ).setClass( 'Label' ) );
 
+	const mapInputsContainer = new UIDiv();
+	mapInputsContainer.addClass( 'input-group' );
 	const enabled = new UICheckbox( false ).setMarginRight( '8px' ).onChange( onChange );
-	container.add( enabled );
-
+	mapInputsContainer.add( enabled );
 	const map = new UITexture( editor ).onChange( onMapChange );
-	container.add( map );
+	mapInputsContainer.add( map );
+	container.add( mapInputsContainer );
 
 	const mapType = property.replace( 'Map', '' );
 
@@ -29,7 +31,7 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 	if ( property === 'aoMap' ) {
 
 		intensity = new UINumber( 1 ).setRange( 0, 1 ).onChange( onIntensityChange );
-		container.add( intensity );
+		mapInputsContainer.add( intensity );
 
 	}
 
@@ -38,7 +40,7 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 	if ( property === 'bumpMap' || property === 'displacementMap' ) {
 
 		scale = new UINumber().onChange( onScaleChange );
-		container.add( scale );
+		mapInputsContainer.add( scale );
 
 	}
 
@@ -47,10 +49,10 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 	if ( property === 'normalMap' || property === 'clearcoatNormalMap' ) {
 
 		scaleX = new UINumber().onChange( onScaleXYChange );
-		container.add( scaleX );
+		mapInputsContainer.add( scaleX );
 
 		scaleY = new UINumber().onChange( onScaleXYChange );
-		container.add( scaleY );
+		mapInputsContainer.add( scaleY );
 
 	}
 
@@ -59,7 +61,7 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 	if ( property === 'iridescenceThicknessMap' ) {
 
 		const range = new UIDiv().setMarginLeft( '3px' );
-		container.add( range );
+		mapInputsContainer.add( range );
 
 		const rangeMinRow = new UIRow().setMarginBottom( '0px' ).setStyle( 'min-height', '0px' );
 		range.add( rangeMinRow );
@@ -121,9 +123,14 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 
 			}
 
-		}
+			enabled.setValue( true );
+			enabled.setDisabled( false );
 
-		enabled.setDisabled( false );
+		} else {
+
+			enabled.setDisabled( true );
+
+		}
 
 		onChange();
 

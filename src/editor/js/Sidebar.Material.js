@@ -53,6 +53,95 @@ function SidebarMaterial( editor ) {
 	const materialSelectorRow = new UIRow();
 	const materialSelectorButton = new UIButton( 'Select Material...' ).setWidth( '150px' );
 
+	// Add drag and drop support
+	materialSelectorButton.dom.addEventListener( 'dragover', function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		materialSelectorButton.dom.style.opacity = '0.7';
+	} );
+
+	materialSelectorButton.dom.addEventListener( 'dragleave', function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		materialSelectorButton.dom.style.opacity = '1';
+	} );
+
+	materialSelectorButton.dom.addEventListener( 'drop', async function ( event ) {
+		event.preventDefault();
+		event.stopPropagation();
+		materialSelectorButton.dom.style.opacity = '1';
+
+		const assetData = event.dataTransfer.getData( 'text/plain' );
+		if ( assetData ) {
+			try {
+				const asset = JSON.parse( assetData );
+				// Check if it's a material or texture asset (including file type with material/texture extension)
+				const isMaterialAsset = asset.type === 'material' || 
+				                       ( asset.type === 'file' && asset.name && asset.name.endsWith( '.material' ) );
+				const isTextureAsset = asset.type === 'texture' || 
+				                     ( asset.type === 'file' && asset.name && 
+				                       [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ]
+				                         .includes( asset.name.split( '.' ).pop()?.toLowerCase() ) );
+				
+				if ( isMaterialAsset || isTextureAsset ) {
+					// Handle material/texture drop
+					if ( ! currentObject ) {
+						alert( 'Please select an object first' );
+						return;
+					}
+
+					if ( ! editor.assetSelector ) {
+						editor.assetSelector = new AssetSelector( editor );
+					}
+
+					// Use AssetSelector's selectMaterial or selectTexture method
+					if ( isMaterialAsset ) {
+						await editor.assetSelector.selectMaterial( asset, async function ( material ) {
+							if ( material ) {
+								const object = currentObject;
+								if ( object ) {
+									const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
+									if ( oldMaterial ) {
+										editor.removeMaterial( oldMaterial );
+									}
+									editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + material.type );
+									editor.addMaterial( material );
+									refreshUI();
+								}
+							}
+						} );
+					} else if ( isTextureAsset ) {
+						// If it's a texture, we need to create a material with that texture
+						await editor.assetSelector.selectTexture( asset, async function ( texture ) {
+							if ( texture ) {
+								const object = currentObject;
+								if ( object && object.material ) {
+									// Create a new material with the texture
+									const materialType = object.material.type;
+									const MaterialClass = THREE[ materialType ] || THREE.MeshStandardMaterial;
+									const newMaterial = new MaterialClass();
+									newMaterial.map = texture;
+									newMaterial.name = object.material.name || 'Material';
+									
+									const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
+									if ( oldMaterial ) {
+										editor.removeMaterial( oldMaterial );
+									}
+									editor.execute( new SetMaterialCommand( editor, object, newMaterial, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + newMaterial.type );
+									editor.addMaterial( newMaterial );
+									refreshUI();
+								}
+							}
+						} );
+					}
+					return;
+				}
+			} catch ( e ) {
+				// Not JSON, continue with button click handler
+			}
+		}
+	} );
+
 	materialSelectorButton.onClick( function () {
 		if ( ! currentObject ) {
 			alert( 'Please select an object first' );

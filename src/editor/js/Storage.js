@@ -80,13 +80,21 @@ function Storage() {
 					
 					if ( errorMessage && errorMessage.includes( 'File not found' ) ) {
 						callback( undefined );
-					} else if ( errorMessage && errorMessage.includes( 'JSON' ) ) {
-						console.error( 'Scene file contains invalid JSON. The file may be corrupted.' );
-						callback( undefined );
 					} else {
-						console.warn( 'Failed to load scene from file:', error );
-						console.warn( 'Error details:', errorMessage );
-						callback( undefined );
+						const errorInfo = {
+							error: true,
+							message: errorMessage,
+							isJsonError: errorMessage && errorMessage.includes( 'JSON' )
+						};
+						
+						if ( errorInfo.isJsonError ) {
+							console.error( 'Scene file contains invalid JSON. The file may be corrupted.' );
+						} else {
+							console.warn( 'Failed to load scene from file:', error );
+							console.warn( 'Error details:', errorMessage );
+						}
+						
+						callback( errorInfo );
 					}
 				}
 

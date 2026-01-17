@@ -88,7 +88,7 @@ function MenubarAdd( editor ) {
 	} );
 	options.add( meshSubmenuTitle );
 
-	const meshSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
+	const meshSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options submenu' ).setDisplay( 'none' );
 	meshSubmenuTitle.add( meshSubmenu );
 	
 	meshSubmenu.onMouseOver( function () {
@@ -427,7 +427,7 @@ function MenubarAdd( editor ) {
 	} );
 	options.add( lightSubmenuTitle );
 
-	const lightSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
+	const lightSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options submenu' ).setDisplay( 'none' );
 	lightSubmenuTitle.add( lightSubmenu );
 	
 	lightSubmenu.onMouseOver( function () {
@@ -606,7 +606,7 @@ function MenubarAdd( editor ) {
 	} );
 	options.add( cameraSubmenuTitle );
 
-	const cameraSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options' ).setDisplay( 'none' );
+	const cameraSubmenu = new UIPanel().setPosition( 'fixed' ).addClass( 'options submenu' ).setDisplay( 'none' );
 	cameraSubmenuTitle.add( cameraSubmenu );
 	
 	cameraSubmenu.onMouseOver( function () {

@@ -125,8 +125,8 @@ function renderProjects() {
 		setupEventListeners();
 		
 		if (projects.length === 0) {
-			actualLoading.style.display = 'none';
-			actualTable.style.display = 'none';
+			actualLoading.classList.add( 'loading-hidden' );
+			actualTable.classList.remove( 'table-visible' );
 			container.innerHTML = `
 				<div class="empty-state">
 					<div class="empty-state-icon">📁</div>
@@ -136,16 +136,17 @@ function renderProjects() {
 			return;
 		}
 		
-		actualLoading.style.display = 'none';
-		actualTable.style.display = 'table';
+		actualLoading.classList.add( 'loading-hidden' );
+		actualTable.style.display = '';
+		actualTable.classList.add( 'table-visible' );
 		
 		renderProjectsTable(actualTable, actualTbody);
 		return;
 	}
 	
 	if (projects.length === 0) {
-		loading.style.display = 'none';
-		table.style.display = 'none';
+		loading.classList.add( 'loading-hidden' );
+		table.classList.remove( 'table-visible' );
 		container.innerHTML = `
 			<div class="empty-state">
 				<div class="empty-state-icon">📁</div>
@@ -155,8 +156,9 @@ function renderProjects() {
 		return;
 	}
 
-	loading.style.display = 'none';
-	table.style.display = 'table';
+	loading.classList.add( 'loading-hidden' );
+	table.style.display = '';
+	table.classList.add( 'table-visible' );
 	
 	renderProjectsTable(table, tbody);
 }
@@ -181,7 +183,7 @@ function renderProjectsTable(table, tbody) {
 		return `
 		<tr id="${rowId}" data-path="${escapeHtml(project.path)}">
 			<td class="col-favorite">
-				<span style="color: #858585; cursor: pointer;">☆</span>
+				<span class="icon-muted">☆</span>
 			</td>
 			<td class="col-link">
 				<span style="color: #858585;">🔗</span>
@@ -263,7 +265,11 @@ function filterProjects(query) {
 		const name = row.querySelector('.col-name').textContent.toLowerCase();
 		const path = row.querySelector('.col-path').textContent.toLowerCase();
 		const matches = name.includes(lowerQuery) || path.includes(lowerQuery);
-		row.style.display = matches ? '' : 'none';
+		if (matches) {
+			row.classList.remove( 'table-row-hidden' );
+		} else {
+			row.classList.add( 'table-row-hidden' );
+		}
 	});
 }
 
@@ -347,37 +353,33 @@ async function deleteProject(path) {
 function showDeleteConfirmModal() {
 	return new Promise((resolve) => {
 		const modal = document.createElement('div');
-		modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+		modal.className = 'modal-overlay';
 		
 		const dialog = document.createElement('div');
-		dialog.style.cssText = 'background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 20px; min-width: 300px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+		dialog.className = 'dialog';
 		
 		const title = document.createElement('div');
+		title.className = 'dialog-title';
 		title.textContent = 'Delete Project';
-		title.style.cssText = 'font-size: 16px; font-weight: 600; color: #cccccc; margin-bottom: 12px;';
 		
 		const message = document.createElement('div');
+		message.className = 'dialog-message';
 		message.textContent = 'Are you sure you want to delete this project? This action cannot be undone.';
-		message.style.cssText = 'color: #cccccc; margin-bottom: 20px; line-height: 1.5;';
 		
 		const buttons = document.createElement('div');
-		buttons.style.cssText = 'display: flex; gap: 8px; justify-content: flex-end;';
+		buttons.className = 'dialog-buttons';
 		
 		const cancelBtn = document.createElement('button');
+		cancelBtn.className = 'dialog-btn dialog-btn-cancel';
 		cancelBtn.textContent = 'Cancel';
-		cancelBtn.style.cssText = 'padding: 6px 16px; background: transparent; border: 1px solid #3e3e42; color: #cccccc; cursor: pointer; border-radius: 2px;';
-		cancelBtn.onmouseover = () => cancelBtn.style.background = 'rgba(255,255,255,0.1)';
-		cancelBtn.onmouseout = () => cancelBtn.style.background = 'transparent';
 		cancelBtn.onclick = () => {
 			document.body.removeChild(modal);
 			resolve(false);
 		};
 		
 		const deleteBtn = document.createElement('button');
+		deleteBtn.className = 'dialog-btn dialog-btn-delete';
 		deleteBtn.textContent = 'Delete';
-		deleteBtn.style.cssText = 'padding: 6px 16px; background: #c72e2e; border: none; color: #ffffff; cursor: pointer; border-radius: 2px;';
-		deleteBtn.onmouseover = () => deleteBtn.style.background = '#d73a3a';
-		deleteBtn.onmouseout = () => deleteBtn.style.background = '#c72e2e';
 		deleteBtn.onclick = () => {
 			document.body.removeChild(modal);
 			resolve(true);
@@ -414,15 +416,13 @@ function showProjectMenu(path, event) {
 	}
 	
 	const menu = document.createElement('div');
-	menu.style.cssText = 'position: fixed; background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); min-width: 120px;';
+	menu.className = 'context-menu';
 	menu.style.left = (event.clientX - 120) + 'px';
 	menu.style.top = event.clientY + 'px';
 	
 	const deleteBtn = document.createElement('button');
+	deleteBtn.className = 'context-menu-btn';
 	deleteBtn.textContent = 'Delete';
-	deleteBtn.style.cssText = 'display: block; width: 100%; padding: 8px 16px; background: transparent; border: none; color: #cccccc; text-align: left; cursor: pointer; font-size: 13px;';
-	deleteBtn.onmouseover = () => deleteBtn.style.background = 'rgba(255,255,255,0.1)';
-	deleteBtn.onmouseout = () => deleteBtn.style.background = 'transparent';
 	deleteBtn.onclick = (e) => {
 		e.stopPropagation();
 		if (menu.parentNode) {
@@ -476,24 +476,22 @@ function formatRelativeDate(timestamp) {
 
 function showError(message) {
 	const modal = document.createElement('div');
-	modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center;';
+	modal.className = 'modal-overlay';
 	
 	const dialog = document.createElement('div');
-	dialog.style.cssText = 'background: #252526; border: 1px solid #c72e2e; border-radius: 4px; padding: 20px; min-width: 300px; max-width: 500px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);';
+	dialog.className = 'dialog dialog-error';
 	
 	const title = document.createElement('div');
+	title.className = 'dialog-title dialog-title-error';
 	title.textContent = 'Error';
-	title.style.cssText = 'font-size: 16px; font-weight: 600; color: #c72e2e; margin-bottom: 12px;';
 	
 	const messageEl = document.createElement('div');
+	messageEl.className = 'dialog-message';
 	messageEl.textContent = message;
-	messageEl.style.cssText = 'color: #cccccc; margin-bottom: 20px; line-height: 1.5;';
 	
 	const button = document.createElement('button');
+	button.className = 'dialog-btn dialog-btn-ok';
 	button.textContent = 'OK';
-	button.style.cssText = 'padding: 6px 16px; background: #007acc; border: none; color: #ffffff; cursor: pointer; border-radius: 2px; float: right;';
-	button.onmouseover = () => button.style.background = '#0086d1';
-	button.onmouseout = () => button.style.background = '#007acc';
 	button.onclick = () => {
 		document.body.removeChild(modal);
 	};

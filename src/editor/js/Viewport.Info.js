@@ -7,29 +7,39 @@ function ViewportInfo( editor ) {
 
 	const container = new UIPanel();
 	container.setId( 'info' );
-	container.setPosition( 'absolute' );
-	container.setLeft( '10px' );
-	container.setBottom( '20px' );
-	container.setFontSize( '12px' );
-	container.setColor( '#fff' );
-	container.setTextTransform( 'lowercase' );
+	container.addClass( 'viewport-info' );
 
-	const objectsText = new UIText( '0' ).setTextAlign( 'right' ).setWidth( '60px' ).setMarginRight( '6px' );
-	const verticesText = new UIText( '0' ).setTextAlign( 'right' ).setWidth( '60px' ).setMarginRight( '6px' );
-	const trianglesText = new UIText( '0' ).setTextAlign( 'right' ).setWidth( '60px' ).setMarginRight( '6px' );
-	const frametimeText = new UIText( '0' ).setTextAlign( 'right' ).setWidth( '60px' ).setMarginRight( '6px' );
-	const samplesText = new UIText( '0' ).setTextAlign( 'right' ).setWidth( '60px' ).setMarginRight( '6px' ).setHidden( true );
+	const header = new UIPanel();
+	header.addClass( 'viewport-info-header' );
+	const headerText = new UIText( 'Stats' );
+	header.add( headerText );
+	header.dom.addEventListener( 'click', function () {
+		container.dom.classList.toggle( 'collapsed' );
+	} );
+	container.add( header );
 
-	const objectsUnitText = new UIText( strings.getKey( 'viewport/info/objects' ) );
-	const verticesUnitText = new UIText( strings.getKey( 'viewport/info/vertices' ) );
-	const trianglesUnitText = new UIText( strings.getKey( 'viewport/info/triangles' ) );
-	const samplesUnitText = new UIText( strings.getKey( 'viewport/info/samples' ) ).setHidden( true );
+	const content = new UIPanel();
+	content.addClass( 'viewport-info-content' );
 
-	container.add( objectsText, objectsUnitText, new UIBreak() );
-	container.add( verticesText, verticesUnitText, new UIBreak() );
-	container.add( trianglesText, trianglesUnitText, new UIBreak() );
-	container.add( frametimeText, new UIText( strings.getKey( 'viewport/info/rendertime' ) ), new UIBreak() );
-	container.add( samplesText, samplesUnitText, new UIBreak() );
+	const objectsText = new UIText( '0' ).addClass( 'stat-value' );
+	const verticesText = new UIText( '0' ).addClass( 'stat-value' );
+	const trianglesText = new UIText( '0' ).addClass( 'stat-value' );
+	const frametimeText = new UIText( '0' ).addClass( 'stat-value' );
+	const samplesText = new UIText( '0' ).addClass( 'stat-value' ).setHidden( true );
+
+	const objectsUnitText = new UIText( strings.getKey( 'viewport/info/objects' ) ).addClass( 'stat-label' );
+	const verticesUnitText = new UIText( strings.getKey( 'viewport/info/vertices' ) ).addClass( 'stat-label' );
+	const trianglesUnitText = new UIText( strings.getKey( 'viewport/info/triangles' ) ).addClass( 'stat-label' );
+	const samplesUnitText = new UIText( strings.getKey( 'viewport/info/samples' ) ).addClass( 'stat-label' ).setHidden( true );
+	const frametimeLabelText = new UIText( strings.getKey( 'viewport/info/rendertime' ) ).addClass( 'stat-label' );
+
+	content.add( objectsUnitText,  objectsText );
+	content.add( verticesUnitText, verticesText );
+	content.add( trianglesUnitText, trianglesText );
+	content.add( frametimeLabelText, frametimeText );
+	content.add( samplesUnitText, samplesText );
+
+	container.add( content );
 
 	signals.objectAdded.add( update );
 	signals.objectRemoved.add( update );
@@ -107,13 +117,9 @@ function ViewportInfo( editor ) {
 
 	}
 
-	function updateFrametime( frametime ) {
-
-		frametimeText.setValue( Number( frametime ).toFixed( 2 ) );
-
+	function updateFrametime( frametimeInSeconds ) {
+		frametimeText.setValue( Number( frametimeInSeconds ).toFixed( 2 ) );
 	}
-
-	//
 
 	editor.signals.pathTracerUpdated.add( function ( samples ) {
 
@@ -133,7 +139,7 @@ function ViewportInfo( editor ) {
 		samplesText.setHidden( ! isRealisticShading );
 		samplesUnitText.setHidden( ! isRealisticShading );
 
-		container.setBottom( isRealisticShading ? '32px' : '20px' );
+		container.setBottom( isRealisticShading ? '32px' : '5px' );
 
 	} );
 

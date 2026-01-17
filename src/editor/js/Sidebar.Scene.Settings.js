@@ -5,7 +5,7 @@
 
 import * as THREE from 'three';
 
-import { UIPanel, UIRow, UIColor, UISelect, UIText, UINumber, UIBreak } from './libs/ui.js';
+import { UIPanel, UIRow, UIColor, UISelect, UIText, UINumber, UIBreak, UIDiv } from './libs/ui.js';
 import { UITexture } from './libs/ui.three.js';
 
 function SidebarSceneSettings( editor ) {
@@ -38,24 +38,28 @@ function SidebarSceneSettings( editor ) {
 	} );
 
 	backgroundRow.add( new UIText( strings.getKey( 'sidebar/scene/background' ) ).setClass( 'Label' ) );
-	backgroundRow.add( backgroundType );
+	
+	const backgroundInputsContainer = new UIDiv();
+	backgroundInputsContainer.addClass( 'input-group' );
+	backgroundInputsContainer.add( backgroundType );
+	
+	const backgroundColor = new UIColor().setValue( '#000000' ).onInput( onBackgroundChanged );
+	backgroundInputsContainer.add( backgroundColor );
 
-	const backgroundColor = new UIColor().setValue( '#000000' ).setMarginLeft( '8px' ).onInput( onBackgroundChanged );
-	backgroundRow.add( backgroundColor );
-
-	const backgroundTexture = new UITexture( editor ).setMarginLeft( '8px' ).onChange( onBackgroundChanged );
+	const backgroundTexture = new UITexture( editor ).onChange( onBackgroundChanged );
 	backgroundTexture.setDisplay( 'none' );
-	backgroundRow.add( backgroundTexture );
+	backgroundInputsContainer.add( backgroundTexture );
 
-	const backgroundEquirectangularTexture = new UITexture( editor ).setMarginLeft( '8px' ).onChange( onBackgroundChanged );
+	const backgroundEquirectangularTexture = new UITexture( editor ).onChange( onBackgroundChanged );
 	backgroundEquirectangularTexture.setDisplay( 'none' );
-	backgroundRow.add( backgroundEquirectangularTexture );
+	backgroundInputsContainer.add( backgroundEquirectangularTexture );
+	
+	backgroundRow.add( backgroundInputsContainer );
 
 	container.add( backgroundRow );
 
 	const backgroundColorSpaceRow = new UIRow();
 	backgroundColorSpaceRow.setDisplay( 'none' );
-	backgroundColorSpaceRow.setMarginLeft( '120px' );
 
 	const backgroundColorSpace = new UISelect().setOptions( {
 
@@ -66,22 +70,24 @@ function SidebarSceneSettings( editor ) {
 	} ).setWidth( '150px' );
 	backgroundColorSpace.setValue( THREE.NoColorSpace );
 	backgroundColorSpace.onChange( onBackgroundChanged );
+	backgroundColorSpaceRow.add( new UIText( 'Color Space' ).setClass( 'Label' ) );
 	backgroundColorSpaceRow.add( backgroundColorSpace );
 
 	container.add( backgroundColorSpaceRow );
 
 	const backgroundEquirectRow = new UIRow();
 	backgroundEquirectRow.setDisplay( 'none' );
-	backgroundEquirectRow.setMarginLeft( '120px' );
 
 	const backgroundBlurriness = new UINumber( 0 ).setWidth( '40px' ).setRange( 0, 1 ).onChange( onBackgroundChanged );
-	backgroundEquirectRow.add( backgroundBlurriness );
-
 	const backgroundIntensity = new UINumber( 1 ).setWidth( '40px' ).setRange( 0, Infinity ).onChange( onBackgroundChanged );
-	backgroundEquirectRow.add( backgroundIntensity );
-
 	const backgroundRotation = new UINumber( 0 ).setWidth( '40px' ).setRange( - 180, 180 ).setStep( 10 ).setNudge( 0.1 ).setUnit( '°' ).onChange( onBackgroundChanged );
-	backgroundEquirectRow.add( backgroundRotation );
+	
+	const backgroundEquirectInputsContainer = new UIDiv();
+	backgroundEquirectInputsContainer.addClass( 'input-group' );
+	backgroundEquirectInputsContainer.add( backgroundBlurriness, backgroundIntensity, backgroundRotation );
+	
+	backgroundEquirectRow.add( new UIText( 'Blur / Intensity / Rotation' ).setClass( 'Label' ) );
+	backgroundEquirectRow.add( backgroundEquirectInputsContainer );
 
 	container.add( backgroundEquirectRow );
 
@@ -147,11 +153,16 @@ function SidebarSceneSettings( editor ) {
 	} );
 
 	environmentRow.add( new UIText( strings.getKey( 'sidebar/scene/environment' ) ).setClass( 'Label' ) );
-	environmentRow.add( environmentType );
-
-	const environmentEquirectangularTexture = new UITexture( editor ).setMarginLeft( '8px' ).onChange( onEnvironmentChanged );
+	
+	const environmentInputsContainer = new UIDiv();
+	environmentInputsContainer.addClass( 'input-group' );
+	environmentInputsContainer.add( environmentType );
+	
+	const environmentEquirectangularTexture = new UITexture( editor ).onChange( onEnvironmentChanged );
 	environmentEquirectangularTexture.setDisplay( 'none' );
-	environmentRow.add( environmentEquirectangularTexture );
+	environmentInputsContainer.add( environmentEquirectangularTexture );
+	
+	environmentRow.add( environmentInputsContainer );
 
 	container.add( environmentRow );
 
@@ -199,33 +210,28 @@ function SidebarSceneSettings( editor ) {
 
 	container.add( fogTypeRow );
 
-	
-
-	const fogPropertiesRow = new UIRow();
-	fogPropertiesRow.setDisplay( 'none' );
-	fogPropertiesRow.setMarginLeft( '120px' );
-	container.add( fogPropertiesRow );
-
 	const fogColor = new UIColor().setValue( '#aaaaaa' );
 	fogColor.onInput( onFogSettingsChanged );
-	fogPropertiesRow.add( fogColor );
-
+	const fogNear = new UINumber( 0.1 ).setWidth( '50px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
+	const fogFar = new UINumber( 50 ).setWidth( '50px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
+	const fogDensity = new UINumber( 0.05 ).setWidth( '50px' ).setRange( 0, 0.1 ).setStep( 0.001 ).setPrecision( 3 ).onChange( onFogSettingsChanged );
 	
+	const fogColorRow = new UIRow().setStyle("margin-left: 8px");
+	const fogNearRow = new UIRow().setStyle("margin-left: 8px");
+	const fogFarRow = new UIRow().setStyle("margin-left: 8px");
+	const fogDensityRow = new UIRow().setStyle("margin-left: 8px");
 
-	const fogNear = new UINumber( 0.1 ).setWidth( '40px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
-	fogPropertiesRow.add( fogNear );
+	fogColorRow.add( new UIText( 'Fog Color' ).setClass( 'Label' ), fogColor);
+	fogNearRow.add( new UIText( 'Fog Near' ).setClass( 'Label' ), fogNear);
+	fogFarRow.add( new UIText( 'Fog Far' ).setClass( 'Label' ), fogFar);
+	fogDensityRow.add( new UIText( 'Fog Density' ).setClass( 'Label' ), fogDensity);
 
-	
+	container.add(fogColorRow)
+	container.add(fogFarRow)
+	container.add(fogNearRow)
+	container.add(fogDensityRow)
 
-	const fogFar = new UINumber( 50 ).setWidth( '40px' ).setRange( 0, Infinity ).onChange( onFogSettingsChanged );
-	fogPropertiesRow.add( fogFar );
-
-	
-
-	const fogDensity = new UINumber( 0.05 ).setWidth( '40px' ).setRange( 0, 0.1 ).setStep( 0.001 ).setPrecision( 3 ).onChange( onFogSettingsChanged );
-	fogPropertiesRow.add( fogDensity );
-
-	//
+	refreshFogUI()
 
 	function onFogChanged() {
 
@@ -254,7 +260,10 @@ function SidebarSceneSettings( editor ) {
 	function refreshFogUI() {
 
 		const type = fogType.getValue();
-		fogPropertiesRow.setDisplay( type === 'None' ? 'none' : '' );
+		fogColorRow.setDisplay( type === 'None' ? 'none' : '' );
+		fogNearRow.setDisplay( type === 'None' ? 'none' : '' );
+		fogFarRow.setDisplay( type === 'None' ? 'none' : '' );
+		fogDensityRow.setDisplay( type === 'None' ? 'none' : '' );
 
 	}
 

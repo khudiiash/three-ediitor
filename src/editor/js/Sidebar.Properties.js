@@ -14,35 +14,22 @@ function SidebarProperties( editor ) {
 	container.setId( 'properties' );
 
 	const inspectorPanel = new UIPanel();
-	inspectorPanel.setBorderTop( '0' );
-	inspectorPanel.setPaddingTop( '4px' );
 
 	const objectPanels = new SidebarObject( editor );
 	const scriptPanel = new UICollapsiblePanel( 'Script' );
 	const scriptContent = new SidebarScript( editor );
 	scriptPanel.add( scriptContent );
 	scriptPanel.collapse();
-	
-	if ( scriptPanel.dom && scriptPanel.dom.style ) {
-		scriptPanel.dom.style.paddingLeft = '0px';
-		scriptPanel.dom.style.marginLeft = '0px';
-	}
 
 	inspectorPanel.add( objectPanels );
 	inspectorPanel.add( scriptPanel );
 
 	
 	const projectPanel = new UIPanel();
-	projectPanel.setBorderTop( '0' );
-	projectPanel.setPaddingTop( '20px' );
 	const projectContent = new SidebarProject( editor );
 	projectPanel.add( projectContent );
 
-	
 	const settingsPanel = new UIPanel();
-	settingsPanel.setBorderTop( '0' );
-	settingsPanel.setPaddingTop( '4px' );
-	
 	const editorSettingsContent = new SidebarSettings( editor );
 	settingsPanel.add( editorSettingsContent );
 

@@ -5,34 +5,43 @@ function UICollapsiblePanel( title ) {
 	const panel = new UIPanel();
 	panel.dom.className = 'Panel CollapsiblePanel';
 	let collapsed = false;
+	
+	const originalSetHidden = panel.setHidden.bind( panel );
+	panel.setHidden = function( isHidden ) {
+		originalSetHidden( isHidden );
+		if ( isHidden ) {
+			panel.dom.style.display = 'none';
+		} else {
+			panel.dom.style.display = '';
+		}
+		return panel;
+	};
 
 	const headerRow = new UIRow();
 	headerRow.dom.className = 'CollapsiblePanelHeader';
-	headerRow.dom.style.cursor = 'pointer';
-	headerRow.dom.style.userSelect = 'none';
 
 	const titleText = new UIText( title ).setClass( 'Label' );
-	titleText.dom.style.fontWeight = 'bold';
 
 	const toggleIcon = document.createElement( 'span' );
 	toggleIcon.className = 'CollapsiblePanelToggle';
 	toggleIcon.textContent = '▼';
-	toggleIcon.style.marginRight = '8px';
-	toggleIcon.style.display = 'inline-block';
-	toggleIcon.style.transition = 'transform 0.2s';
 
 	headerRow.dom.appendChild( toggleIcon );
 	headerRow.add( titleText );
 
 	const contentPanel = new UIPanel();
 	contentPanel.dom.className = 'CollapsiblePanelContent';
-	contentPanel.dom.style.display = 'block';
 
 	headerRow.dom.addEventListener( 'click', function () {
 
 		collapsed = ! collapsed;
-		contentPanel.dom.style.display = collapsed ? 'none' : 'block';
-		toggleIcon.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+		if (collapsed) {
+			contentPanel.dom.style.display = 'none';
+			toggleIcon.style.transform = 'rotate(-90deg)';
+		} else {
+			contentPanel.dom.style.display = 'block';
+			toggleIcon.style.transform = 'rotate(0deg)';
+		}
 
 	} );
 
@@ -43,20 +52,33 @@ function UICollapsiblePanel( title ) {
 	panel.toggle = function () {
 
 		collapsed = ! collapsed;
-		contentPanel.dom.style.display = collapsed ? 'none' : 'block';
-		toggleIcon.style.transform = collapsed ? 'rotate(-90deg)' : 'rotate(0deg)';
+		if (collapsed) {
+			contentPanel.dom.style.display = 'none';
+			toggleIcon.style.transform = 'rotate(-90deg)';
+		} else {
+			contentPanel.dom.style.display = 'block';
+			toggleIcon.style.transform = 'rotate(0deg)';
+		}
 
 	};
 
 	panel.collapse = function () {
 
-		if ( ! collapsed ) panel.toggle();
+		if ( ! collapsed ) {
+			collapsed = true;
+			contentPanel.dom.style.display = 'none';
+			toggleIcon.style.transform = 'rotate(-90deg)';
+		}
 
 	};
 
 	panel.expand = function () {
 
-		if ( collapsed ) panel.toggle();
+		if ( collapsed ) {
+			collapsed = false;
+			contentPanel.dom.style.display = 'block';
+			toggleIcon.style.transform = 'rotate(0deg)';
+		}
 
 	};
 

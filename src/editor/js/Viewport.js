@@ -93,12 +93,10 @@ function Viewport( editor ) {
 	let previewRenderer = null;
 	const previewContainer = document.createElement( 'div' );
 	previewContainer.id = 'camera-preview';
-	previewContainer.style.cssText = 'position: absolute; top: 20px; left: 20px; width: 200px; height: 150px; border: 2px solid #08f; background: #000; display: none; cursor: pointer; z-index: 1000;';
 	previewContainer.title = 'Click to switch to this camera';
 	container.dom.appendChild( previewContainer );
 
 	const previewCanvas = document.createElement( 'canvas' );
-	previewCanvas.style.cssText = 'width: 100%; height: 100%; display: block;';
 	previewContainer.appendChild( previewCanvas );
 
 	previewContainer.addEventListener( 'click', function () {

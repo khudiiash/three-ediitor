@@ -5,16 +5,12 @@ function ViewportControls( editor ) {
 	const signals = editor.signals;
 
 	const container = new UIPanel();
-	container.setPosition( 'absolute' );
-	container.setRight( '10px' );
-	container.setTop( '10px' );
-	container.setColor( '#ffffff' );
-
-	
+	container.addClass( 'viewport-controls' );
+	container.dom.style.display = 'flex';
+	container.dom.style.flexDirection = 'row';
+	container.dom.style.gap = 'var(--space-2)';
 
 	const cameraSelect = new UISelect();
-	cameraSelect.setMarginLeft( '10px' );
-	cameraSelect.setMarginRight( '10px' );
 	cameraSelect.onChange( function () {
 
 		editor.setViewportCamera( this.getValue() );

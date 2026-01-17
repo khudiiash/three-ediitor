@@ -57,7 +57,7 @@ function Player( editor ) {
 	this.height = 500;
 
 	
-	this.load = function ( json ) {
+	this.load = async function ( json ) {
 
 		const project = json.project;
 
@@ -70,8 +70,20 @@ function Player( editor ) {
 			if ( project.toneMappingExposure !== undefined ) renderer.toneMappingExposure = project.toneMappingExposure;
 		}
 
+		if ( editor.controls && editor.controls.update ) {
+			editor.controls.update();
+		}
+
+		if ( editor.viewportCamera && editor.controls && editor.controls.object ) {
+			editor.viewportCamera.position.copy( editor.controls.object.position );
+			editor.viewportCamera.quaternion.copy( editor.controls.object.quaternion );
+			editor.viewportCamera.scale.copy( editor.controls.object.scale );
+			editor.viewportCamera.updateProjectionMatrix();
+		}
+
+		const viewportCamera = editor.viewportCamera || editor.camera;
+		const viewportCameraUuid = viewportCamera.uuid;
 		
-		const viewportCameraUuid = editor.camera.uuid;
 		const sceneCameras = [];
 		editor.scene.traverse( function ( object ) {
 			if ( ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object.uuid !== viewportCameraUuid ) {
@@ -81,30 +93,29 @@ function Player( editor ) {
 		
 		let sceneCamera = null;
 		
-		
 		if ( editor.selected && ( editor.selected.isPerspectiveCamera || editor.selected.isOrthographicCamera ) && editor.selected.uuid !== viewportCameraUuid ) {
 			sceneCamera = editor.selected;
 		}
-		
 		else if ( sceneCameras.length > 0 ) {
 			sceneCamera = sceneCameras[ 0 ];
 		}
-		
 		else {
-			sceneCamera = editor.camera;
+			sceneCamera = viewportCamera;
 		}
 
-		
 		json.camera = sceneCamera.toJSON();
 
 		initEngine();
 		
-		if ( typeof window !== 'undefined' && window.__TAURI__ ) {
-			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
-			if ( projectPath ) {
-				window.__editorProjectPath = projectPath;
+		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+		if ( projectPath && typeof window !== 'undefined' ) {
+			window.__editorProjectPath = projectPath;
+			if ( typeof sessionStorage !== 'undefined' ) {
+				sessionStorage.setItem( 'editor_project_path', projectPath );
 			}
-			
+		}
+		
+		if ( typeof window !== 'undefined' && window.__TAURI__ ) {
 			if ( typeof window.ScriptCompiler === 'undefined' ) {
 				import( './ScriptCompiler.js' ).then( module => {
 					window.ScriptCompiler = module;
@@ -114,11 +125,56 @@ function Player( editor ) {
 			}
 		}
 		
-		SceneLoader.loadScene( app, json ).catch( () => {} );
+		if ( app && app.scene ) {
+			if ( app.getEntities ) {
+				const entities = app.getEntities();
+				if ( entities && entities.length > 0 ) {
+					entities.forEach( entity => {
+						try {
+							if ( entity && typeof entity.destroy === 'function' ) {
+								entity.destroy();
+							} else if ( entity && typeof entity.dispose === 'function' ) {
+								entity.dispose();
+							}
+						} catch ( e ) {
+							console.warn( '[Player] Error destroying entity:', e );
+						}
+					} );
+				}
+			}
+			
+			while ( app.scene.children.length > 0 ) {
+				const child = app.scene.children[ 0 ];
+				app.scene.remove( child );
+				if ( child && typeof child.dispose === 'function' ) {
+					try {
+						child.dispose();
+					} catch ( e ) {
+					}
+				}
+			}
+		}
+		
+		try {
+			await SceneLoader.loadScene( app, json );
+		} catch ( error ) {
+			console.error( '[Player] Failed to load scene:', error );
+			throw error;
+		}
 		
 		scene = app.scene;
 		camera = app.getCamera();
 		
+		if ( json.camera && camera ) {
+			const expectedCamera = json.camera;
+			if ( camera instanceof THREE.PerspectiveCamera || camera instanceof THREE.OrthographicCamera ) {
+				if ( expectedCamera.object && expectedCamera.object.matrix ) {
+					const matrix = new THREE.Matrix4().fromArray( expectedCamera.object.matrix );
+					matrix.decompose( camera.position, camera.quaternion, camera.scale );
+				}
+				camera.updateProjectionMatrix();
+			}
+		}
 		
 		if ( camera ) {
 			camera.aspect = this.width / this.height;
@@ -208,6 +264,12 @@ function Player( editor ) {
 		startTime = prevTime = performance.now();
 
 		if ( renderer ) {
+			renderer.clear();
+			
+			if ( scene && camera ) {
+				renderer.render( scene, camera );
+			}
+			
 			renderer.setAnimationLoop( animate );
 		}
 
@@ -272,9 +334,24 @@ function Player( editor ) {
 
 	}.bind( this ) );
 
-	signals.startPlayer.add( function () {
+	signals.startPlayer.add( async function () {
+
+		if ( isPlaying ) {
+			this.stop();
+		}
 
 		isPlaying = true;
+
+		if ( editor.controls && editor.controls.update ) {
+			editor.controls.update();
+		}
+
+		if ( editor.viewportCamera && editor.controls && editor.controls.object ) {
+			editor.viewportCamera.position.copy( editor.controls.object.position );
+			editor.viewportCamera.quaternion.copy( editor.controls.object.quaternion );
+			editor.viewportCamera.scale.copy( editor.controls.object.scale );
+			editor.viewportCamera.updateProjectionMatrix();
+		}
 
 		
 		const editorCanvas = viewport.querySelector( 'canvas' );
@@ -282,20 +359,44 @@ function Player( editor ) {
 			editorCanvas.style.display = 'none';
 		}
 
+		// CRITICAL: The difference between first time and subsequent times:
+		// - First time: canvas is blank (never rendered), so showing it shows nothing
+		// - Subsequent times: canvas has the last rendered frame, so showing it shows old frame
+		// Solution: Clear the canvas element BEFORE showing it
+		if ( renderer && renderer.domElement ) {
+			// Force clear the canvas by temporarily changing its size
+			// This clears the canvas element's pixel buffer completely
+			const canvasEl = renderer.domElement;
+			const oldWidth = canvasEl.width;
+			const oldHeight = canvasEl.height;
+			canvasEl.width = 1;
+			canvasEl.height = 1;
+			canvasEl.width = oldWidth;
+			canvasEl.height = oldHeight;
+			// Also clear the renderer's internal state
+			renderer.clear();
+		}
 		
+		// Now show the canvas - it will be blank/cleared
 		dom.style.display = '';
 
-		
 		const json = editor.toJSON();
-		this.load( json );
 		
-		
-		this.setSize( viewport.clientWidth, viewport.clientHeight );
-		this.play();
+		try {
+			await this.load( json );
+			
+			this.setSize( viewport.clientWidth, viewport.clientHeight );
+			
+			this.play();
+		} catch ( error ) {
+			console.error( '[Player] Failed to start play mode:', error );
+			isPlaying = false;
+			alert( 'Failed to start play mode: ' + ( error.message || error ) );
+		}
 
 	}.bind( this ) );
 
-	signals.stopPlayer.add( function () {
+	signals.stopPlayer.add( async function () {
 
 		isPlaying = false;
 

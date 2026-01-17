@@ -203,7 +203,9 @@ export class App {
             });
 
             this.loadParticleSystems();
-            this.loadScriptsFromScene().catch(() => {});
+            this.loadScriptsFromScene().catch((error) => {
+                console.warn('[App] Failed to load scripts from scene:', error);
+            });
         } else {
             while (this.scene.children.length > 0) {
                 this.scene.remove(this.scene.children[0]);

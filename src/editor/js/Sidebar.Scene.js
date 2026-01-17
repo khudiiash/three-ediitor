@@ -10,18 +10,13 @@ function SidebarScene( editor ) {
 	const strings = editor.strings;
 
 	const container = new UIPanel();
-	container.setBorderTop( '0' );
-	container.setPaddingTop( '0' );
-	container.dom.style.height = 'calc(100% - 4px)';
-	container.dom.style.display = 'flex';
-	container.dom.style.flexDirection = 'column';
-	container.dom.style.marginBottom = '4px';
+	container.addClass( 'outliner-container' );
 
 	const searchRow = new UIRow();
-	searchRow.setPadding( '4px' );
-	const searchInput = new UIInput( '' ).setWidth( '100%' ).setFontSize( '12px' );
+	searchRow.addClass( 'outliner-header' );
+	const searchInput = new UIInput( '' );
+	searchInput.addClass( 'outliner-search' );
 	searchInput.dom.placeholder = 'Search...';
-	searchInput.dom.style.cssText = 'padding: 4px 8px; background: #1e1e1e; border: 1px solid #444; color: #aaa;';
 	searchRow.add( searchInput );
 	container.add( searchRow );
 
@@ -42,6 +37,7 @@ function SidebarScene( editor ) {
 	function buildOption( object, draggable ) {
 
 		const option = document.createElement( 'div' );
+		option.className = 'scene-tree-item';
 		const isSystemEntity = isBatchedRenderer( object );
 		option.draggable = draggable && !isSystemEntity;
 		option.innerHTML = buildHTML( object );
@@ -172,47 +168,9 @@ function SidebarScene( editor ) {
 
 	const outliner = new UIOutliner( editor );
 	outliner.setId( 'outliner' );
-	outliner.dom.style.flex = '1';
-	outliner.dom.style.height = '100%';
+	outliner.addClass( 'scene-tree' );
 	
-	if ( ! document.getElementById( 'outliner-scrollbar-style' ) ) {
-		const style = document.createElement( 'style' );
-		style.id = 'outliner-scrollbar-style';
-		style.textContent = `
-			#outliner::-webkit-scrollbar { width: 2px !important; height: 2px !important; }
-			#outliner::-webkit-scrollbar-track { background: transparent !important; }
-			#outliner::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.05) !important; border-radius: 1px !important; }
-			#outliner::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.15) !important; }
-		`;
-		document.head.appendChild( style );
-	}
-	
-	if ( ! document.getElementById( 'outliner-visibility-style' ) ) {
-		const visibilityStyle = document.createElement( 'style' );
-		visibilityStyle.id = 'outliner-visibility-style';
-		visibilityStyle.textContent = `
-			.visibility-toggle {
-				display: inline-block;
-				width: 5px;
-				height: 5px;
-				border-radius: 50%;
-				margin-left: 8px;
-				cursor: pointer;
-				vertical-align: middle;
-				transition: background-color 0.2s ease;
-			}
-			.visibility-toggle.visibility-visible {
-				background-color: #ffffff;
-			}
-			.visibility-toggle.visibility-hidden {
-				background-color: #888888;
-			}
-			.visibility-toggle:hover {
-				opacity: 0.7;
-			}
-		`;
-		document.head.appendChild( visibilityStyle );
-	}
+	// Scrollbar and visibility styles are now in sidebar.css
 	outliner.onChange( function () {
 
 		ignoreObjectSelectedSignal = true;
@@ -243,21 +201,21 @@ function SidebarScene( editor ) {
 				if ( asset.type ) {
 					event.preventDefault();
 					event.stopPropagation();
-					outliner.dom.style.outline = '2px dashed #ff8800';
+					outliner.dom.classList.add('drag-over');
 				}
 			} catch ( e ) {
 			}
 		}
 	} );
-	
+
 	outliner.dom.addEventListener( 'dragleave', function ( event ) {
-		outliner.dom.style.outline = '';
+		outliner.dom.classList.remove('drag-over');
 	} );
-	
+
 	outliner.dom.addEventListener( 'drop', async function ( event ) {
 		event.preventDefault();
 		event.stopPropagation();
-		outliner.dom.style.outline = '';
+		outliner.dom.classList.remove('drag-over');
 		
 		const assetData = event.dataTransfer.getData( 'text/plain' );
 		if ( assetData ) {
@@ -388,9 +346,9 @@ function SidebarScene( editor ) {
 
 					}
 
-					const option = buildOption( object, true );
-					option.style.paddingLeft = ( pad * 18 ) + 'px';
-					options.push( option );
+			const option = buildOption( object, true );
+			option.style.setProperty('--tree-indent', `${pad * 18}px`);
+			options.push( option );
 
 					const shouldExpand = nodeStates.get( object ) === true || ( searchFilter && hasMatchingChild( object ) );
 					if ( shouldExpand ) {
@@ -441,7 +399,14 @@ function SidebarScene( editor ) {
 
 				const openerHTML = openerElement ? openerElement.outerHTML : '';
 
+				// Preserve the tree indentation style
+				const currentIndent = option.style.getPropertyValue( '--tree-indent' );
+
 				option.innerHTML = openerHTML + buildHTML( object );
+
+				if ( currentIndent ) {
+					option.style.setProperty( '--tree-indent', currentIndent );
+				}
 
 				
 				const visibilityToggle = option.querySelector( '.visibility-toggle' );

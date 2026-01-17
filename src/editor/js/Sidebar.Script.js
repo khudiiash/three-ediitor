@@ -11,16 +11,18 @@ function SidebarScript( editor ) {
 	const signals = editor.signals;
 
 	const container = new UIPanel();
-	container.setBorderTop( '0' );
-	container.setPaddingTop( '4px' );
+	container.dom.classList.add( 'script-sidebar-container' );
 	container.setDisplay( 'none' );
 
 	const scriptsContainer = new UIPanel();
 	container.add( scriptsContainer );
 
 	const addScriptRow = new UIRow();
-	const addScriptSelect = new UISelect().setWidth( '150px' ).setFontSize( '12px' );
-	const addScriptButton = new UIButton( '+' ).setWidth( '30px' ).setMarginLeft( '4px' );
+	addScriptRow.dom.classList.add( 'script-add-row' );
+	const addScriptSelect = new UISelect();
+	addScriptSelect.dom.classList.add( 'script-add-select' );
+	const addScriptButton = new UIButton( '+' );
+	addScriptButton.dom.classList.add( 'script-add-button' );
 	
 	addScriptButton.onClick( async function () {
 		if ( !editor.selected ) {
@@ -148,7 +150,7 @@ export default class ${validClassName} extends Script {
 		}
 	} );
 	
-	addScriptRow.add( new UIText( 'Script' ).setWidth( '90px' ) );
+	// Add select and button on the same line (no label)
 	addScriptRow.add( addScriptSelect );
 	addScriptRow.add( addScriptButton );
 	container.add( addScriptRow );
@@ -179,7 +181,7 @@ export default class ${validClassName} extends Script {
 
 	function updateScriptSelect() {
 		const scripts = getScriptAssets();
-		const options = { '': '-- Select Script --' };
+		const options = { '': 'Select...' };
 		scripts.forEach( script => {
 			options[ script.path ] = script.name;
 		} );
@@ -218,20 +220,15 @@ export default class ${validClassName} extends Script {
 
 				( function ( object, script, index ) {
 
-					const scriptRow = new UIRow();
-					scriptRow.setMarginBottom( '10px' );
-					scriptRow.setPaddingBottom( '10px' );
-					scriptRow.dom.style.borderBottom = '1px solid #333';
+				const scriptRow = new UIRow();
+				scriptRow.dom.classList.add( 'script-item-row' );
 
-					const scriptName = new UIText( script.assetPath.split( '/' ).pop() || 'Script' );
-					scriptName.setWidth( '120px' );
-					scriptName.dom.style.fontWeight = 'bold';
-					scriptRow.add( scriptName );
+				const scriptName = new UIText( script.assetPath.split( '/' ).pop() || 'Script' );
+				scriptName.dom.classList.add( 'script-item-name' );
+				scriptRow.add( scriptName );
 
-					const editButton = new UIButton( 'EDIT' );
-					editButton.setWidth( '50px' );
-					editButton.setMarginLeft( '4px' );
-					editButton.setFontSize( '11px' );
+				const editButton = new UIButton( 'EDIT' );
+				editButton.dom.classList.add( 'script-edit-button' );
 					editButton.onClick( async function () {
 						const isTauri = typeof window !== 'undefined' && window.__TAURI__;
 						const invoke = isTauri ? window.__TAURI__.core.invoke : null;
@@ -257,9 +254,8 @@ export default class ${validClassName} extends Script {
 					} );
 					scriptRow.add( editButton );
 
-					const removeButton = new UIButton( '×' );
-					removeButton.setWidth( '24px' );
-					removeButton.setMarginLeft( '4px' );
+				const removeButton = new UIButton( '×' );
+				removeButton.dom.classList.add( 'script-remove-button' );
 					removeButton.onClick( function () {
 						if ( confirm( 'Remove this script?' ) ) {
 							editor.execute( new RemoveScriptAssetCommand( editor, object, index ) );
@@ -270,32 +266,32 @@ export default class ${validClassName} extends Script {
 
 					scriptsContainer.add( scriptRow );
 
-					const scriptAttributesContainer = new UIPanel();
-					scriptAttributesContainer.setDisplay( 'none' );
-					scriptAttributesContainer.setMarginLeft( '20px' );
-					scriptsContainer.add( scriptAttributesContainer );
-					
-					const toggleButton = document.createElement( 'span' );
-					toggleButton.textContent = '▼';
-					toggleButton.style.cssText = 'cursor: pointer; margin-right: 4px; user-select: none; display: inline-block; transform: rotate(-90deg); transition: transform 0.2s;';
-					
-					scriptName.dom.style.cursor = 'pointer';
-					scriptName.dom.style.display = 'flex';
-					scriptName.dom.style.alignItems = 'center';
-					scriptName.dom.insertBefore( toggleButton, scriptName.dom.firstChild );
+				const scriptAttributesContainer = new UIPanel();
+				scriptAttributesContainer.dom.classList.add( 'script-attributes-container' );
+				scriptsContainer.add( scriptAttributesContainer );
+				
+				const toggleButton = document.createElement( 'span' );
+				toggleButton.textContent = '▼';
+				toggleButton.classList.add( 'script-item-toggle' );
+				scriptName.dom.insertBefore( toggleButton, scriptName.dom.firstChild );
 					
 					const scriptKey = script.assetPath;
 					let isExpanded = expandedSet.has( scriptKey );
 					
+				if ( isExpanded ) {
+					toggleButton.classList.add( 'expanded' );
+					scriptAttributesContainer.dom.classList.add( 'expanded' );
+				}
+				
+				const toggleExpand = function () {
+					isExpanded = !isExpanded;
 					if ( isExpanded ) {
-						toggleButton.style.transform = 'rotate(0deg)';
-						scriptAttributesContainer.setDisplay( 'block' );
+						toggleButton.classList.add( 'expanded' );
+						scriptAttributesContainer.dom.classList.add( 'expanded' );
+					} else {
+						toggleButton.classList.remove( 'expanded' );
+						scriptAttributesContainer.dom.classList.remove( 'expanded' );
 					}
-					
-					const toggleExpand = function () {
-						isExpanded = !isExpanded;
-						toggleButton.style.transform = isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)';
-						scriptAttributesContainer.setDisplay( isExpanded ? 'block' : 'none' );
 						if ( isExpanded ) {
 							expandedSet.add( scriptKey );
 						} else {
@@ -384,16 +380,17 @@ export default class ${validClassName} extends Script {
 						for ( const attrName in attributesToShow ) {
 							const attrValue = attributesToShow[ attrName ];
 							const attrRow = new UIRow();
-							attrRow.setMarginLeft( '20px' );
-							attrRow.setMarginTop( '4px' );
+							attrRow.dom.classList.add( 'script-attribute-row' );
 
-							const attrLabel = new UIText( attrName ).setWidth( '90px' );
+							const attrLabel = new UIText( attrName );
+							attrLabel.dom.classList.add( 'script-attribute-label' );
 							attrRow.add( attrLabel );
 
 							let attrInput;
 							
 							if ( typeof attrValue === 'number' ) {
-								attrInput = new UINumber( attrValue ).setWidth( '60px' );
+								attrInput = new UINumber( attrValue );
+								attrInput.dom.classList.add( 'script-attribute-input' );
 								attrInput.onChange( function () {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
@@ -403,13 +400,14 @@ export default class ${validClassName} extends Script {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
 							} else if ( typeof attrValue === 'string' ) {
-								attrInput = new UIInput( attrValue ).setWidth( '120px' );
+								attrInput = new UIInput( attrValue );
+								attrInput.dom.classList.add( 'script-attribute-input-string' );
 								attrInput.onChange( function () {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
 							} else {
 								attrInput = new UIText( JSON.stringify( attrValue ) );
-								attrInput.setWidth( '120px' );
+								attrInput.dom.classList.add( 'script-attribute-input-string' );
 							}
 
 							attrRow.add( attrInput );
@@ -417,7 +415,11 @@ export default class ${validClassName} extends Script {
 						}
 						
 						if ( Object.keys( attributesToShow ).length > 0 ) {
-							scriptAttributesContainer.setDisplay( isExpanded ? 'block' : 'none' );
+							if ( isExpanded ) {
+								scriptAttributesContainer.dom.classList.add( 'expanded' );
+							} else {
+								scriptAttributesContainer.dom.classList.remove( 'expanded' );
+							}
 						}
 					} )( script );
 

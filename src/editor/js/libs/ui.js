@@ -84,7 +84,13 @@ class UIElement {
 
 	addClass( name ) {
 
-		this.dom.classList.add( name );
+		if ( name.includes( ' ' ) ) {
+			name.split( ' ' ).forEach( cls => {
+				if ( cls ) this.dom.classList.add( cls );
+			} );
+		} else {
+			this.dom.classList.add( name );
+		}
 
 		return this;
 
@@ -108,10 +114,8 @@ class UIElement {
 
 	setStyle( style, array ) {
 
-		for ( let i = 0; i < array.length; i ++ ) {
-
-			this.dom.style[ style ] = array[ i ];
-
+		if ( array && array.length > 0 ) {
+			this.dom.style[ style ] = array[ 0 ];
 		}
 
 		return this;
@@ -491,11 +495,11 @@ class UIColor extends UIElement {
 		super( document.createElement( 'input' ) );
 
 		this.dom.className = 'Color';
-		this.dom.style.width = '32px';
-		this.dom.style.height = '16px';
-		this.dom.style.border = '0px';
-		this.dom.style.padding = '2px';
-		this.dom.style.backgroundColor = 'transparent';
+		this.dom.style.width = '';
+		this.dom.style.height = '';
+		this.dom.style.border = '';
+		this.dom.style.padding = '';
+		this.dom.style.backgroundColor = '';
 
 		this.dom.setAttribute( 'autocomplete', 'off' );
 
@@ -1152,6 +1156,8 @@ class UITabbedPanel extends UIDiv {
 			if ( panel ) {
 
 				panel.setDisplay( 'none' );
+				panel.dom.style.display = 'none';
+				panel.dom.classList.remove( 'TabPanel' );
 
 			}
 
@@ -1176,7 +1182,9 @@ class UITabbedPanel extends UIDiv {
 
 		if ( panel ) {
 
-			panel.setDisplay( '' );
+			panel.setDisplay( 'block' );
+			panel.dom.style.display = 'block';
+			panel.dom.classList.add( 'TabPanel' );
 
 		}
 
@@ -1220,7 +1228,10 @@ class UITabbedPanel extends UIDiv {
 		this.panels.push( panel );
 		this.panelsDiv.add( panel );
 
-		this.select( id );
+		// Don't auto-select, let the caller do it
+		if ( this.selected === '' ) {
+			this.select( id );
+		}
 
 	}
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 
-import { UIPanel, UIRow, UIInput, UIButton, UIColor, UICheckbox, UIInteger, UITextArea, UIText, UINumber, UISelect } from './libs/ui.js';
+import { UIPanel, UIRow, UIInput, UIButton, UIColor, UICheckbox, UIInteger, UITextArea, UIText, UINumber, UISelect, UIDiv } from './libs/ui.js';
 import { UIBoolean } from './libs/ui.three.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
@@ -54,6 +54,12 @@ function SidebarObject( editor ) {
 	cameraPanel.collapse();
 	particlePanel.collapse();
 	scenePanel.collapse();
+	
+	meshPanel.setHidden( true );
+	lightPanel.setHidden( true );
+	cameraPanel.setHidden( true );
+	particlePanel.setHidden( true );
+	scenePanel.setHidden( true );
 
 	const sceneContent = new SidebarSceneSettings( editor );
 	scenePanel.add( sceneContent );
@@ -90,8 +96,11 @@ function SidebarObject( editor ) {
 	objectPositionX.dom.addEventListener( 'blur', update );
 	objectPositionY.dom.addEventListener( 'blur', update );
 	objectPositionZ.dom.addEventListener( 'blur', update );
+	const positionInputsContainer = new UIDiv();
+	positionInputsContainer.addClass( 'input-group' );
+	positionInputsContainer.add( objectPositionX, objectPositionY, objectPositionZ );
 	objectPositionRow.add( new UIText( strings.getKey( 'sidebar/object/position' ) || 'Position' ).setClass( 'Label' ) );
-	objectPositionRow.add( objectPositionX, objectPositionY, objectPositionZ );
+	objectPositionRow.add( positionInputsContainer );
 	entityPanel.add( objectPositionRow );
 
 	const objectRotationRow = new UIRow();
@@ -101,8 +110,11 @@ function SidebarObject( editor ) {
 	objectRotationX.dom.addEventListener( 'blur', update );
 	objectRotationY.dom.addEventListener( 'blur', update );
 	objectRotationZ.dom.addEventListener( 'blur', update );
+	const rotationInputsContainer = new UIDiv();
+	rotationInputsContainer.addClass( 'input-group' );
+	rotationInputsContainer.add( objectRotationX, objectRotationY, objectRotationZ );
 	objectRotationRow.add( new UIText( strings.getKey( 'sidebar/object/rotation' ) || 'Rotation' ).setClass( 'Label' ) );
-	objectRotationRow.add( objectRotationX, objectRotationY, objectRotationZ );
+	objectRotationRow.add( rotationInputsContainer );
 	entityPanel.add( objectRotationRow );
 
 	let scaleLocked = true;
@@ -137,9 +149,11 @@ function SidebarObject( editor ) {
 	objectScaleX.dom.addEventListener( 'blur', update );
 	objectScaleY.dom.addEventListener( 'blur', update );
 	objectScaleZ.dom.addEventListener( 'blur', update );
+	const scaleInputsContainer = new UIDiv();
+	scaleInputsContainer.addClass( 'input-group' );
+	scaleInputsContainer.add( scaleLockCheckbox, objectScaleX, objectScaleY, objectScaleZ );
 	objectScaleRow.add( new UIText( strings.getKey( 'sidebar/object/scale' ) || 'Scale' ).setClass( 'Label' ) );
-	objectScaleRow.add( scaleLockCheckbox );
-	objectScaleRow.add( objectScaleX, objectScaleY, objectScaleZ );
+	objectScaleRow.add( scaleInputsContainer );
 	entityPanel.add( objectScaleRow );
 
 	const objectCameraTypeRow = new UIRow();
@@ -167,33 +181,18 @@ function SidebarObject( editor ) {
 	objectFovRow.add( objectFov );
 	cameraPanel.add( objectFovRow );
 
-	const objectLeftRow = new UIRow();
+	const objectCameraBoundsRow = new UIRow();
 	const objectLeft = new UINumber().onChange( update );
-	objectLeftRow.add( new UIText( strings.getKey( 'sidebar/object/left' ) ).setClass( 'Label' ) );
-	objectLeftRow.add( objectLeft );
-	cameraPanel.add( objectLeftRow );
-	objectLeftRow.setDisplay( 'none' );
-
-	const objectRightRow = new UIRow();
 	const objectRight = new UINumber().onChange( update );
-	objectRightRow.add( new UIText( strings.getKey( 'sidebar/object/right' ) ).setClass( 'Label' ) );
-	objectRightRow.add( objectRight );
-	cameraPanel.add( objectRightRow );
-	objectRightRow.setDisplay( 'none' );
-
-	const objectTopRow = new UIRow();
 	const objectTop = new UINumber().onChange( update );
-	objectTopRow.add( new UIText( strings.getKey( 'sidebar/object/top' ) ).setClass( 'Label' ) );
-	objectTopRow.add( objectTop );
-	cameraPanel.add( objectTopRow );
-	objectTopRow.setDisplay( 'none' );
-
-	const objectBottomRow = new UIRow();
 	const objectBottom = new UINumber().onChange( update );
-	objectBottomRow.add( new UIText( strings.getKey( 'sidebar/object/bottom' ) ).setClass( 'Label' ) );
-	objectBottomRow.add( objectBottom );
-	cameraPanel.add( objectBottomRow );
-	objectBottomRow.setDisplay( 'none' );
+	const cameraBoundsInputsContainer = new UIDiv();
+	cameraBoundsInputsContainer.addClass( 'input-group' );
+	cameraBoundsInputsContainer.add( objectLeft, objectRight, objectTop, objectBottom );
+	objectCameraBoundsRow.add( new UIText( 'Bounds' ).setClass( 'Label' ) );
+	objectCameraBoundsRow.add( cameraBoundsInputsContainer );
+	cameraPanel.add( objectCameraBoundsRow );
+	objectCameraBoundsRow.setDisplay( 'none' );
 
 	let cameraSizeUpdateTimeout = null;
 	function updateCameraSize() {
@@ -216,17 +215,15 @@ function SidebarObject( editor ) {
 	objectOrthoHeightRow.add( objectOrthoHeight );
 	cameraPanel.add( objectOrthoHeightRow );
 
-	const objectNearRow = new UIRow();
+	const objectNearFarRow = new UIRow();
 	const objectNear = new UINumber().onChange( update );
-	objectNearRow.add( new UIText( strings.getKey( 'sidebar/object/near' ) || 'Near' ).setClass( 'Label' ) );
-	objectNearRow.add( objectNear );
-	cameraPanel.add( objectNearRow );
-
-	const objectFarRow = new UIRow();
 	const objectFar = new UINumber().onChange( update );
-	objectFarRow.add( new UIText( strings.getKey( 'sidebar/object/far' ) || 'Far' ).setClass( 'Label' ) );
-	objectFarRow.add( objectFar );
-	cameraPanel.add( objectFarRow );
+	const nearFarInputsContainer = new UIDiv();
+	nearFarInputsContainer.addClass( 'input-group' );
+	nearFarInputsContainer.add( objectNear, objectFar );
+	objectNearFarRow.add( new UIText( 'Near / Far' ).setClass( 'Label' ) );
+	objectNearFarRow.add( nearFarInputsContainer );
+	cameraPanel.add( objectNearFarRow );
 
 	const particleDurationRow = new UIRow();
 	const particleDuration = new UINumber( 1 ).setRange( 0, Infinity ).onChange( update );
@@ -273,41 +270,45 @@ function SidebarObject( editor ) {
 	const particleStartLifeRow = new UIRow();
 	const particleStartLifeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 3 ).onChange( update );
 	const particleStartLifeMax = new UINumber( 0.2 ).setRange( 0, Infinity ).setPrecision( 3 ).onChange( update );
+	const startLifeInputsContainer = new UIDiv();
+	startLifeInputsContainer.addClass( 'input-group' );
+	startLifeInputsContainer.add( particleStartLifeMin.setWidth( '60px' ) );
+	startLifeInputsContainer.add( particleStartLifeMax.setWidth( '60px' ) );
 	particleStartLifeRow.add( new UIText( 'Start Life' ).setClass( 'Label' ) );
-	particleStartLifeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
-	particleStartLifeRow.add( particleStartLifeMin.setWidth( '60px' ) );
-	particleStartLifeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
-	particleStartLifeRow.add( particleStartLifeMax.setWidth( '60px' ) );
+	particleStartLifeRow.add( startLifeInputsContainer );
 	particlePanel.add( particleStartLifeRow );
 
 	const particleStartSpeedRow = new UIRow();
 	const particleStartSpeedMin = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
 	const particleStartSpeedMax = new UINumber( 1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const startSpeedInputsContainer = new UIDiv();
+	startSpeedInputsContainer.addClass( 'input-group' );
+	startSpeedInputsContainer.add( particleStartSpeedMin.setWidth( '60px' ) );
+	startSpeedInputsContainer.add( particleStartSpeedMax.setWidth( '60px' ) );
 	particleStartSpeedRow.add( new UIText( 'Start Speed' ).setClass( 'Label' ) );
-	particleStartSpeedRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
-	particleStartSpeedRow.add( particleStartSpeedMin.setWidth( '60px' ) );
-	particleStartSpeedRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
-	particleStartSpeedRow.add( particleStartSpeedMax.setWidth( '60px' ) );
+	particleStartSpeedRow.add( startSpeedInputsContainer );
 	particlePanel.add( particleStartSpeedRow );
 
 	const particleStartRotationRow = new UIRow();
 	const particleStartRotationMin = new UINumber( 0 ).setRange( -360, 360 ).setPrecision( 1 ).onChange( update );
 	const particleStartRotationMax = new UINumber( 0 ).setRange( -360, 360 ).setPrecision( 1 ).onChange( update );
+	const startRotationInputsContainer = new UIDiv();
+	startRotationInputsContainer.addClass( 'input-group' );
+	startRotationInputsContainer.add( particleStartRotationMin.setWidth( '60px' ) );
+	startRotationInputsContainer.add( particleStartRotationMax.setWidth( '60px' ) );
 	particleStartRotationRow.add( new UIText( 'Start Rotation' ).setClass( 'Label' ) );
-	particleStartRotationRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
-	particleStartRotationRow.add( particleStartRotationMin.setWidth( '60px' ) );
-	particleStartRotationRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
-	particleStartRotationRow.add( particleStartRotationMax.setWidth( '60px' ) );
+	particleStartRotationRow.add( startRotationInputsContainer );
 	particlePanel.add( particleStartRotationRow );
 
 	const particleStartSizeRow = new UIRow();
 	const particleStartSizeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
 	const particleStartSizeMax = new UINumber( 0.3 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const startSizeInputsContainer = new UIDiv();
+	startSizeInputsContainer.addClass( 'input-group' );
+	startSizeInputsContainer.add( particleStartSizeMin.setWidth( '60px' ) );
+	startSizeInputsContainer.add( particleStartSizeMax.setWidth( '60px' ) );
 	particleStartSizeRow.add( new UIText( 'Start Size' ).setClass( 'Label' ) );
-	particleStartSizeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
-	particleStartSizeRow.add( particleStartSizeMin.setWidth( '60px' ) );
-	particleStartSizeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
-	particleStartSizeRow.add( particleStartSizeMax.setWidth( '60px' ) );
+	particleStartSizeRow.add( startSizeInputsContainer );
 	particlePanel.add( particleStartSizeRow );
 
 	const particleStartColorRow = new UIRow();
@@ -325,11 +326,12 @@ function SidebarObject( editor ) {
 	const particleEndSizeRow = new UIRow();
 	const particleEndSizeMin = new UINumber( 0.1 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
 	const particleEndSizeMax = new UINumber( 0.3 ).setRange( 0, Infinity ).setPrecision( 2 ).onChange( update );
+	const endSizeInputsContainer = new UIDiv();
+	endSizeInputsContainer.addClass( 'input-group' );
+	endSizeInputsContainer.add( particleEndSizeMin.setWidth( '60px' ) );
+	endSizeInputsContainer.add( particleEndSizeMax.setWidth( '60px' ) );
 	particleEndSizeRow.add( new UIText( 'End Size' ).setClass( 'Label' ) );
-	particleEndSizeRow.add( new UIText( 'Min' ).setClass( 'Label min-max-label' ) );
-	particleEndSizeRow.add( particleEndSizeMin.setWidth( '60px' ) );
-	particleEndSizeRow.add( new UIText( 'Max' ).setClass( 'Label min-max-label' ) );
-	particleEndSizeRow.add( particleEndSizeMax.setWidth( '60px' ) );
+	particleEndSizeRow.add( endSizeInputsContainer );
 	particlePanel.add( particleEndSizeRow );
 
 	const particleMaterialColorRow = new UIRow();
@@ -634,17 +636,15 @@ function SidebarObject( editor ) {
 	objectShadowMapSizeRow.add( objectShadowMapSize );
 	lightPanel.add( objectShadowMapSizeRow );
 
-	const objectShadowCameraNearRow = new UIRow();
+	const objectShadowCameraNearFarRow = new UIRow();
 	const objectShadowCameraNear = new UINumber( 0.5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 100 ).onChange( update );
-	objectShadowCameraNearRow.add( new UIText( 'Camera Near' ).setClass( 'Label' ) );
-	objectShadowCameraNearRow.add( objectShadowCameraNear );
-	lightPanel.add( objectShadowCameraNearRow );
-
-	const objectShadowCameraFarRow = new UIRow();
 	const objectShadowCameraFar = new UINumber( 500 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 1, 10000 ).onChange( update );
-	objectShadowCameraFarRow.add( new UIText( 'Camera Far' ).setClass( 'Label' ) );
-	objectShadowCameraFarRow.add( objectShadowCameraFar );
-	lightPanel.add( objectShadowCameraFarRow );
+	const shadowCameraNearFarInputsContainer = new UIDiv();
+	shadowCameraNearFarInputsContainer.addClass( 'input-group' );
+	shadowCameraNearFarInputsContainer.add( objectShadowCameraNear, objectShadowCameraFar );
+	objectShadowCameraNearFarRow.add( new UIText( 'Camera Near / Far' ).setClass( 'Label' ) );
+	objectShadowCameraNearFarRow.add( shadowCameraNearFarInputsContainer );
+	lightPanel.add( objectShadowCameraNearFarRow );
 
 	const objectShadowCameraAreaRow = new UIRow();
 	const objectShadowCameraArea = new UINumber( 5 ).setPrecision( 3 ).setWidth( '50px' ).setRange( 0.1, 1000 ).onChange( update );
@@ -1200,11 +1200,15 @@ function SidebarObject( editor ) {
 		const isParticleSystem = object.userData && object.userData.isParticleSystem;
 		const isScene = object.isScene;
 
+		// Show/hide panels based on object type
 		meshPanel.setHidden( ! isMesh );
 		lightPanel.setHidden( ! isLight );
 		cameraPanel.setHidden( ! isCamera );
 		particlePanel.setHidden( ! isParticleSystem );
 		scenePanel.setHidden( ! isScene );
+		
+		// Entity panel is always shown when an object is selected
+		entityPanel.setHidden( false );
 
 		if ( isMesh ) {
 			geometryPanel.setHidden( ! object.geometry );
@@ -1214,8 +1218,8 @@ function SidebarObject( editor ) {
 		const properties = {
 			'fov': objectFovRow,
 			'orthoHeight': objectOrthoHeightRow,
-			'near': objectNearRow,
-			'far': objectFarRow,
+			'near': objectNearFarRow,
+			'far': objectNearFarRow,
 			'intensity': objectIntensityRow,
 			'color': objectColorRow,
 			'groundColor': objectGroundColorRow,
@@ -1231,10 +1235,7 @@ function SidebarObject( editor ) {
 			'power': objectPowerRow
 		};
 
-		objectLeftRow.setDisplay( 'none' );
-		objectRightRow.setDisplay( 'none' );
-		objectTopRow.setDisplay( 'none' );
-		objectBottomRow.setDisplay( 'none' );
+		objectCameraBoundsRow.setDisplay( 'none' );
 
 		for ( const property in properties ) {
 			const uiElement = properties[ property ];
@@ -1268,8 +1269,7 @@ function SidebarObject( editor ) {
 			
 			if ( object.shadow !== undefined && object.shadow.camera !== undefined ) {
 				objectShadowMapSizeRow.setDisplay( '' );
-				objectShadowCameraNearRow.setDisplay( '' );
-				objectShadowCameraFarRow.setDisplay( '' );
+				objectShadowCameraNearFarRow.setDisplay( '' );
 				if ( object.isDirectionalLight && object.shadow.camera.left !== undefined ) {
 					objectShadowCameraAreaRow.setDisplay( '' );
 					objectShadowCameraFovRow.setDisplay( 'none' );
@@ -1282,16 +1282,14 @@ function SidebarObject( editor ) {
 				}
 			} else {
 				objectShadowMapSizeRow.setDisplay( 'none' );
-				objectShadowCameraNearRow.setDisplay( 'none' );
-				objectShadowCameraFarRow.setDisplay( 'none' );
+				objectShadowCameraNearFarRow.setDisplay( 'none' );
 				objectShadowCameraAreaRow.setDisplay( 'none' );
 				objectShadowCameraFovRow.setDisplay( 'none' );
 			}
 		} else {
 			lightCastShadowRow.setDisplay( 'none' );
 			objectShadowMapSizeRow.setDisplay( 'none' );
-			objectShadowCameraNearRow.setDisplay( 'none' );
-			objectShadowCameraFarRow.setDisplay( 'none' );
+			objectShadowCameraNearFarRow.setDisplay( 'none' );
 			objectShadowCameraAreaRow.setDisplay( 'none' );
 			objectShadowCameraFovRow.setDisplay( 'none' );
 		}
