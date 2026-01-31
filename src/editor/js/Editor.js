@@ -12,6 +12,7 @@ import { CutObjectCommand } from './commands/CutObjectCommand.js';
 import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
 import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
 import { AssetObjectLoader } from './AssetObjectLoader.js';
+import { AssetRegistry } from '../../engine/dist/three-engine.js';
 
 var _DEFAULT_CAMERA = new THREE.PerspectiveCamera( 50, 1, 0.01, 1000 );
 _DEFAULT_CAMERA.name = 'Camera';
@@ -99,7 +100,6 @@ function Editor() {
 		intersectionsDetected: new Signal(),
 
 		pathTracerUpdated: new Signal(),
-
 	};
 
 	this.storage = new _Storage();
@@ -125,6 +125,7 @@ function Editor() {
 	this.geometries = {};
 	this.materials = {};
 	this.textures = {};
+	this.assets = new AssetRegistry();
 	this.scripts = {};
 
 	this.materialsRefCounter = new Map(); 
@@ -176,8 +177,6 @@ Editor.prototype = {
 
 	},
 
-	//
-
 	addObject: function ( object, parent, index ) {
 
 		var scope = this;
@@ -187,7 +186,25 @@ Editor.prototype = {
 		const defaultMaterialUuid = this.config.getKey( 'project/defaults/material' );
 		const defaultMaterial = defaultMaterialUuid ? this.materials[ defaultMaterialUuid ] : null;
 
+		function bindMaterialToAsset( material ) {
+			if ( !material || !material.assetPath ) return material;
+			const path = ( material.assetPath || '' ).replace( /^\/+/, '' );
+			const asset = scope.assets.getByUrl( path );
+			const mat = asset && typeof asset.getMaterial === 'function' ? asset.getMaterial() : null;
+			return mat || material;
+		}
+
 		object.traverse( function ( child ) {
+
+			if ( child.material !== undefined ) {
+				if ( Array.isArray( child.material ) ) {
+					for ( var i = 0; i < child.material.length; i ++ ) {
+						child.material[ i ] = bindMaterialToAsset( child.material[ i ] ) || child.material[ i ];
+					}
+				} else {
+					child.material = bindMaterialToAsset( child.material ) || child.material;
+				}
+			}
 
 			if ( child.geometry !== undefined ) scope.addGeometry( child.geometry );
 			if ( child.material !== undefined ) scope.addMaterial( child.material );
@@ -390,6 +407,26 @@ Editor.prototype = {
 
 	},
 
+	getMaterialByAssetPath: function ( assetPath ) {
+
+		var material;
+		var materials = Object.values( this.materials );
+
+		for ( var i = 0; i < materials.length; i ++ ) {
+
+			if ( materials[ i ].assetPath === assetPath ) {
+
+				material = materials[ i ];
+				break;
+
+			}
+
+		}
+
+		return material;
+
+	},
+
 	setMaterialName: function ( material, name ) {
 
 		material.name = name;
@@ -580,6 +617,17 @@ Editor.prototype = {
 	},
 
 	setObjectMaterial: function ( object, slot, newMaterial ) {
+		
+		if ( newMaterial && newMaterial.assetPath ) {
+			const assetPath = newMaterial.assetPath.startsWith( '/' ) ? newMaterial.assetPath.slice( 1 ) : newMaterial.assetPath;
+			const materialAsset = this.assets.getByUrl( assetPath );
+			if ( materialAsset && materialAsset.getMaterial ) {
+				const assetMaterial = materialAsset.getMaterial();
+				if ( assetMaterial ) {
+					newMaterial = assetMaterial;
+				}
+			}
+		}
 
 		if ( Array.isArray( object.material ) && slot !== undefined ) {
 
@@ -590,6 +638,49 @@ Editor.prototype = {
 			object.material = newMaterial;
 
 		}
+
+	},
+
+	syncMaterialAssetToScene: function ( materialAsset ) {
+
+		const assetMaterial = materialAsset.getMaterial && materialAsset.getMaterial();
+		if ( !assetMaterial ) return;
+
+		const assetUrl = ( materialAsset.url || '' ).replace( /^\/+/, '' );
+
+		this.scene.traverse( function ( object ) {
+
+			if ( !object.material ) return;
+
+			const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+
+			materials.forEach( function ( current, index ) {
+
+				if ( !current || !current.assetPath ) return;
+
+				const matPath = ( current.assetPath || '' ).replace( /^\/+/, '' );
+				if ( matPath !== assetUrl ) return;
+				if ( current === assetMaterial ) return;
+
+				if ( Array.isArray( object.material ) ) {
+
+					this.removeMaterial( object.material[ index ] );
+					object.material[ index ] = assetMaterial;
+					this.addMaterial( assetMaterial );
+
+				} else {
+
+					this.removeMaterial( object.material );
+					object.material = assetMaterial;
+					this.addMaterial( assetMaterial );
+
+				}
+
+				this.signals.materialChanged.dispatch( object, Array.isArray( object.material ) ? index : 0 );
+
+			}.bind( this ) );
+
+		}.bind( this ) );
 
 	},
 
@@ -724,7 +815,7 @@ Editor.prototype = {
 			
 			
 			const projectPath = this.storage && this.storage.getProjectPath ? this.storage.getProjectPath() : null;
-			var loader = new AssetObjectLoader( manager, projectPath );
+			var loader = new AssetObjectLoader( manager, projectPath, this );
 			var camera = await loader.parseAsync( json.camera );
 
 			const existingUuid = this.camera.uuid;
@@ -799,21 +890,55 @@ Editor.prototype = {
 
 			const scene = await loader.parseAsync( cleanedSceneJSON );
 			
-			let particleSystemCount = 0;
-			scene.traverse( function ( object ) {
-				if ( object.userData && object.userData.isParticleSystem ) {
-					particleSystemCount++;
-					if ( !object.userData.particleSystem ) {
-						console.warn( '[Editor] Particle system object found but particleSystem data is missing:', object.name, object.uuid );
-					} else {
-						console.log( '[Editor] Particle system object loaded:', object.name, object.uuid, 'with data:', object.userData.particleSystem );
-					}
-				}
-			} );
-			
-			if ( particleSystemCount > 0 ) {
-				console.log( '[Editor] Found', particleSystemCount, 'particle system(s) in loaded scene' );
+			if ( window.loadAssets && typeof window.loadAssets === 'function' ) {
+				await window.loadAssets();
 			}
+			
+			const materialReplacements = new Map();
+			scene.traverse( function( object ) {
+				if ( object.material ) {
+					const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+					materials.forEach( function( material ) {
+						if ( material ) {
+							let assetPath = material.assetPath;
+							if ( !assetPath && material.uuid ) {
+								if ( cleanedSceneJSON.materials && Array.isArray( cleanedSceneJSON.materials ) ) {
+									const materialJson = cleanedSceneJSON.materials.find( m => m.uuid === material.uuid );
+									if ( materialJson && materialJson.userData && materialJson.userData.assetPath ) {
+										assetPath = materialJson.userData.assetPath;
+										material.assetPath = assetPath;
+									}
+								}
+							}
+							
+							if ( assetPath ) {
+								const normalizedPath = assetPath.startsWith( '/' ) ? assetPath.slice( 1 ) : assetPath;
+								if ( !materialReplacements.has( material.uuid ) ) {
+									const materialAsset = this.assets.getByUrl( normalizedPath );
+									if ( materialAsset && materialAsset instanceof MaterialAsset ) {
+										const assetMaterial = materialAsset.getMaterial();
+										if ( assetMaterial ) {
+											materialReplacements.set( material.uuid, assetMaterial );
+										}
+									}
+								}
+								
+								const replacement = materialReplacements.get( material.uuid );
+								if ( replacement && replacement !== material ) {
+									if ( Array.isArray( object.material ) ) {
+										const index = object.material.indexOf( material );
+										if ( index !== -1 ) {
+											object.material[ index ] = replacement;
+										}
+									} else {
+										object.material = replacement;
+									}
+								}
+							}
+						}
+					}.bind( this ) );
+				}
+			}.bind( this ) );
 			
 			this.setScene( scene );
 
@@ -842,9 +967,6 @@ Editor.prototype = {
 	},
 
 	toJSON: function () {
-
-		
-
 		if ( !this.scene ) {
 			return {
 				metadata: {},
@@ -961,8 +1083,6 @@ Editor.prototype = {
 			}
 		}
 
-		//
-
 		const result = {
 
 			metadata: {},
@@ -981,7 +1101,6 @@ Editor.prototype = {
 
 		};
 
-		
 		for ( let i = 0; i < objectsToRestore.length; i++ ) {
 			const item = objectsToRestore[ i ];
 			item.parent.add( item.object );
@@ -1088,6 +1207,35 @@ Editor.prototype = {
 			} );
 		}
 
+		if ( result.scene && result.scene.materials && Array.isArray( result.scene.materials ) ) {
+			const materialMap = {};
+			this.scene.traverse( function( object ) {
+				if ( object.material ) {
+					const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+					materials.forEach( function( material ) {
+						if ( material && material.uuid ) {
+							materialMap[ material.uuid ] = material;
+						}
+					} );
+				}
+			} );
+
+			result.scene.materials = result.scene.materials.map( function( materialJson ) {
+				const material = materialMap[ materialJson.uuid ];
+				if ( material && material.assetPath ) {
+					if ( ! materialJson.userData ) {
+						materialJson.userData = {};
+					}
+					let normalizedAssetPath = material.assetPath;
+					if ( normalizedAssetPath.startsWith( '/' ) ) {
+						normalizedAssetPath = normalizedAssetPath.slice( 1 );
+					}
+					materialJson.userData.assetPath = normalizedAssetPath;
+				}
+				return materialJson;
+			} );
+		}
+
 		return result;
 
 	},
@@ -1098,21 +1246,21 @@ Editor.prototype = {
 
 	},
 
-	execute: function ( cmd, optionalName ) {
+	execute: async function ( cmd, optionalName ) {
 
-		this.history.execute( cmd, optionalName );
-
-	},
-
-	undo: function () {
-
-		this.history.undo();
+		await this.history.execute( cmd, optionalName );
 
 	},
 
-	redo: function () {
+	undo: async function () {
 
-		this.history.redo();
+		await this.history.undo();
+
+	},
+
+	redo: async function () {
+
+		await this.history.redo();
 
 	},
 
@@ -1217,16 +1365,99 @@ Editor.prototype = {
 		}
 		path = path.replace( /\/+/g, '/' );
 
+		const isScriptAsset = /\.(ts|js)$/i.test( path );
+		const scriptBaseName = isScriptAsset ? path.replace( /\.(ts|js)$/i, '' ).split( '/' ).pop() : null;
+
+		function scriptPathMatches( scriptAssetPath ) {
+			if ( !scriptAssetPath || typeof scriptAssetPath !== 'string' ) return false;
+			const normalized = scriptAssetPath.replace( /^\/+/, '' ).replace( /\\/g, '/' );
+			const base = normalized.replace( /\.(ts|js)$/i, '' ).split( '/' ).pop();
+			return base === scriptBaseName;
+		}
+
+		if ( isScriptAsset && scriptBaseName && scope.scene ) {
+			scope.scene.traverse( function ( object ) {
+				const scripts = object.userData && object.userData.scripts;
+				if ( !scripts || !Array.isArray( scripts ) ) return;
+				const before = scripts.length;
+				for ( let i = scripts.length - 1; i >= 0; i -- ) {
+					if ( scriptPathMatches( scripts[ i ].assetPath ) ) {
+						scripts.splice( i, 1 );
+					}
+				}
+				if ( scripts.length !== before ) {
+					scope.signals.sceneGraphChanged.dispatch();
+				}
+			} );
+		}
+
 		( async function () {
 
 			try {
-				await invoke( 'delete_asset_file', {
-					projectPath: projectPath,
-					assetPath: path
-				} );
+				const pathsToDelete = [ path ];
+				if ( isScriptAsset ) {
+					const otherExt = path.replace( /\.ts$/i, '.js' );
+					if ( otherExt === path ) {
+						pathsToDelete.push( path.replace( /\.js$/i, '.ts' ) );
+					} else {
+						pathsToDelete.push( otherExt );
+					}
+				}
+
+				for ( const p of pathsToDelete ) {
+					try {
+						await invoke( 'delete_asset_file', {
+							projectPath: projectPath,
+							assetPath: p
+						} );
+					} catch ( err ) {
+						if ( p !== path && ( err && ( err.message || err ).toString().toLowerCase().includes( 'not found' ) ) ) {
+							// other extension may not exist, ignore
+						} else {
+							throw err;
+						}
+					}
+				}
+
+				if ( window.assetsRoot ) {
+					function normalizePath( p ) {
+						if ( !p || typeof p !== 'string' ) return '';
+						return p.replace( /^\/+/, '' ).replace( /\\/g, '/' );
+					}
+					function removeFileFromFolder( folder, filePath ) {
+						const norm = normalizePath( filePath );
+						if ( folder.files ) {
+							const index = folder.files.findIndex( f => normalizePath( f.path ) === norm );
+							if ( index !== -1 ) {
+								folder.files.splice( index, 1 );
+								return true;
+							}
+						}
+						if ( folder.children ) {
+							for ( const child of folder.children ) {
+								if ( removeFileFromFolder( child, filePath ) ) {
+									return true;
+								}
+							}
+						}
+						return false;
+					}
+					for ( const p of pathsToDelete ) {
+						removeFileFromFolder( window.assetsRoot, p );
+					}
+				}
+
+				for ( const p of pathsToDelete ) {
+					scope.assets.unregisterByUrl( p );
+				}
 
 				window.selectedAsset = null;
 				scope.signals.sceneGraphChanged.dispatch();
+
+				if ( window.refreshAssets ) {
+					await window.refreshAssets();
+					scope.signals.sceneGraphChanged.dispatch();
+				}
 
 			} catch ( error ) {
 				console.error( '[Editor] Failed to delete asset:', error );

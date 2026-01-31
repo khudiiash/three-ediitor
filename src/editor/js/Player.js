@@ -359,13 +359,13 @@ function Player( editor ) {
 			editorCanvas.style.display = 'none';
 		}
 
-		// CRITICAL: The difference between first time and subsequent times:
-		// - First time: canvas is blank (never rendered), so showing it shows nothing
-		// - Subsequent times: canvas has the last rendered frame, so showing it shows old frame
-		// Solution: Clear the canvas element BEFORE showing it
+		
+		
+		
+		
 		if ( renderer && renderer.domElement ) {
-			// Force clear the canvas by temporarily changing its size
-			// This clears the canvas element's pixel buffer completely
+			
+			
 			const canvasEl = renderer.domElement;
 			const oldWidth = canvasEl.width;
 			const oldHeight = canvasEl.height;
@@ -373,11 +373,11 @@ function Player( editor ) {
 			canvasEl.height = 1;
 			canvasEl.width = oldWidth;
 			canvasEl.height = oldHeight;
-			// Also clear the renderer's internal state
+			
 			renderer.clear();
 		}
 		
-		// Now show the canvas - it will be blank/cleared
+		
 		dom.style.display = '';
 
 		const json = editor.toJSON();

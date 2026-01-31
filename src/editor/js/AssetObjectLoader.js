@@ -1,11 +1,13 @@
 import * as THREE from 'three';
+import { MaterialAsset } from '@engine/three-engine.js';
 
 class AssetObjectLoader extends THREE.ObjectLoader {
 
-	constructor( manager, projectPath ) {
+	constructor( manager, projectPath, editor = null ) {
 
 		super( manager );
 		this.projectPath = projectPath;
+		this.editor = editor;
 
 	}
 
@@ -47,7 +49,6 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 						if ( json.images ) {
 							const imageObj = json.images.find( img => img.uuid === imageUuid );
 							if ( imageObj ) {
-								// In browser mode, ignore blob URLs from IndexedDB and use asset path instead
 								const isInBrowser = typeof window !== 'undefined' && window.location && window.location.protocol === 'http:';
 								if ( imageObj.url && imageObj.url.startsWith( 'blob:' ) && isInBrowser && assetPath ) {
 									imagePath = assetPath;
@@ -61,10 +62,8 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 					
 					let finalPath = assetPath || imagePath;
 					
-					// In browser mode, ignore blob URLs and use asset path
 					const isInBrowser = typeof window !== 'undefined' && window.location && window.location.protocol === 'http:';
 					if ( finalPath && finalPath.startsWith( 'blob:' ) && isInBrowser && assetPath ) {
-						// Replace blob URL with asset path in browser mode
 						let normalizedPath = assetPath;
 						if ( normalizedPath.startsWith( '/' ) ) {
 							normalizedPath = normalizedPath.slice( 1 );
@@ -72,14 +71,12 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 						if ( !normalizedPath.startsWith( 'assets/' ) ) {
 							normalizedPath = 'assets/' + normalizedPath;
 						}
-						// Update the image URL to use asset path instead of blob URL
 						if ( json.images ) {
 							const imageObj = json.images.find( img => img.uuid === imageUuid );
 							if ( imageObj ) {
 								imageObj.url = normalizedPath;
 							}
 						}
-						// Update finalPath to use normalized path
 						finalPath = normalizedPath;
 					}
 					
@@ -146,7 +143,6 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 			const projectName = projectPath.split( /[/\\]/ ).pop();
 			
 			if ( isTauri && !isInBrowser ) {
-				// Tauri mode - use file system access
 				manager.setURLModifier( ( url ) => {
 					if ( url && url.startsWith( 'assets/' ) && !url.startsWith( 'data:' ) && !url.startsWith( 'blob:' ) && !url.startsWith( 'http' ) ) {
 						return url;
@@ -175,10 +171,6 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 					return originalFileLoaderLoad.call( this, url, onLoad, onProgress, onError );
 				};
 			} else if ( useApiForAssets ) {
-				// Browser/play mode - use API
-				console.log( '[AssetObjectLoader] Setting up API asset loading for project:', projectName );
-				
-				// Helper function to extract and normalize asset path
 				const extractAssetPath = ( url ) => {
 					if ( !url || typeof url !== 'string' ) return null;
 					
@@ -198,7 +190,6 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 					}
 					
 					if ( assetPath ) {
-						// Remove any leading 'assets/' from assetPath to avoid double prefix
 						while ( assetPath.startsWith( 'assets/' ) ) {
 							assetPath = assetPath.slice( 7 );
 						}
@@ -210,7 +201,6 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 				
 				manager.setURLModifier( ( url ) => {
 					if ( !url || typeof url !== 'string' ) {
-						console.log( '[AssetObjectLoader] URL modifier: invalid URL', url );
 						return url;
 					}
 					if ( url.startsWith( 'data:' ) || url.startsWith( 'blob:' ) || url.startsWith( '/api/projects/' ) ) {
@@ -223,43 +213,32 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 						const encodedProjectName = encodeURIComponent( projectName );
 						const encodedAssetPath = encodeURIComponent( assetPath );
 						const apiUrl = `/api/projects/${encodedProjectName}/assets/${encodedAssetPath}`;
-						console.log( '[AssetObjectLoader] URL modifier transforming:', url, '->', apiUrl );
 						return apiUrl;
 					}
 					return url;
 				} );
 				
-				// Also intercept ImageLoader for textures (ImageLoader might not use URL modifier)
 				const ImageLoader = THREE.ImageLoader;
 				if ( ImageLoader && !ImageLoader.prototype.__editorAssetLoaderIntercepted ) {
 					ImageLoader.prototype.__editorAssetLoaderIntercepted = true;
 					const originalImageLoaderLoad = ImageLoader.prototype.load;
 					ImageLoader.prototype.load = function( url, onLoad, onProgress, onError ) {
-						console.log( '[AssetObjectLoader] ImageLoader.load called with URL:', url, 'projectName:', projectName );
 						
-						// Skip data URLs and already-transformed API URLs
 						if ( url && typeof url === 'string' && ( url.startsWith( 'data:' ) || url.startsWith( '/api/projects/' ) ) ) {
 							return originalImageLoaderLoad.call( this, url, onLoad, onProgress, onError );
 						}
 						
-						// In browser mode, don't use blob URLs from IndexedDB - use API instead
 						if ( url && typeof url === 'string' && url.startsWith( 'blob:' ) && useApiForAssets ) {
-							console.log( '[AssetObjectLoader] Ignoring blob URL in browser mode, will use asset path instead:', url );
-							// Don't return here - let it fall through to asset path detection
 						} else if ( url && typeof url === 'string' && url.startsWith( 'blob:' ) ) {
-							// In Tauri mode, blob URLs are fine
 							return originalImageLoaderLoad.call( this, url, onLoad, onProgress, onError );
 						}
 						
-						// Use the same helper function to extract asset path
 						const assetPath = extractAssetPath( url );
 						
 						if ( assetPath ) {
-							// Encode project name and asset path to handle UTF-8 characters
 							const encodedProjectName = encodeURIComponent( projectName );
 							const encodedAssetPath = encodeURIComponent( assetPath );
 							const apiUrl = `/api/projects/${encodedProjectName}/assets/${encodedAssetPath}`;
-							console.log( '[AssetObjectLoader] Intercepting asset load, using API:', apiUrl );
 							return originalImageLoaderLoad.call( this, apiUrl, onLoad, onProgress, onError );
 						}
 						
@@ -270,8 +249,69 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 		}
 		
 		this.manager = manager;
-		const result = await super.parseAsync( json );
 		
+		if ( json.materials && this.editor ) {
+			const originalParseMaterials = this.parseMaterials.bind( this );
+			this.parseMaterials = ( materialsJson, textures ) => {
+				const parsedMaterials = originalParseMaterials( materialsJson, textures );
+				const materialMap = {};
+				
+				if ( Array.isArray( parsedMaterials ) ) {
+					parsedMaterials.forEach( ( material, index ) => {
+						if ( material && materialsJson[ index ] ) {
+							const materialJson = materialsJson[ index ];
+							if ( materialJson.userData && materialJson.userData.assetPath ) {
+								const assetPath = materialJson.userData.assetPath.startsWith( '/' ) ? materialJson.userData.assetPath.slice( 1 ) : materialJson.userData.assetPath;
+								material.assetPath = assetPath;
+								const materialAsset = this.editor.assets.getByUrl( assetPath );
+								if ( materialAsset && materialAsset instanceof MaterialAsset ) {
+									const assetMaterial = materialAsset.getMaterial();
+									if ( assetMaterial ) {
+										materialMap[ material.uuid ] = assetMaterial;
+									}
+								}
+							}
+						}
+					} );
+				} else if ( parsedMaterials && typeof parsedMaterials === 'object' ) {
+					for ( const uuid in parsedMaterials ) {
+						const material = parsedMaterials[ uuid ];
+						if ( material ) {
+							const materialJson = materialsJson.find( m => m.uuid === uuid );
+							if ( materialJson && materialJson.userData && materialJson.userData.assetPath ) {
+								const assetPath = materialJson.userData.assetPath.startsWith( '/' ) ? materialJson.userData.assetPath.slice( 1 ) : materialJson.userData.assetPath;
+								material.assetPath = assetPath;
+								const materialAsset = this.editor.assets.getByUrl( assetPath );
+								if ( materialAsset && materialAsset instanceof MaterialAsset ) {
+									const assetMaterial = materialAsset.getMaterial();
+									if ( assetMaterial ) {
+										materialMap[ uuid ] = assetMaterial;
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				if ( Object.keys( materialMap ).length > 0 ) {
+					if ( Array.isArray( parsedMaterials ) ) {
+						return parsedMaterials.map( ( material, index ) => {
+							return materialMap[ material.uuid ] || material;
+						} );
+					} else {
+						const result = {};
+						for ( const uuid in parsedMaterials ) {
+							result[ uuid ] = materialMap[ uuid ] || parsedMaterials[ uuid ];
+						}
+						return result;
+					}
+				}
+				
+				return parsedMaterials;
+			};
+		}
+		
+		const result = await super.parseAsync( json );
 		
 		if ( json.textures && result ) {
 			result.traverse( function( object ) {
@@ -295,10 +335,28 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 									}
 								}
 							} );
+							
+							if ( material.assetPath ) {
+								const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+								const materialAsset = this.editor ? this.editor.assets.getByUrl( assetPath ) : null;
+								if ( materialAsset && materialAsset instanceof MaterialAsset ) {
+									const assetMaterial = materialAsset.getMaterial();
+									if ( assetMaterial && assetMaterial !== material ) {
+										if ( Array.isArray( object.material ) ) {
+											const index = object.material.indexOf( material );
+											if ( index !== -1 ) {
+												object.material[ index ] = assetMaterial;
+											}
+										} else {
+											object.material = assetMaterial;
+										}
+									}
+								}
+							}
 						}
-					} );
+					}.bind( this ) );
 				}
-			} );
+			}.bind( this ) );
 		}
 		
 		return result;

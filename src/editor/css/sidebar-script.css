@@ -100,3 +100,37 @@
 .script-attribute-input-string {
 	width: 120px;
 }
+
+.script-attribute-entity-slot {
+	min-height: 24px;
+	border: 1px dashed var(--border-default);
+	border-radius: var(--radius-sm);
+	padding: var(--space-1) var(--space-2);
+	cursor: default;
+	font-size: var(--font-size-sm);
+	color: var(--text-tertiary);
+	flex: 1;
+	min-width: 0;
+}
+
+.script-attribute-entity-slot:hover {
+	border-color: var(--border-strong);
+	color: var(--text-secondary);
+}
+
+.script-attribute-entity-slot.drag-over {
+	border-color: var(--focus-ring);
+	background: rgba(0, 136, 255, 0.1);
+}
+
+#script {
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: var(--bg-primary);
+	border: 1px solid var(--border-subtle);
+	z-index: var(--z-modal);
+	display: none;
+}

@@ -39,7 +39,7 @@ function SidebarObjectAnimation( editor ) {
 
 	signals.objectSelected.add( function ( object ) {
 
-		if ( object !== null && object.animations.length > 0 ) {
+		if ( object !== null && object.animations && Array.isArray( object.animations ) && object.animations.length > 0 ) {
 
 			animationsList.clear();
 

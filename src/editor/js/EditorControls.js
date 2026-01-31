@@ -237,6 +237,7 @@ class EditorControls extends THREE.EventDispatcher {
 		}
 
 		function onMouseMove( event ) {
+			console.log( 'onMouseMove' );
 
 			pointer.set( event.clientX, event.clientY );
 

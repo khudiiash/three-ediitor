@@ -42,6 +42,8 @@ function SidebarScene( editor ) {
 		option.draggable = draggable && !isSystemEntity;
 		option.innerHTML = buildHTML( object );
 		option.value = object.id;
+		option.dataset.uuid = object.uuid;
+		option.dataset.name = object.name || object.uuid || '';
 		
 		if ( isSystemEntity ) {
 			option.classList.add( 'system-entity' );
@@ -170,7 +172,6 @@ function SidebarScene( editor ) {
 	outliner.setId( 'outliner' );
 	outliner.addClass( 'scene-tree' );
 	
-	// Scrollbar and visibility styles are now in sidebar.css
 	outliner.onChange( function () {
 
 		ignoreObjectSelectedSignal = true;
@@ -232,8 +233,8 @@ function SidebarScene( editor ) {
 							const projectPath = editor.storage.getProjectPath();
 							let modelPath = asset.modelPath;
 							
-							if ( !modelPath && asset.path && asset.path.endsWith( '.model' ) ) {
-								const baseName = asset.name.replace( /\.model$/, '' );
+							if ( !modelPath && asset.path && asset.path.endsWith( '.mesh' ) ) {
+								const baseName = asset.name.replace( /\.mesh$/, '' );
 								const folderPath = asset.path.substring( 0, asset.path.lastIndexOf( '/' ) );
 								const folderName = folderPath.substring( folderPath.lastIndexOf( '/' ) + 1 );
 								if ( /\.(glb|gltf|fbx|obj)$/i.test( folderName ) ) {
@@ -278,9 +279,8 @@ function SidebarScene( editor ) {
 					return;
 				}
 				
-				console.log( '[Hierarchy] Dropped asset type:', asset.type, asset );
-				
 			} catch ( e ) {
+				console.error( e );
 			}
 		}
 	} );
@@ -399,7 +399,6 @@ function SidebarScene( editor ) {
 
 				const openerHTML = openerElement ? openerElement.outerHTML : '';
 
-				// Preserve the tree indentation style
 				const currentIndent = option.style.getPropertyValue( '--tree-indent' );
 
 				option.innerHTML = openerHTML + buildHTML( object );
@@ -448,12 +447,12 @@ function SidebarScene( editor ) {
 
 		if ( ignoreObjectSelectedSignal === true ) return;
 
-		if ( object !== null && object.parent !== null ) {
+		if ( object !== null && object.parent !== null && object.parent !== undefined && typeof object.parent === 'object' ) {
 
 			let needsRefresh = false;
 			let parent = object.parent;
 
-			while ( parent !== editor.scene ) {
+			while ( parent !== null && parent !== undefined && parent !== editor.scene && typeof parent === 'object' ) {
 
 				if ( nodeStates.get( parent ) !== true ) {
 
@@ -468,7 +467,11 @@ function SidebarScene( editor ) {
 
 			if ( needsRefresh ) refreshUI();
 
-			outliner.setValue( object.id );
+			if ( object.id !== undefined ) {
+				outliner.setValue( object.id );
+			} else {
+				outliner.setValue( null );
+			}
 
 		} else {
 

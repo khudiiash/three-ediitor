@@ -17,21 +17,18 @@ class AssetSelector {
 			texture: [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ],
 			audio: [ 'mp3', 'wav', 'ogg', 'm4a', 'aac' ],
 			model: [ 'glb', 'gltf', 'fbx', 'obj' ],
-			geometry: [ 'json', 'glb', 'gltf', 'fbx', 'obj' ], 
-			material: [ 'json' ] 
+			geometry: [ 'json', 'geo' ],
+			material: [ 'json', 'mat' ] 
 		};
 
-		// Create overlay
 		const overlay = document.createElement( 'div' );
 		overlay.className = 'asset-selector-overlay';
 		document.body.appendChild( overlay );
 
-		// Create modal
 		const modal = document.createElement( 'div' );
 		modal.className = 'asset-selector-modal';
 		overlay.appendChild( modal );
 
-		// Create header
 		const header = document.createElement( 'div' );
 		header.className = 'asset-selector-header';
 
@@ -48,7 +45,6 @@ class AssetSelector {
 
 		modal.appendChild( header );
 
-		// Create toolbar
 		const toolbar = document.createElement( 'div' );
 		toolbar.className = 'asset-selector-toolbar';
 
@@ -81,7 +77,6 @@ class AssetSelector {
 
 		toolbar.appendChild( leftToolbar );
 
-		// View mode buttons
 		const viewModeButtons = document.createElement( 'div' );
 		viewModeButtons.className = 'asset-selector-toolbar-right';
 
@@ -133,7 +128,6 @@ class AssetSelector {
 
 		modal.appendChild( toolbar );
 
-		// Create grid container
 		const gridContainer = document.createElement( 'div' );
 		gridContainer.className = 'asset-selector-grid';
 		modal.appendChild( gridContainer );
@@ -212,125 +206,32 @@ class AssetSelector {
 
 		this.gridContainer.innerHTML = '';
 
-		
-		if ( this.assetType === 'geometry' ) {
-			const defaultGeometries = [
-				'BoxGeometry', 'SphereGeometry', 'CylinderGeometry', 'PlaneGeometry',
-				'ConeGeometry', 'TorusGeometry', 'TorusKnotGeometry', 'OctahedronGeometry',
-				'TetrahedronGeometry', 'IcosahedronGeometry', 'DodecahedronGeometry',
-				'CapsuleGeometry', 'CircleGeometry', 'RingGeometry', 'LatheGeometry'
-			];
-
-			defaultGeometries.forEach( geoType => {
-				const defaultItem = document.createElement( 'div' );
-				defaultItem.className = 'asset-item asset-item-default';
-
-				const thumbnail = document.createElement( 'div' );
-				thumbnail.className = 'asset-item-default-thumbnail';
-				const badge = this.createFileBadge( geoType + '.geometry', 120 );
-				thumbnail.appendChild( badge );
-				defaultItem.appendChild( thumbnail );
-
-				const name = document.createElement( 'div' );
-				name.className = 'asset-item-default-name';
-				name.textContent = geoType;
-				defaultItem.appendChild( name );
-
-				defaultItem.addEventListener( 'click', () => {
-					this.selectAsset( {
-						type: 'default-geometry',
-						geometryType: geoType,
-						name: geoType
-					} );
-				} );
-
-				this.gridContainer.appendChild( defaultItem );
-			} );
-		}
-
-		if ( this.assetType === 'material' ) {
-			const defaultMaterials = [
-				'LineBasicMaterial', 'LineDashedMaterial', 'MeshBasicMaterial',
-				'MeshDepthMaterial', 'MeshNormalMaterial', 'MeshLambertMaterial',
-				'MeshMatcapMaterial', 'MeshPhongMaterial', 'MeshToonMaterial',
-				'MeshStandardMaterial', 'MeshPhysicalMaterial', 'RawShaderMaterial',
-				'ShaderMaterial', 'ShadowMaterial', 'SpriteMaterial', 'PointsMaterial'
-			];
-
-			defaultMaterials.forEach( matType => {
-				const defaultItem = document.createElement( 'div' );
-				defaultItem.className = 'asset-item asset-item-default';
-
-				const thumbnail = document.createElement( 'div' );
-				thumbnail.className = 'asset-item-default-thumbnail';
-				
-				// Render preview for default material
-				(async () => {
-					try {
-						const previewRenderer = getAssetPreviewRenderer();
-						const material = assetManager.getMaterial(`default/${matType}`);
-						if (material) {
-							const dataUrl = await previewRenderer.renderMaterialPreview(material, 120, 120);
-							const img = document.createElement('img');
-							img.src = dataUrl;
-							thumbnail.appendChild(img);
-						} else {
-							const badge = this.createFileBadge(matType + '.material', 120);
-							thumbnail.appendChild(badge);
-						}
-					} catch (error) {
-						const badge = this.createFileBadge(matType + '.material', 120);
-						thumbnail.appendChild(badge);
-					}
-				})();
-				
-				defaultItem.appendChild( thumbnail );
-
-				const name = document.createElement( 'div' );
-				name.className = 'asset-item-default-name';
-				name.textContent = matType;
-				defaultItem.appendChild( name );
-
-				defaultItem.addEventListener( 'click', () => {
-					this.selectAsset( {
-						type: 'default-material',
-						materialType: matType,
-						name: matType
-					} );
-				} );
-
-				this.gridContainer.appendChild( defaultItem );
-			} );
-		}
-
 		const assets = this.getAllAssetsFromProject( this.assetType );
 		
-		console.log('[AssetSelector] loadAssets - assetType:', this.assetType, 'assets count:', assets.length);
-		if (assets.length > 0) {
-			console.log('[AssetSelector] First asset:', assets[0]);
+		if ( this.assetType !== 'geometry' ) {
+			await this.ensureModelsInCache( assets );
 		}
-		console.log('[AssetSelector] AssetManager stats:', assetManager.getStats());
-		
-		await this.ensureModelsInCache(assets);
 
-		if ( assets.length === 0 && this.assetType !== 'geometry' && this.assetType !== 'material' ) {
+		if ( assets.length === 0 ) {
 			const emptyMessage = document.createElement( 'div' );
 			emptyMessage.className = 'asset-selector-empty-message';
-			emptyMessage.textContent = `No ${this.assetType} assets found in project. Import some files to get started.`;
+			if ( this.assetType === 'material' ) {
+				emptyMessage.textContent = 'No material assets in project. Create .mat files in the Assets panel.';
+			} else if ( this.assetType === 'geometry' ) {
+				emptyMessage.textContent = 'No geometry assets in project. Use .geo, .json, or geometries from imported models.';
+			} else {
+				emptyMessage.textContent = `No ${this.assetType} assets found in project. Import some files to get started.`;
+			}
 			this.gridContainer.appendChild( emptyMessage );
 			return;
 		}
 
 		if (this.viewMode === 'list') {
-			console.log('[AssetSelector] Rendering list view');
-			// Set list view class
 			this.gridContainer.className = 'asset-selector-grid view-list';
 			
-			// Create table structure like in assets panel
 			const table = document.createElement('table');
 			table.className = 'asset-selector-table';
 			
-			// Add table body
 			const tbody = document.createElement('tbody');
 			tbody.id = 'asset-selector-tbody';
 			
@@ -341,9 +242,7 @@ class AssetSelector {
 			
 			table.appendChild( tbody );
 			this.gridContainer.appendChild( table );
-			console.log('[AssetSelector] List view rendered, rows:', assets.length);
 		} else {
-			// Set grid view class based on mode
 			this.gridContainer.className = this.viewMode === 'large' 
 				? 'asset-selector-grid view-large' 
 				: 'asset-selector-grid view-grid';
@@ -372,14 +271,13 @@ class AssetSelector {
 			folder.files.forEach( file => {
 				const ext = file.name.split( '.' ).pop()?.toLowerCase();
 				
-				// Handle virtual model files (.geometry, .material, .model, .texture)
-				if ( assetType === 'geometry' && file.type === 'geometry' && file.name.endsWith('.geometry') ) {
-					console.log('[AssetSelector] Found geometry file:', file.name, file);
+				
+				if ( assetType === 'geometry' && file.type === 'geometry' && file.name.endsWith( '.geo' ) ) {
 					assets.push( {
 						name: file.name,
 						path: file.path,
 						type: 'geometry',
-						extension: 'geometry',
+						extension: 'geo',
 						modelGeometry: file.modelGeometry,
 						modelPath: file.modelPath,
 						isModelContent: true
@@ -387,19 +285,12 @@ class AssetSelector {
 					return;
 				}
 				
-				if ( assetType === 'material' && file.type === 'material' && file.name.endsWith('.material') ) {
-					console.log('[AssetSelector] Found material file:', file.name, file);
-					console.log('[AssetSelector] Material data:', {
-						hasModelMaterial: !!file.modelMaterial,
-						modelMaterialName: file.modelMaterial?.name,
-						hasMaterialObject: !!(file.modelMaterial?.material),
-						modelPath: file.modelPath
-					});
+				if ( assetType === 'material' && file.type === 'material' && file.name.endsWith( '.mat' ) ) {
 					assets.push( {
 						name: file.name,
 						path: file.path,
 						type: 'material',
-						extension: 'material',
+						extension: 'mat',
 						modelMaterial: file.modelMaterial,
 						modelPath: file.modelPath,
 						isModelContent: true
@@ -407,8 +298,7 @@ class AssetSelector {
 					return;
 				}
 				
-				if ( assetType === 'model' && file.type === 'model' && file.name.endsWith('.model') ) {
-					console.log('[AssetSelector] Found model file:', file.name, file);
+				if ( assetType === 'model' && file.type === 'model' && file.name.endsWith( '.mesh' ) ) {
 					assets.push( {
 						name: file.name,
 						path: file.path,
@@ -435,7 +325,7 @@ class AssetSelector {
 					return;
 				}
 				
-				// Handle regular files
+				
 				if ( extensions.includes( ext ) ) {
 					assets.push( {
 						name: file.name,
@@ -547,41 +437,27 @@ class AssetSelector {
 
 			if ( asset.type === 'material' ) {
 				try {
-					console.log('[AssetSelector Grid] Material asset:', {
-						name: asset.name,
-						hasModelMaterial: !!asset.modelMaterial,
-						modelMaterialName: asset.modelMaterial?.name,
-						hasMaterialDirect: !!(asset.modelMaterial && asset.modelMaterial.material),
-						modelPath: asset.modelPath,
-						assetManagerStats: assetManager.getStats()
-					});
-					
 					let material = asset.modelMaterial && asset.modelMaterial.material ? asset.modelMaterial.material : null;
 					
 					if ( !material && asset.modelPath ) {
-						const materialName = asset.name.replace('.material', '');
+						const materialName = asset.name.replace( /\.mat$/, '' );
 						const matId = `${asset.modelPath}/${materialName}`;
 						material = assetManager.getMaterial(matId);
-						console.log('[AssetSelector Grid] Looking up material:', matId, 'Found:', !!material);
 						
 						if (!material) {
 							if (asset.modelMaterial && asset.modelMaterial.name) {
 								const altMatId = `${asset.modelPath}/${asset.modelMaterial.name}`;
 								material = assetManager.getMaterial(altMatId);
-								console.log('[AssetSelector Grid] Trying alternate material ID:', altMatId, 'Found:', !!material);
 							}
 						}
 					}
 					
 					if ( material ) {
-						console.log('[AssetSelector Grid] Rendering material preview');
 						const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
 						const img = document.createElement( 'img' );
 						img.src = dataUrl;
 						thumbnail.appendChild( img );
 						return;
-					} else {
-						console.log('[AssetSelector Grid] No material found for preview');
 					}
 					
 					const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
@@ -610,10 +486,15 @@ class AssetSelector {
 				try {
 					let geometry = asset.modelGeometry && asset.modelGeometry.geometry ? asset.modelGeometry.geometry : null;
 					
+					if ( !geometry && asset.path ) {
+						geometry = assetManager.getGeometry( asset.path );
+					}
 					if ( !geometry && asset.modelPath ) {
-						const geometryName = asset.name.replace('.geometry', '');
-						const geoId = `${asset.modelPath}/${geometryName}`;
-						geometry = assetManager.getGeometry(geoId);
+						const geometryName = asset.name.replace( /\.geo$/, '' );
+						geometry = assetManager.getGeometry( `${asset.modelPath}/${geometryName}` );
+						if ( !geometry && asset.modelGeometry && asset.modelGeometry.name ) {
+							geometry = assetManager.getGeometry( asset.modelPath + '/' + asset.modelGeometry.name );
+						}
 					}
 					
 					if ( geometry ) {
@@ -693,9 +574,7 @@ class AssetSelector {
 		item.appendChild( name );
 
 		item.addEventListener( 'click', () => {
-			// Remove selected class from all items
 			this.gridContainer.querySelectorAll( '.asset-item' ).forEach( i => i.classList.remove( 'selected' ) );
-			// Add selected class to clicked item
 			item.classList.add( 'selected' );
 			this.selectAsset( asset );
 		} );
@@ -739,9 +618,9 @@ class AssetSelector {
 				await this.selectAudio( assetData, callback );
 			} else if ( assetData.type === 'model' ) {
 				await this.selectModel( assetData, callback );
-			} else if ( assetData.type === 'geometry' || assetData.type === 'default-geometry' ) {
+			} else if ( assetData.type === 'geometry' ) {
 				await this.selectGeometry( assetData, callback );
-			} else if ( assetData.type === 'material' || assetData.type === 'default-material' ) {
+			} else if ( assetData.type === 'material' ) {
 				await this.selectMaterial( assetData, callback );
 			} else {
 				console.warn( 'Unknown asset type:', assetData.type );
@@ -857,7 +736,7 @@ class AssetSelector {
 					const img = new Image();
 					img.onload = () => {
 						const texture = new THREE.Texture( img );
-						// Ensure texture matrix is initialized
+						
 						if ( ! texture.matrix ) {
 							texture.matrix = new THREE.Matrix3();
 						}
@@ -912,7 +791,7 @@ class AssetSelector {
 			
 			if ( isExistingAsset ) {
 				const texture = new THREE.Texture( image );
-				// Ensure texture matrix is initialized
+				
 				if ( ! texture.matrix ) {
 					texture.matrix = new THREE.Matrix3();
 				}
@@ -948,7 +827,7 @@ class AssetSelector {
 				const newImage = new Image();
 				newImage.onload = () => {
 					const texture = new THREE.Texture( newImage );
-					// Ensure texture matrix is initialized
+					
 					if ( ! texture.matrix ) {
 						texture.matrix = new THREE.Matrix3();
 					}
@@ -1069,83 +948,51 @@ class AssetSelector {
 
 	async selectGeometry( assetData, callback ) {
 
-		
-		if ( assetData.type === 'default-geometry' && assetData.geometryType ) {
-			const defaultGeometries = {
-				'BoxGeometry': THREE.BoxGeometry,
-				'SphereGeometry': THREE.SphereGeometry,
-				'CylinderGeometry': THREE.CylinderGeometry,
-				'PlaneGeometry': THREE.PlaneGeometry,
-				'ConeGeometry': THREE.ConeGeometry,
-				'TorusGeometry': THREE.TorusGeometry,
-				'TorusKnotGeometry': THREE.TorusKnotGeometry,
-				'OctahedronGeometry': THREE.OctahedronGeometry,
-				'TetrahedronGeometry': THREE.TetrahedronGeometry,
-				'IcosahedronGeometry': THREE.IcosahedronGeometry,
-				'DodecahedronGeometry': THREE.DodecahedronGeometry,
-				'CapsuleGeometry': THREE.CapsuleGeometry,
-				'CircleGeometry': THREE.CircleGeometry,
-				'RingGeometry': THREE.RingGeometry,
-				'LatheGeometry': THREE.LatheGeometry
-			};
-
-			const GeometryClass = defaultGeometries[ assetData.geometryType ];
-			if ( GeometryClass ) {
-				let newGeometry;
-				if ( assetData.geometryType === 'BoxGeometry' ) {
-					newGeometry = new GeometryClass( 1, 1, 1 );
-				} else if ( assetData.geometryType === 'SphereGeometry' ) {
-					newGeometry = new GeometryClass( 1, 32, 16 );
-				} else if ( assetData.geometryType === 'CylinderGeometry' ) {
-					newGeometry = new GeometryClass( 1, 1, 1, 32 );
-				} else if ( assetData.geometryType === 'PlaneGeometry' ) {
-					newGeometry = new GeometryClass( 1, 1 );
-				} else if ( assetData.geometryType === 'ConeGeometry' ) {
-					newGeometry = new GeometryClass( 1, 1, 32 );
-				} else if ( assetData.geometryType === 'TorusGeometry' ) {
-					newGeometry = new GeometryClass( 1, 0.4, 16, 100 );
-				} else if ( assetData.geometryType === 'TorusKnotGeometry' ) {
-					newGeometry = new GeometryClass( 1, 0.3, 100, 16 );
-				} else if ( assetData.geometryType === 'CapsuleGeometry' ) {
-					newGeometry = new GeometryClass( 1, 1, 4, 8 );
-				} else if ( assetData.geometryType === 'CircleGeometry' ) {
-					newGeometry = new GeometryClass( 1, 32 );
-				} else if ( assetData.geometryType === 'RingGeometry' ) {
-					newGeometry = new GeometryClass( 0.5, 1, 32 );
-				} else {
-					newGeometry = new GeometryClass();
-				}
-				newGeometry.name = assetData.geometryType;
-				newGeometry.isGeometry = true;
-				this.isProcessing = false;
-				callback( newGeometry );
-				this.hide();
-				return;
+		// Geometry from assets (virtual .geo from models or assetManager) — no file parsing
+		let geometry = assetData.modelGeometry && assetData.modelGeometry.geometry ? assetData.modelGeometry.geometry : null;
+		if ( ! geometry && assetData.modelPath && assetData.name ) {
+			const geometryName = assetData.name.replace( /\.geo$/, '' );
+			geometry = assetManager.getGeometry( assetData.modelPath + '/' + geometryName );
+			if ( ! geometry && assetData.modelGeometry && assetData.modelGeometry.name ) {
+				geometry = assetManager.getGeometry( assetData.modelPath + '/' + assetData.modelGeometry.name );
 			}
 		}
+		if ( ! geometry && assetData.path ) {
+			geometry = assetManager.getGeometry( assetData.path );
+		}
+		if ( geometry ) {
+			geometry = geometry.clone();
+			geometry.assetPath = assetData.path || ( assetData.modelPath ? assetData.modelPath + '/' + ( assetData.modelGeometry && assetData.modelGeometry.name ? assetData.modelGeometry.name : assetData.name.replace( /\.geo$/, '' ) ) : null );
+			geometry.sourceFile = assetData.name;
+			geometry.isGeometry = true;
+			this.isProcessing = false;
+			callback( geometry );
+			this.hide();
+			return;
+		}
 
-		
+		// Standalone .json / .geo geometry files (BufferGeometry JSON)
+		const ext = ( assetData.extension || assetData.name.split( '.' ).pop() || '' ).toLowerCase();
+		if ( ext !== 'json' && ext !== 'geo' ) {
+			this.isProcessing = false;
+			return;
+		}
 
-		
 		const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
 
 		if ( isTauri && this.editor.storage && this.editor.storage.getProjectPath ) {
 			const projectPath = this.editor.storage.getProjectPath();
-			const assetPath = assetData.path.startsWith( '/' ) ? assetData.path.substring( 1 ) : assetData.path;
-
+			const assetPath = ( assetData.path || '' ).replace( /^\/+/, '' );
 			try {
 				const assetBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
 					projectPath: projectPath,
 					assetPath: assetPath
 				} );
-
-				const ext = assetData.extension || assetData.name.split( '.' ).pop()?.toLowerCase();
-				
-				if ( ext === 'json' || ext === 'geometry' ) {
-					const text = new TextDecoder().decode( new Uint8Array( assetBytes ) );
-					const geometryData = JSON.parse( text );
-					const loader = new THREE.BufferGeometryLoader();
-					const geometry = loader.parse( geometryData );
+				const text = new TextDecoder().decode( new Uint8Array( assetBytes ) );
+				const geometryData = JSON.parse( text );
+				const loader = new THREE.BufferGeometryLoader();
+				geometry = loader.parse( geometryData );
+				if ( geometry ) {
 					geometry.assetPath = assetPath;
 					geometry.sourceFile = assetData.name;
 					geometry.isGeometry = true;
@@ -1153,136 +1000,7 @@ class AssetSelector {
 					callback( geometry );
 					this.hide();
 				} else {
-					
-					
-					let arrayBuffer;
-					if ( assetBytes instanceof ArrayBuffer ) {
-						arrayBuffer = assetBytes;
-					} else if ( assetBytes instanceof Uint8Array ) {
-						
-						arrayBuffer = assetBytes.buffer.slice( assetBytes.byteOffset, assetBytes.byteOffset + assetBytes.byteLength );
-					} else {
-						
-						const uint8Array = new Uint8Array( assetBytes );
-						arrayBuffer = uint8Array.buffer.slice( uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength );
-					}
-					
-					let loader;
-					if ( ext === 'glb' || ext === 'gltf' ) {
-						const { GLTFLoader } = await import( 'three/addons/loaders/GLTFLoader.js' );
-						const { DRACOLoader } = await import( 'three/addons/loaders/DRACOLoader.js' );
-						const { KTX2Loader } = await import( 'three/addons/loaders/KTX2Loader.js' );
-						const { MeshoptDecoder } = await import( 'three/addons/libs/meshopt_decoder.module.js' );
-
-						const dracoLoader = new DRACOLoader();
-						dracoLoader.setDecoderPath( '../examples/jsm/libs/draco/gltf/' );
-
-						const ktx2Loader = new KTX2Loader();
-						ktx2Loader.setTranscoderPath( '../examples/jsm/libs/basis/' );
-
-						if ( this.editor.signals ) {
-							this.editor.signals.rendererDetectKTX2Support.dispatch( ktx2Loader );
-						}
-
-						loader = new GLTFLoader();
-						loader.setDRACOLoader( dracoLoader );
-						loader.setKTX2Loader( ktx2Loader );
-						loader.setMeshoptDecoder( MeshoptDecoder );
-
-						
-						let parseData;
-						if ( ext === 'glb' ) {
-							
-							parseData = arrayBuffer;
-						} else {
-							
-							const uint8Array = new Uint8Array( arrayBuffer );
-							parseData = new TextDecoder().decode( uint8Array );
-						}
-
-						loader.parse( parseData, '', ( result ) => {
-							let loadedMesh = null;
-							if ( result.scene ) {
-								result.scene.traverse( ( child ) => {
-									if ( child.isMesh && ! loadedMesh ) {
-										loadedMesh = child;
-									}
-								} );
-							}
-
-							if ( loader.dracoLoader ) loader.dracoLoader.dispose();
-							if ( loader.ktx2Loader ) loader.ktx2Loader.dispose();
-
-							if ( loadedMesh && loadedMesh.geometry ) {
-								const geometry = loadedMesh.geometry.clone();
-								geometry.assetPath = assetPath;
-								geometry.sourceFile = assetData.name;
-								geometry.isGeometry = true;
-								this.isProcessing = false;
-								callback( geometry );
-								this.hide();
-							} else {
-								this.isProcessing = false;
-							}
-						}, ( error ) => {
-							console.error( 'Failed to parse model:', error );
-							this.isProcessing = false;
-						} );
-					} else if ( ext === 'fbx' ) {
-						const { FBXLoader } = await import( 'three/addons/loaders/FBXLoader.js' );
-						loader = new FBXLoader();
-						const result = loader.parse( arrayBuffer );
-						
-						let loadedMesh = null;
-						if ( result ) {
-							result.traverse( ( child ) => {
-								if ( child.isMesh && ! loadedMesh ) {
-									loadedMesh = child;
-								}
-							} );
-						}
-
-						if ( loadedMesh && loadedMesh.geometry ) {
-							const geometry = loadedMesh.geometry.clone();
-							geometry.assetPath = assetPath;
-							geometry.sourceFile = assetData.name;
-							geometry.isGeometry = true;
-							this.isProcessing = false;
-							callback( geometry );
-							this.hide();
-						} else {
-							this.isProcessing = false;
-						}
-					} else if ( ext === 'obj' ) {
-						const { OBJLoader } = await import( 'three/addons/loaders/OBJLoader.js' );
-						loader = new OBJLoader();
-						const uint8Array = new Uint8Array( arrayBuffer );
-						const text = new TextDecoder().decode( uint8Array );
-						const result = loader.parse( text );
-						
-						let loadedMesh = null;
-						if ( result ) {
-							result.traverse( ( child ) => {
-								if ( child.isMesh && ! loadedMesh ) {
-									loadedMesh = child;
-								}
-							} );
-						}
-
-						if ( loadedMesh && loadedMesh.geometry ) {
-							const geometry = loadedMesh.geometry.clone();
-							geometry.assetPath = assetPath;
-							geometry.sourceFile = assetData.name;
-							geometry.isGeometry = true;
-							this.isProcessing = false;
-							callback( geometry );
-							this.hide();
-						} else {
-							this.isProcessing = false;
-						}
-					} else {
-						this.isProcessing = false;
-					}
+					this.isProcessing = false;
 				}
 			} catch ( error ) {
 				console.error( '[AssetSelector] Failed to load geometry asset:', error );
@@ -1290,16 +1008,19 @@ class AssetSelector {
 			}
 		} else {
 			try {
-				if ( assetData.extension === 'json' || assetData.extension === 'geometry' ) {
-					const response = await fetch( assetData.url || assetData.content );
-					const geometryData = await response.json();
-					const loader = new THREE.BufferGeometryLoader();
-					const geometry = loader.parse( geometryData );
+				const response = await fetch( assetData.url || assetData.content );
+				const geometryData = await response.json();
+				const loader = new THREE.BufferGeometryLoader();
+				geometry = loader.parse( geometryData );
+				if ( geometry ) {
 					geometry.assetPath = assetData.path;
 					geometry.sourceFile = assetData.name;
+					geometry.isGeometry = true;
 					this.isProcessing = false;
 					callback( geometry );
 					this.hide();
+				} else {
+					this.isProcessing = false;
 				}
 			} catch ( error ) {
 				console.error( '[AssetSelector] Failed to load geometry:', error );
@@ -1311,88 +1032,105 @@ class AssetSelector {
 
 	async selectMaterial( assetData, callback ) {
 
+		const assetPath = assetData.path.startsWith( '/' ) ? assetData.path.substring( 1 ) : assetData.path;
+		const assetName = assetData.name.replace( /\.mat$/, '' );
 		
-		if ( assetData.type === 'default-material' && assetData.materialType ) {
-			const materialClassesList = {
-				'LineBasicMaterial': THREE.LineBasicMaterial,
-				'LineDashedMaterial': THREE.LineDashedMaterial,
-				'MeshBasicMaterial': THREE.MeshBasicMaterial,
-				'MeshDepthMaterial': THREE.MeshDepthMaterial,
-				'MeshNormalMaterial': THREE.MeshNormalMaterial,
-				'MeshLambertMaterial': THREE.MeshLambertMaterial,
-				'MeshMatcapMaterial': THREE.MeshMatcapMaterial,
-				'MeshPhongMaterial': THREE.MeshPhongMaterial,
-				'MeshToonMaterial': THREE.MeshToonMaterial,
-				'MeshStandardMaterial': THREE.MeshStandardMaterial,
-				'MeshPhysicalMaterial': THREE.MeshPhysicalMaterial,
-				'RawShaderMaterial': THREE.RawShaderMaterial,
-				'ShaderMaterial': THREE.ShaderMaterial,
-				'ShadowMaterial': THREE.ShadowMaterial,
-				'SpriteMaterial': THREE.SpriteMaterial,
-				'PointsMaterial': THREE.PointsMaterial
-			};
-
-			const MaterialClass = materialClassesList[ assetData.materialType ];
-			if ( MaterialClass ) {
-				const newMaterial = new MaterialClass();
-				newMaterial.name = assetData.materialType;
-				newMaterial.isMaterial = true;
+		let materialAsset = this.editor.assets.getByUrl( assetPath );
+		
+		if ( !materialAsset ) {
+			const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
+			let materialData = null;
+			
+			if ( isTauri && this.editor.storage && this.editor.storage.getProjectPath ) {
+				const projectPath = this.editor.storage.getProjectPath();
+				try {
+					const assetBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
+						projectPath: projectPath,
+						assetPath: assetPath
+					} );
+					const text = new TextDecoder().decode( new Uint8Array( assetBytes ) );
+					materialData = JSON.parse( text );
+				} catch ( error ) {
+					console.error( '[AssetSelector] Failed to load material file:', error );
+					this.isProcessing = false;
+					return;
+				}
+			} else {
+				try {
+					const response = await fetch( assetData.url || assetData.content );
+					materialData = await response.json();
+				} catch ( error ) {
+					console.error( '[AssetSelector] Failed to load material:', error );
+					this.isProcessing = false;
+					return;
+				}
+			}
+			
+			if ( !materialData || !materialData.type || !materialData.type.includes( 'Material' ) ) {
+				console.error( '[AssetSelector] Invalid material data' );
 				this.isProcessing = false;
-				callback( newMaterial );
-				this.hide();
 				return;
 			}
+			
+			let material = null;
+			try {
+				const loader = new THREE.MaterialLoader();
+				loader.setTextures( {} );
+				material = loader.parse( materialData );
+				
+				if ( !material ) {
+					const objectLoader = new THREE.ObjectLoader();
+					const parsed = objectLoader.parseMaterials( [ materialData ] );
+					material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+				}
+				
+				if ( !material && materialData.type ) {
+					const MaterialClass = THREE[ materialData.type ];
+					if ( MaterialClass ) {
+						material = new MaterialClass();
+						if ( materialData.color !== undefined ) material.color.setHex( materialData.color );
+						if ( materialData.roughness !== undefined ) material.roughness = materialData.roughness;
+						if ( materialData.metalness !== undefined ) material.metalness = materialData.metalness;
+						if ( materialData.emissive !== undefined ) material.emissive.setHex( materialData.emissive );
+						material.name = materialData.name || assetName;
+					}
+				}
+			} catch ( parseError ) {
+				console.warn( '[AssetSelector] Failed to parse material:', parseError );
+				this.isProcessing = false;
+				return;
+			}
+			
+			if ( !material ) {
+				console.error( '[AssetSelector] Failed to create material' );
+				this.isProcessing = false;
+				return;
+			}
+			
+			material.assetPath = assetPath;
+			material.sourceFile = assetData.name;
+			material.isMaterial = true;
+			
+			const { MaterialAsset } = await import( '@engine/three-engine.js' );
+			materialAsset = new MaterialAsset( assetName, assetPath, {
+				name: assetName,
+				path: assetPath,
+				source: assetData.name,
+				materialType: material.type
+			} );
+			materialAsset.setMaterial( material );
+			this.editor.assets.register( materialAsset );
 		}
-
 		
-
-		const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
-
-		if ( isTauri && this.editor.storage && this.editor.storage.getProjectPath ) {
-			const projectPath = this.editor.storage.getProjectPath();
-			const assetPath = assetData.path.startsWith( '/' ) ? assetData.path.substring( 1 ) : assetData.path;
-
-			try {
-				const assetBytes = await window.__TAURI__.core.invoke( 'read_asset_file', {
-					projectPath: projectPath,
-					assetPath: assetPath
-				} );
-
-				const text = new TextDecoder().decode( new Uint8Array( assetBytes ) );
-				const materialData = JSON.parse( text );
-
-				const loader = new THREE.ObjectLoader();
-				const material = loader.parseMaterials( [ materialData ] )[ 0 ];
-				material.assetPath = assetPath;
-				material.sourceFile = assetData.name;
-				material.isMaterial = true;
-
-				this.isProcessing = false;
-				callback( material );
-				this.hide();
-
-			} catch ( error ) {
-				console.error( '[AssetSelector] Failed to load material asset:', error );
-				this.isProcessing = false;
-			}
-			} else {
-			try {
-				const response = await fetch( assetData.url || assetData.content );
-				const materialData = await response.json();
-				const loader = new THREE.ObjectLoader();
-				const material = loader.parseMaterials( [ materialData ] )[ 0 ];
-				material.assetPath = assetData.path;
-				material.sourceFile = assetData.name;
-				material.isMaterial = true;
-				this.isProcessing = false;
-				callback( material );
-				this.hide();
-			} catch ( error ) {
-				console.error( '[AssetSelector] Failed to load material:', error );
-				this.isProcessing = false;
-			}
+		const material = materialAsset.getMaterial();
+		if ( material ) {
+			this.isProcessing = false;
+			callback( material );
+			this.hide();
+		} else {
+			console.error( '[AssetSelector] Material asset has no material' );
+			this.isProcessing = false;
 		}
-
 	}
 
 	filterAssets( searchTerm ) {
@@ -1506,11 +1244,10 @@ class AssetSelector {
 		const thumbnailContainer = document.createElement( 'span' );
 		thumbnailContainer.className = 'asset-list-thumbnail';
 		
-		// Add placeholder badge first
+		
 		const badge = this.createFileBadge(asset.name, 24);
 		thumbnailContainer.appendChild(badge);
-
-		// Asynchronously load preview
+		
 		(async () => {
 			try {
 				const previewRenderer = getAssetPreviewRenderer();
@@ -1527,7 +1264,7 @@ class AssetSelector {
 				} else if (asset.type === 'material') {
 					let material = asset.modelMaterial?.material;
 					if (!material && asset.modelPath) {
-						const materialName = asset.name.replace('.material', '');
+						const materialName = asset.name.replace( /\.mat$/, '' );
 						material = assetManager.getMaterial(`${asset.modelPath}/${materialName}`);
 					}
 					if (material) {
@@ -1538,8 +1275,11 @@ class AssetSelector {
 					}
 				} else if (asset.type === 'geometry') {
 					let geometry = asset.modelGeometry?.geometry;
+					if (!geometry && asset.path) {
+						geometry = assetManager.getGeometry(asset.path);
+					}
 					if (!geometry && asset.modelPath) {
-						const geometryName = asset.name.replace('.geometry', '');
+						const geometryName = asset.name.replace( /\.geo$/, '' );
 						geometry = assetManager.getGeometry(`${asset.modelPath}/${geometryName}`);
 					}
 					if (geometry) {
@@ -1587,12 +1327,9 @@ class AssetSelector {
 		row.appendChild(typeCell);
 		row.appendChild(sizeCell);
 
-		row.addEventListener('click', () => {
-			if (this.onSelectCallback) {
-				this.onSelectCallback(asset);
-			}
-			this.hide();
-		});
+		row.addEventListener( 'click', () => {
+			this.selectAsset( asset );
+		} );
 
 		return row;
 	}
@@ -1608,24 +1345,6 @@ class AssetSelector {
 		});
 		
 		if (modelPaths.size === 0) return;
-		
-		console.log('[AssetSelector] Loading models into cache:', Array.from(modelPaths));
-		
-		const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
-		
-		for (const modelPath of modelPaths) {
-			try {
-				const modelContents = await window.ModelParser.parseModel(modelPath, null, projectPath);
-				if (modelContents) {
-					window.modelCache.set(modelPath, modelContents);
-					console.log('[AssetSelector] Loaded model into cache:', modelPath);
-				}
-			} catch (error) {
-				console.warn('[AssetSelector] Failed to load model:', modelPath, error);
-			}
-		}
-		
-		console.log('[AssetSelector] Cache size after loading:', window.modelCache.size);
 	}
 
 	async ensureModelsInCache( assets ) {
@@ -1640,8 +1359,6 @@ class AssetSelector {
 		
 		if (modelPaths.size === 0) return;
 		
-		console.log('[AssetSelector] Loading models into AssetManager:', Array.from(modelPaths));
-		
 		const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
 		
 		for (const modelPath of modelPaths) {
@@ -1649,14 +1366,11 @@ class AssetSelector {
 				const modelContents = await ModelParser.parseModel(modelPath, null, projectPath);
 				if (modelContents) {
 					assetManager.registerParsedModel(modelPath, modelContents);
-					console.log('[AssetSelector] Loaded model into AssetManager:', modelPath);
 				}
 			} catch (error) {
 				console.warn('[AssetSelector] Failed to load model:', modelPath, error);
 			}
 		}
-		
-		console.log('[AssetSelector] AssetManager stats:', assetManager.getStats());
 	}
 
 	createFileBadge( filename, size = 60 ) {

@@ -23,6 +23,22 @@ function SidebarMaterial( editor ) {
 
 	let currentMaterialSlot = 0;
 
+	function copyCommonMaterialProperties( src, dest ) {
+		const common = [ 'color', 'emissive', 'specular', 'shininess', 'roughness', 'metalness',
+			'opacity', 'transparent', 'wireframe', 'side', 'depthWrite', 'depthTest', 'alphaTest', 'blending',
+			'map', 'emissiveMap', 'normalMap', 'bumpMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap',
+			'matcap', 'specularMap', 'gradientMap' ];
+		common.forEach( function ( key ) {
+			if ( key in src && key in dest ) {
+				const v = src[ key ];
+				if ( v && v.isColor ) dest[ key ].copy( v );
+				else if ( v && v.isTexture ) dest[ key ] = v;
+				else if ( typeof v === 'number' ) dest[ key ] = v;
+				else if ( typeof v === 'boolean' ) dest[ key ] = v;
+			}
+		} );
+	}
+
 	const container = new UIPanel();
 	container.setBorderTop( '0' );
 	container.setDisplay( 'none' );
@@ -43,17 +59,66 @@ function SidebarMaterial( editor ) {
 	
 
 	const materialClassRow = new UIRow();
-	const materialClass = new UIInput().setWidth( '150px' ).setFontSize( '12px' ).setDisabled( true );
+	const materialClassSelect = new UISelect().setWidth( '170px' ).setFontSize( '12px' );
+	const materialTypeOptions = {
+		'LineBasicMaterial': 'LineBasicMaterial',
+		'LineDashedMaterial': 'LineDashedMaterial',
+		'MeshBasicMaterial': 'MeshBasicMaterial',
+		'MeshDepthMaterial': 'MeshDepthMaterial',
+		'MeshNormalMaterial': 'MeshNormalMaterial',
+		'MeshLambertMaterial': 'MeshLambertMaterial',
+		'MeshMatcapMaterial': 'MeshMatcapMaterial',
+		'MeshPhongMaterial': 'MeshPhongMaterial',
+		'MeshToonMaterial': 'MeshToonMaterial',
+		'MeshStandardMaterial': 'MeshStandardMaterial',
+		'MeshPhysicalMaterial': 'MeshPhysicalMaterial',
+		'RawShaderMaterial': 'RawShaderMaterial',
+		'ShaderMaterial': 'ShaderMaterial',
+		'ShadowMaterial': 'ShadowMaterial',
+		'SpriteMaterial': 'SpriteMaterial',
+		'PointsMaterial': 'PointsMaterial'
+	};
+	materialClassSelect.setOptions( materialTypeOptions );
+	materialClassSelect.onChange( function () {
+		const newType = materialClassSelect.getValue();
+		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
+		if ( ! material || material.type === newType ) return;
+		const MaterialClass = materialClasses[ newType ];
+		if ( ! MaterialClass ) return;
+		const newMaterial = new MaterialClass();
+		copyCommonMaterialProperties( material, newMaterial );
+		newMaterial.name = material.name || newType;
+		if ( material.assetPath ) {
+			newMaterial.assetPath = material.assetPath;
+			newMaterial.sourceFile = material.sourceFile;
+			newMaterial.isMaterial = true;
+			const path = ( material.assetPath || '' ).replace( /^\/+/, '' );
+			const materialAsset = editor.assets.getByUrl( path );
+			if ( materialAsset && typeof materialAsset.setMaterial === 'function' ) {
+				materialAsset.setMaterial( newMaterial );
+				editor.syncMaterialAssetToScene( materialAsset );
+			} else {
+				editor.removeMaterial( material );
+				editor.setObjectMaterial( currentObject, currentMaterialSlot, newMaterial );
+				editor.addMaterial( newMaterial );
+				editor.signals.materialChanged.dispatch( currentObject, currentMaterialSlot );
+			}
+		} else {
+			editor.removeMaterial( material );
+			editor.execute( new SetMaterialCommand( editor, currentObject, newMaterial, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + newType );
+			editor.addMaterial( newMaterial );
+		}
+		refreshUI();
+	} );
 
 	materialClassRow.add( new UIText( strings.getKey( 'sidebar/material/type' ) ).setClass( 'Label' ) );
-	materialClassRow.add( materialClass );
+	materialClassRow.add( materialClassSelect );
 
 	container.add( materialClassRow );
 
 	const materialSelectorRow = new UIRow();
 	const materialSelectorButton = new UIButton( 'Select Material...' ).setWidth( '150px' );
 
-	// Add drag and drop support
 	materialSelectorButton.dom.addEventListener( 'dragover', function ( event ) {
 		event.preventDefault();
 		event.stopPropagation();
@@ -75,16 +140,14 @@ function SidebarMaterial( editor ) {
 		if ( assetData ) {
 			try {
 				const asset = JSON.parse( assetData );
-				// Check if it's a material or texture asset (including file type with material/texture extension)
 				const isMaterialAsset = asset.type === 'material' || 
-				                       ( asset.type === 'file' && asset.name && asset.name.endsWith( '.material' ) );
+				                       ( asset.type === 'file' && asset.name && asset.name.endsWith( '.mat' ) );
 				const isTextureAsset = asset.type === 'texture' || 
 				                     ( asset.type === 'file' && asset.name && 
 				                       [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ]
 				                         .includes( asset.name.split( '.' ).pop()?.toLowerCase() ) );
 				
 				if ( isMaterialAsset || isTextureAsset ) {
-					// Handle material/texture drop
 					if ( ! currentObject ) {
 						alert( 'Please select an object first' );
 						return;
@@ -94,7 +157,6 @@ function SidebarMaterial( editor ) {
 						editor.assetSelector = new AssetSelector( editor );
 					}
 
-					// Use AssetSelector's selectMaterial or selectTexture method
 					if ( isMaterialAsset ) {
 						await editor.assetSelector.selectMaterial( asset, async function ( material ) {
 							if ( material ) {
@@ -111,12 +173,10 @@ function SidebarMaterial( editor ) {
 							}
 						} );
 					} else if ( isTextureAsset ) {
-						// If it's a texture, we need to create a material with that texture
 						await editor.assetSelector.selectTexture( asset, async function ( texture ) {
 							if ( texture ) {
 								const object = currentObject;
 								if ( object && object.material ) {
-									// Create a new material with the texture
 									const materialType = object.material.type;
 									const MaterialClass = THREE[ materialType ] || THREE.MeshStandardMaterial;
 									const newMaterial = new MaterialClass();
@@ -137,7 +197,7 @@ function SidebarMaterial( editor ) {
 					return;
 				}
 			} catch ( e ) {
-				// Not JSON, continue with button click handler
+				console.error( e );
 			}
 		}
 	} );
@@ -152,51 +212,19 @@ function SidebarMaterial( editor ) {
 			editor.assetSelector = new AssetSelector( editor );
 		}
 
-		editor.assetSelector.show( async function ( assetData ) {
-			if ( ! assetData ) return;
+		editor.assetSelector.show( async function ( material ) {
+			if ( ! material || ! ( material instanceof THREE.Material ) ) return;
 
 			const object = currentObject;
 			if ( ! object || ! object.material ) return;
 
-			let newMaterial = null;
-
-			if ( assetData && ( assetData.isMaterial || assetData instanceof THREE.Material ) ) {
-				newMaterial = assetData;
-			} else if ( assetData.type === 'default-material' && assetData.materialType ) {
-				const materialClassesList = {
-					'LineBasicMaterial': THREE.LineBasicMaterial,
-					'LineDashedMaterial': THREE.LineDashedMaterial,
-					'MeshBasicMaterial': THREE.MeshBasicMaterial,
-					'MeshDepthMaterial': THREE.MeshDepthMaterial,
-					'MeshNormalMaterial': THREE.MeshNormalMaterial,
-					'MeshLambertMaterial': THREE.MeshLambertMaterial,
-					'MeshMatcapMaterial': THREE.MeshMatcapMaterial,
-					'MeshPhongMaterial': THREE.MeshPhongMaterial,
-					'MeshToonMaterial': THREE.MeshToonMaterial,
-					'MeshStandardMaterial': THREE.MeshStandardMaterial,
-					'MeshPhysicalMaterial': THREE.MeshPhysicalMaterial,
-					'RawShaderMaterial': THREE.RawShaderMaterial,
-					'ShaderMaterial': THREE.ShaderMaterial,
-					'ShadowMaterial': THREE.ShadowMaterial,
-					'SpriteMaterial': THREE.SpriteMaterial,
-					'PointsMaterial': THREE.PointsMaterial
-				};
-				const MaterialClass = materialClassesList[ assetData.materialType ];
-				if ( MaterialClass ) {
-					newMaterial = new MaterialClass();
-					newMaterial.name = assetData.materialType;
-				}
+			const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
+			if ( oldMaterial ) {
+				editor.removeMaterial( oldMaterial );
 			}
-
-			if ( newMaterial ) {
-				const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
-				if ( oldMaterial ) {
-					editor.removeMaterial( oldMaterial );
-				}
-				editor.execute( new SetMaterialCommand( editor, object, newMaterial, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + newMaterial.type );
-				editor.addMaterial( newMaterial );
-				refreshUI();
-			}
+			editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + material.type );
+			editor.addMaterial( material );
+			refreshUI();
 		}, null, 'material' );
 	} );
 
@@ -209,7 +237,7 @@ function SidebarMaterial( editor ) {
 	const materialNameRow = new UIRow();
 	const materialName = new UIInput().setWidth( '150px' ).setFontSize( '12px' ).onChange( function () {
 
-		editor.execute( new SetMaterialValueCommand( editor, editor.selected, 'name', materialName.getValue(), currentMaterialSlot ) );
+		editor.execute( new SetMaterialValueCommand( editor, currentObject, 'name', materialName.getValue(), currentMaterialSlot ) );
 
 	} );
 
@@ -587,8 +615,6 @@ function SidebarMaterial( editor ) {
 	} );
 	container.add( exportJson );
 
-	//
-
 	function update() {
 
 		const previousSelectedSlot = currentMaterialSlot;
@@ -626,13 +652,13 @@ function SidebarMaterial( editor ) {
 
 	}
 
-	//
-
 	function setRowVisibility() {
 
-		const material = currentObject.material;
+		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
 
-		if ( Array.isArray( material ) ) {
+		if ( !material ) return;
+
+		if ( Array.isArray( currentObject.material ) ) {
 
 			materialSlotRow.setDisplay( '' );
 
@@ -668,6 +694,8 @@ function SidebarMaterial( editor ) {
 
 		material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
 
+		if ( !material ) return;
+
 		if ( material.name !== undefined ) {
 
 			materialName.setValue( material.name );
@@ -676,7 +704,7 @@ function SidebarMaterial( editor ) {
 
 		if ( material.type !== undefined ) {
 
-			materialClass.setValue( material.type );
+			materialClassSelect.setValue( material.type );
 
 		}
 
@@ -713,13 +741,20 @@ function SidebarMaterial( editor ) {
 
 			}
 
+		} else if ( object && object.isMaterial && object.material instanceof THREE.Material ) {
+
+			hasMaterial = true;
+
 		}
 
 		if ( hasMaterial ) {
 
 			currentObject = object;
+			currentMaterialSlot = 0;
+			materialSlotSelect.setValue( 0 );
 			refreshUI();
 			container.setDisplay( '' );
+			signals.materialChanged.dispatch( object, 0 );
 
 		} else {
 
@@ -730,7 +765,39 @@ function SidebarMaterial( editor ) {
 
 	} );
 
-	signals.materialChanged.add( refreshUI );
+	signals.materialChanged.add( function ( object, slot ) {
+
+		if ( object && object.isMaterial && object.material instanceof THREE.Material ) {
+
+			if ( currentObject !== object ) {
+				currentObject = object;
+				currentMaterialSlot = slot || 0;
+				materialSlotSelect.setValue( currentMaterialSlot );
+				refreshUI();
+				container.setDisplay( '' );
+			} else {
+				refreshUI();
+			}
+
+		} else if ( object && object.material instanceof THREE.Material ) {
+			const material = object.material;
+			if ( material && material.assetPath ) {
+				const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+				const materialAsset = editor.assets.getByUrl( assetPath );
+				if ( materialAsset ) {
+					materialAsset.on( 'changed', function onMaterialAssetChanged() {
+						if ( currentObject && currentObject === object ) {
+							const currentMaterial = editor.getObjectMaterial( currentObject, currentMaterialSlot );
+							if ( currentMaterial && currentMaterial.assetPath === material.assetPath ) {
+								refreshUI();
+							}
+						}
+					} );
+				}
+			}
+		}
+
+	} );
 
 	return container;
 

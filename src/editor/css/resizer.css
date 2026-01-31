@@ -41,3 +41,17 @@
 	transform: translateY(2.5px);
 	cursor: row-resize;
 }
+
+.resizer-horizontal {
+	height: 4px;
+	cursor: ns-resize;
+	left: 0;
+	right: 0;
+}
+
+.resizer-vertical {
+	width: 4px;
+	cursor: ew-resize;
+	top: 0;
+	bottom: 0;
+}

@@ -71,26 +71,24 @@ export abstract class Script {
     }
 
     setAttribute(name: string, value: any): void {
-        if (this.attributes.has(name)) {
-            this.attributeValues.set(name, value);
-            const self = this as any;
-            try {
-                const descriptor = Object.getOwnPropertyDescriptor(self, name);
-                if (descriptor && (!descriptor.writable || !descriptor.configurable)) {
-                    delete self[name];
-                }
-            } catch (e) {
+        const self = this as any;
+        this.attributeValues.set(name, value);
+        try {
+            const descriptor = Object.getOwnPropertyDescriptor(self, name);
+            if (descriptor && (!descriptor.writable || !descriptor.configurable)) {
+                delete self[name];
             }
-            self[name] = value;
-            try {
-                Object.defineProperty(self, name, {
-                    value: value,
-                    writable: true,
-                    enumerable: true,
-                    configurable: true
-                });
-            } catch (e) {
-            }
+        } catch (e) {
+        }
+        self[name] = value;
+        try {
+            Object.defineProperty(self, name, {
+                value: value,
+                writable: true,
+                enumerable: true,
+                configurable: true
+            });
+        } catch (e) {
         }
     }
 

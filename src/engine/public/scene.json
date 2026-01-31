@@ -1,86 +1,228 @@
 {
-  "camera": {
-    "metadata": {
-      "generator": "Object3D.toJSON",
-      "type": "Object",
-      "version": 4.7
-    },
-    "object": {
-      "aspect": 1,
-      "far": 1000,
-      "filmGauge": 35,
-      "filmOffset": 0,
-      "focus": 10,
-      "fov": 50,
-      "layers": 1,
-      "matrix": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        0.8944271909999153,
-        -0.44721359549995787,
-        0,
-        0,
-        0.44721359549995787,
-        0.8944271909999153,
-        0,
-        0,
-        5,
-        10,
-        1
-      ],
-      "name": "Camera",
-      "near": 0.01,
-      "type": "PerspectiveCamera",
-      "uuid": "",
-      "zoom": 1
-    }
-  },
-  "environment": null,
-  "history": {
-    "redos": [],
-    "undos": []
-  },
-  "metadata": {},
-  "project": {
-    "shadowType": 1,
-    "shadows": true,
-    "toneMapping": 0,
-    "toneMappingExposure": 1
-  },
-  "scene": {
-    "metadata": {
-      "generator": "Object3D.toJSON",
-      "type": "Object",
-      "version": 4.5
-    },
-    "object": {
-      "children": [],
-      "layers": 1,
-      "matrix": [
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        0,
-        1
-      ],
-      "name": "Scene",
-      "type": "Scene",
-      "uuid": ""
-    }
-  },
-  "scripts": {}
+	"metadata": {},
+	"project": {
+		"shadows": true,
+		"shadowType": 1,
+		"toneMapping": 0,
+		"toneMappingExposure": 1
+	},
+	"camera": {
+		"metadata": {
+			"version": 4.7,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"object": {
+			"uuid": "",
+			"type": "PerspectiveCamera",
+			"name": "Camera",
+			"layers": 1,
+			"matrix": [
+				1,
+				0,
+				0,
+				0,
+				0,
+				0.8944271909999153,
+				-0.44721359549995787,
+				0,
+				0,
+				0.44721359549995787,
+				0.8944271909999153,
+				0,
+				0,
+				1.6718842844495843,
+				3.3437685688991197,
+				1
+			],
+			"up": [
+				0,
+				1,
+				0
+			],
+			"fov": 50,
+			"zoom": 1,
+			"near": 0.01,
+			"far": 1000,
+			"focus": 10,
+			"aspect": 1.552511415525114,
+			"filmGauge": 35,
+			"filmOffset": 0
+		}
+	},
+	"controls": {
+		"center": [
+			0,
+			0,
+			0
+		]
+	},
+	"scene": {
+		"metadata": {
+			"version": 4.7,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"geometries": [
+			{
+				"uuid": "888e0f6c-f827-4de2-b5d5-430f87e252e8",
+				"type": "BoxGeometry",
+				"width": 1,
+				"height": 1,
+				"depth": 1,
+				"widthSegments": 1,
+				"heightSegments": 1,
+				"depthSegments": 1
+			}
+		],
+		"materials": [
+			{
+				"uuid": "0ce2fbdf-e1c3-4806-874f-7c42131e0b46",
+				"type": "MeshStandardMaterial",
+				"color": 16777215,
+				"roughness": 1,
+				"metalness": 0,
+				"emissive": 0,
+				"envMapRotation": [
+					0,
+					0,
+					0,
+					"XYZ"
+				],
+				"envMapIntensity": 1,
+				"blendColor": 0
+			}
+		],
+		"object": {
+			"uuid": "",
+			"type": "Scene",
+			"name": "Scene",
+			"layers": 1,
+			"matrix": [
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0,
+				0,
+				1
+			],
+			"up": [
+				0,
+				1,
+				0
+			],
+			"children": [
+				{
+					"uuid": "0f07348b-780e-4202-86e4-0513d593e103",
+					"type": "Mesh",
+					"name": "Box",
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						-0.17144069754553987,
+						0,
+						0,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					],
+					"geometry": "888e0f6c-f827-4de2-b5d5-430f87e252e8",
+					"material": "0ce2fbdf-e1c3-4806-874f-7c42131e0b46"
+				},
+				{
+					"uuid": "6845a435-6d81-4189-81a3-641753cfba13",
+					"type": "DirectionalLight",
+					"name": "DirectionalLight",
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						5,
+						10,
+						7.5,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					],
+					"color": 16777215,
+					"intensity": 1,
+					"shadow": {
+						"camera": {
+							"uuid": "a2394749-7302-47e5-8a88-a571b9b43d31",
+							"type": "OrthographicCamera",
+							"layers": 1,
+							"up": [
+								0,
+								1,
+								0
+							],
+							"zoom": 1,
+							"left": -5,
+							"right": 5,
+							"top": 5,
+							"bottom": -5,
+							"near": 0.5,
+							"far": 500
+						}
+					},
+					"target": "2b08cfb2-34d0-4a62-a16a-5da6cfaec099"
+				}
+			],
+			"backgroundRotation": [
+				0,
+				0,
+				0,
+				"XYZ"
+			],
+			"environmentRotation": [
+				0,
+				0,
+				0,
+				"XYZ"
+			]
+		}
+	},
+	"scripts": {},
+	"history": {
+		"undos": [],
+		"redos": []
+	},
+	"environment": null
 }

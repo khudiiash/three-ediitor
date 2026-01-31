@@ -409,7 +409,7 @@ async fn read_assets_metadata(project_path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn open_file_in_editor(project_path: String, asset_path: String) -> Result<(), String> {
+async fn open_file(project_path: String, asset_path: String) -> Result<(), String> {
     use std::path::PathBuf;
     use std::process::Command;
     
@@ -444,6 +444,54 @@ async fn open_file_in_editor(project_path: String, asset_path: String) -> Result
         return Err("Unsupported platform".to_string());
     }
     
+    Ok(())
+}
+
+#[tauri::command]
+async fn run_npm_install(project_path: String) -> Result<(), String> {
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    let path = PathBuf::from(&project_path);
+    if !path.exists() || !path.is_dir() {
+        return Err("Project path does not exist or is not a directory".to_string());
+    }
+
+    let package_json_path = path.join("package.json");
+    if !package_json_path.exists() {
+        let name = path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("project");
+        let package_json_content = serde_json::json!({
+            "name": name,
+            "version": "1.0.0",
+            "private": true,
+            "type": "module",
+            "dependencies": {
+                "three": "^0.170.0"
+            }
+        });
+        let content = serde_json::to_string_pretty(&package_json_content)
+            .map_err(|e| format!("Failed to serialize package.json: {}", e))?;
+        tokio::fs::write(&package_json_path, content).await
+            .map_err(|e| format!("Failed to write package.json: {}", e))?;
+    }
+
+    let output = Command::new("npm")
+        .args(&["install"])
+        .current_dir(&path)
+        .output()
+        .map_err(|e| format!("Failed to run npm install: {}", e))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!(
+            "npm install failed: {}\nstdout: {}\nstderr: {}",
+            output.status, stdout, stderr
+        ));
+    }
+
     Ok(())
 }
 
@@ -954,7 +1002,8 @@ pub fn run() {
             get_file_metadata,
             read_assets_metadata,
             write_assets_metadata,
-            open_file_in_editor,
+            open_file,
+            run_npm_install,
             list_assets_directory,
             write_build_file,
             read_editor_template_file,

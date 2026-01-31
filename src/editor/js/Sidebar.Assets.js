@@ -5,6 +5,175 @@ import { ModelParser } from './ModelParser.js';
 import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
 import { assetManager } from '@engine/three-engine.js';
 
+import { Modal } from './Modal.js';
+import { MaterialAsset, TextureAsset, AssetType } from '@engine/three-engine.js';
+
+	function getAssetTypeFromFile( file ) {
+		const ext = file.name ? file.name.split( '.' ).pop()?.toLowerCase() : '';
+		if ( file.type === 'material' || file.name.endsWith( '.mat' ) ) {
+			return AssetType.MATERIAL;
+		}
+		if ( file.type === 'texture' || [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ].includes( ext ) ) {
+			return AssetType.TEXTURE;
+		}
+		if ( file.type === 'geometry' || file.name.endsWith( '.geo' ) ) {
+			return AssetType.GEOMETRY;
+		}
+		if ( file.type === 'model' || file.name.endsWith( '.mesh' ) || [ 'glb', 'gltf', 'fbx', 'obj' ].includes( ext ) ) {
+			return AssetType.MODEL;
+		}
+		if ( file.type === 'script' || [ 'ts', 'tsx', 'js', 'jsx' ].includes( ext ) ) {
+			return AssetType.SCRIPT;
+		}
+		return AssetType.DATA;
+	}
+
+	function createAssetFromFile( file ) {
+		const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
+		const assetName = file.name.replace( /\.[^/.]+$/, '' );
+		const assetType = getAssetTypeFromFile( file );
+		
+		if ( assetType === AssetType.MATERIAL ) {
+			let materialType = 'MeshStandardMaterial';
+			if ( file.content ) {
+				try {
+					const materialData = JSON.parse( file.content );
+					if ( materialData.type ) {
+						materialType = materialData.type;
+					}
+				} catch ( e ) {
+				}
+			}
+			return new MaterialAsset( assetName, assetPath, {
+				name: assetName,
+				path: assetPath,
+				source: file.name,
+				dateCreated: file.dateCreated || Date.now(),
+				dateModified: file.dateModified || Date.now(),
+				materialType: materialType
+			} );
+		}
+		
+		if ( assetType === AssetType.TEXTURE ) {
+			return new TextureAsset( assetName, assetPath, {
+				name: assetName,
+				path: assetPath,
+				source: file.name,
+				dateCreated: file.dateCreated || Date.now(),
+				dateModified: file.dateModified || Date.now(),
+				width: file.metadata?.texture?.width,
+				height: file.metadata?.texture?.height,
+				colorSpace: file.metadata?.texture?.colorSpace,
+				flipY: file.metadata?.texture?.flipY,
+				generateMipmaps: file.metadata?.texture?.generateMipmaps,
+				minFilter: file.metadata?.texture?.minFilter,
+				magFilter: file.metadata?.texture?.magFilter,
+				wrapS: file.metadata?.texture?.wrapS,
+				wrapT: file.metadata?.texture?.wrapT,
+				anisotropy: file.metadata?.texture?.anisotropy
+			} );
+		}
+		
+		return null;
+	}
+
+	async function registerAssetFromFile( file ) {
+		if ( file.modelMaterial || file.modelTexture || file.modelGeometry || file.modelObject ) {
+			return;
+		}
+		
+		const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
+		const existingAsset = editor.assets.getByUrl( assetPath );
+		if ( existingAsset ) {
+			if ( existingAsset.state === 'not_loaded' ) {
+				try {
+					if ( file.content && existingAsset instanceof MaterialAsset ) {
+						try {
+							const materialData = JSON.parse( file.content );
+							if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
+								const loader = new THREE.MaterialLoader();
+								loader.setTextures( {} );
+								let material = loader.parse( materialData );
+								if ( !material ) {
+									const objectLoader = new THREE.ObjectLoader();
+									const parsed = objectLoader.parseMaterials( [ materialData ], {} );
+									material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+								}
+								if ( material ) {
+									material.assetPath = assetPath;
+									material.sourceFile = file.name;
+									material.isMaterial = true;
+									await existingAsset.setMaterial( material );
+									editor.syncMaterialAssetToScene( existingAsset );
+									return;
+								}
+							}
+						} catch ( parseError ) {
+							console.warn( '[Assets] Failed to parse material content, loading from file:', parseError );
+						}
+					}
+					await editor.assets.load( existingAsset.id );
+					if ( existingAsset instanceof MaterialAsset ) editor.syncMaterialAssetToScene( existingAsset );
+				} catch ( error ) {
+					console.warn( '[Assets] Failed to load existing asset:', assetPath, error );
+				}
+			}
+			return;
+		}
+		
+		const asset = createAssetFromFile( file );
+		if ( asset ) {
+			editor.assets.register( asset );
+			try {
+				if ( file.content && asset instanceof MaterialAsset ) {
+					try {
+						const materialData = JSON.parse( file.content );
+						if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
+							const loader = new THREE.MaterialLoader();
+							loader.setTextures( {} );
+							let material = loader.parse( materialData );
+							if ( !material ) {
+								const objectLoader = new THREE.ObjectLoader();
+								const parsed = objectLoader.parseMaterials( [ materialData ], {} );
+								material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+							}
+							if ( !material && materialData.type ) {
+								const MaterialClass = THREE[ materialData.type ];
+								if ( MaterialClass ) {
+									material = new MaterialClass();
+									if ( materialData.color !== undefined ) material.color.setHex( materialData.color );
+									if ( materialData.roughness !== undefined ) material.roughness = materialData.roughness;
+									if ( materialData.metalness !== undefined ) material.metalness = materialData.metalness;
+									if ( materialData.emissive !== undefined ) material.emissive.setHex( materialData.emissive );
+									if ( materialData.name !== undefined ) material.name = materialData.name;
+								}
+							}
+							if ( material ) {
+								material.assetPath = assetPath;
+								material.sourceFile = file.name;
+								material.isMaterial = true;
+								await asset.setMaterial( material );
+								editor.syncMaterialAssetToScene( asset );
+								return;
+							}
+						}
+					} catch ( parseError ) {
+						console.warn( '[Assets] Failed to parse material content, loading from file:', parseError );
+					}
+				}
+				await editor.assets.load( asset.id );
+				if ( asset instanceof MaterialAsset ) editor.syncMaterialAssetToScene( asset );
+			} catch ( error ) {
+				console.warn( '[Assets] Failed to load asset:', assetPath, error );
+			}
+		}
+	}
+
+	function unregisterAssetFromFile( file ) {
+		const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
+		editor.assets.unregisterByUrl( assetPath );
+	}
+
 function SidebarAssets( editor ) {
 
 	const signals = editor.signals;
@@ -46,12 +215,12 @@ function SidebarAssets( editor ) {
 		const menuItem = document.createElement( 'div' );
 		menuItem.className = 'context-menu-item';
 		menuItem.textContent = item.label;
-		menuItem.addEventListener( 'click', () => {
+		menuItem.addEventListener( 'click', async () => {
 			addMenu.classList.remove( 'active' );
 			if ( item.action === 'script' ) {
-				createScriptAsset();
+				await createScriptAsset();
 			} else if ( item.action === 'folder' ) {
-				createFolder();
+				await createFolder();
 			} else if ( item.action === 'import' ) {
 				addAsset();
 			}
@@ -216,8 +385,8 @@ function SidebarAssets( editor ) {
 	const contextMenu = new UIPanel();
 	contextMenu.setId( 'assets-context-menu' );
 	contextMenu.setPosition( 'fixed' );
-	contextMenu.setDisplay( 'none' );
 	contextMenu.dom.className = 'context-menu';
+	contextMenu.dom.style.display = 'none';
 	document.body.appendChild( contextMenu.dom );
 
 	function createMenuItem( text, onClick ) {
@@ -233,8 +402,8 @@ function SidebarAssets( editor ) {
 
 	}
 
-	const newFolderItem = createMenuItem( 'New Folder', function () {
-		createNewFolder();
+	const newFolderItem = createMenuItem( 'New Folder', async function () {
+		await createNewFolder();
 	} );
 
 	const newAssetSubmenuTitle = new UIRow();
@@ -248,25 +417,26 @@ function SidebarAssets( editor ) {
 	newAssetSubmenu.setClass( 'options' );
 	newAssetSubmenu.setDisplay( 'none' );
 	newAssetSubmenu.dom.className = 'options';
+	newAssetSubmenu.dom.classList.add( 'submenu-hidden' );
 
 	const assetTypes = [
 		{ name: 'Upload', icon: '📤', action: () => addAsset() },
-		{ name: 'CSS', icon: '📄', action: () => createAssetFile( 'css', '' ) },
-		{ name: 'CubeMap', icon: '🌐', action: () => createAssetFile( 'cubemap', '' ) },
-		{ name: 'HTML', icon: '🌐', action: () => createAssetFile( 'html', '' ) },
-		{ name: 'JSON', icon: '📄', action: () => createAssetFile( 'json', '{}' ) },
-		{ name: 'Material', icon: '🎨', action: () => createAssetFile( 'material', '' ) },
-		{ name: 'Script', icon: '📜', action: () => createAssetFile( 'js', '' ) },
-		{ name: 'Shader', icon: '📄', action: () => createAssetFile( 'shader', '' ) },
-		{ name: 'Text', icon: '📝', action: () => createAssetFile( 'txt', '' ) }
+		{ name: 'CSS', icon: '📄', action: async () => await createAssetFile( 'css', '' ) },
+		{ name: 'CubeMap', icon: '🌐', action: async () => await createAssetFile( 'cubemap', '' ) },
+		{ name: 'HTML', icon: '🌐', action: async () => await createAssetFile( 'html', '' ) },
+		{ name: 'JSON', icon: '📄', action: async () => await createAssetFile( 'json', '{}' ) },
+		{ name: 'Material', icon: '🎨', action: async () => await createAssetFile( 'material', '' ) },
+		{ name: 'Script', icon: '📜', action: async () => await createScriptAsset() },
+		{ name: 'Shader', icon: '📄', action: async () => await createAssetFile( 'shader', '' ) },
+		{ name: 'Text', icon: '📝', action: async () => await createAssetFile( 'txt', '' ) }
 	];
 
 	assetTypes.forEach( assetType => {
 		const item = new UIRow();
 		item.setClass( 'context-menu-item' );
-		item.dom.innerHTML = `<span class="context-menu-item-icon">${assetType.icon}</span><span>${assetType.name}</span>`;
-		item.onClick( function () {
-			assetType.action();
+		item.setTextContent( assetType.name );
+		item.onClick( async function () {
+			await assetType.action();
 			hideContextMenu();
 		} );
 		newAssetSubmenu.add( item );
@@ -277,25 +447,27 @@ function SidebarAssets( editor ) {
 	function showSubmenu() {
 		clearTimeout( submenuTimeout );
 		
-		const rect = newAssetSubmenuTitle.dom.getBoundingClientRect();
+		const menuRect = contextMenu.dom.getBoundingClientRect();
+		const itemRect = newAssetSubmenuTitle.dom.getBoundingClientRect();
 		const windowWidth = window.innerWidth;
 		const windowHeight = window.innerHeight;
 		
 		newAssetSubmenu.dom.style.left = '-9999px';
 		newAssetSubmenu.dom.style.top = '0px';
+		newAssetSubmenu.dom.style.display = 'block';
+		newAssetSubmenu.dom.classList.remove( 'submenu-hidden' );
 		newAssetSubmenu.dom.classList.add( 'submenu-visible' );
 		
 		newAssetSubmenu.dom.offsetHeight;
 		
 		const submenuRect = newAssetSubmenu.dom.getBoundingClientRect();
 		
-		let left = rect.right + 2;
-		let top = rect.top;
+		let left = menuRect.right + 2;
+		let top = itemRect.top;
 		
 		if ( left + submenuRect.width > windowWidth ) {
-			
-			left = rect.left - submenuRect.width - 2;
-			if ( left < 0 ) {
+			left = menuRect.left - submenuRect.width - 2;
+			if ( left < 10 ) {
 				left = 10;
 			}
 		}
@@ -304,7 +476,7 @@ function SidebarAssets( editor ) {
 			top = windowHeight - submenuRect.height - 10;
 		}
 		
-		if ( top < 0 ) {
+		if ( top < 10 ) {
 			top = 10;
 		}
 		
@@ -333,6 +505,7 @@ function SidebarAssets( editor ) {
 	newAssetSubmenu.dom.addEventListener( 'mouseleave', function () {
 		newAssetSubmenu.dom.classList.remove( 'submenu-visible' );
 		newAssetSubmenu.dom.classList.add( 'submenu-hidden' );
+		newAssetSubmenu.dom.style.display = 'none';
 	} );
 
 	newAssetSubmenuTitle.add( newAssetSubmenu );
@@ -357,27 +530,51 @@ function SidebarAssets( editor ) {
 
 		contextMenu.dom.style.left = x + 'px';
 		contextMenu.dom.style.top = y + 'px';
+		contextMenu.dom.style.display = 'block';
 		contextMenu.dom.classList.add( 'active' );
 
 		const rect = contextMenu.dom.getBoundingClientRect();
 		const windowWidth = window.innerWidth;
 		const windowHeight = window.innerHeight;
 
-		if ( x + rect.width > windowWidth ) {
-			contextMenu.dom.style.left = ( windowWidth - rect.width - 10 ) + 'px';
+		newAssetSubmenu.dom.style.display = 'block';
+		const submenuRect = newAssetSubmenu.dom.getBoundingClientRect();
+		newAssetSubmenu.dom.style.display = 'none';
+
+		const submenuWidth = submenuRect.width;
+		const menuWidth = rect.width;
+		const totalWidth = menuWidth + submenuWidth + 2;
+
+		let menuLeft = x;
+		let menuTop = y;
+
+		if ( menuLeft + totalWidth > windowWidth ) {
+			menuLeft = windowWidth - totalWidth - 10;
+			if ( menuLeft < 10 ) {
+				menuLeft = 10;
+			}
 		}
 
-		if ( y + rect.height > windowHeight ) {
-			contextMenu.dom.style.top = ( windowHeight - rect.height - 10 ) + 'px';
+		if ( menuTop + rect.height > windowHeight ) {
+			menuTop = windowHeight - rect.height - 10;
 		}
+
+		if ( menuTop < 10 ) {
+			menuTop = 10;
+		}
+
+		contextMenu.dom.style.left = menuLeft + 'px';
+		contextMenu.dom.style.top = menuTop + 'px';
 
 	}
 
 
 	function hideContextMenu() {
-
 		contextMenu.dom.classList.remove( 'active' );
-
+		contextMenu.dom.style.display = 'none';
+		newAssetSubmenu.dom.classList.remove( 'submenu-visible' );
+		newAssetSubmenu.dom.classList.add( 'submenu-hidden' );
+		newAssetSubmenu.dom.style.display = 'none';
 	}
 
 	container.dom.addEventListener( 'contextmenu', function ( event ) {
@@ -403,6 +600,32 @@ function SidebarAssets( editor ) {
 		showContextMenu( event.clientX, event.clientY );
 
 	} );
+
+	const handleLeftClick = function ( event ) {
+		const target = event.target;
+		const isClickOnItem = target.closest( '.asset-grid-item' ) || 
+		                      target.closest( '.assets-table-row' ) || 
+		                      target.closest( '.assets-folder-item' ) ||
+		                      target.closest( '.context-menu' ) ||
+		                      target.closest( 'button' ) ||
+		                      target.closest( 'input' ) ||
+		                      target.closest( 'select' );
+		
+		if ( !isClickOnItem && ( event.target === container.dom || 
+		                         event.target === filesPanel.dom || 
+		                         event.target === folderTree || 
+		                         event.target === filesTable ||
+		                         container.dom.contains( event.target ) ) ) {
+			event.preventDefault();
+			event.stopPropagation();
+			showContextMenu( event.clientX, event.clientY );
+		}
+	};
+
+	container.dom.addEventListener( 'click', handleLeftClick );
+	filesPanel.dom.addEventListener( 'click', handleLeftClick );
+	folderTree.addEventListener( 'click', handleLeftClick );
+	filesTable.addEventListener( 'click', handleLeftClick );
 
 	document.addEventListener( 'click', function ( event ) {
 
@@ -436,7 +659,7 @@ function SidebarAssets( editor ) {
 
 	let currentFolder = assetsRoot;
 	window.currentFolder = currentFolder;
-	let viewMode = 'list'; // 'list', 'grid', 'large-grid'
+	let viewMode = 'list'; 
 	let selectedAsset = null;
 	window.selectedAsset = selectedAsset;
 	const previewRenderer = getAssetPreviewRenderer();
@@ -444,8 +667,6 @@ function SidebarAssets( editor ) {
 	window.assetManager = assetManager;
 	
 	function initializeDefaultAssets() {
-		console.log('[AssetManager] Initializing default Three.js assets...');
-		
 		const defaultGeometries = [
 			{ name: 'BoxGeometry', create: () => new THREE.BoxGeometry(1, 1, 1) },
 			{ name: 'SphereGeometry', create: () => new THREE.SphereGeometry(0.5, 32, 16) },
@@ -500,23 +721,19 @@ function SidebarAssets( editor ) {
 			});
 		});
 		
-		console.log('[AssetManager] Default assets initialized:', assetManager.getStats());
 	}
 	
 	function initializeUserAssets() {
-		console.log('[AssetManager] Initializing user assets from assetsRoot...');
-		
 		function traverseFolder(folder) {
 			folder.files.forEach(file => {
 				if (file.modelContents) {
 					const modelPath = file.path;
 					assetManager.registerParsedModel(modelPath, file.modelContents);
-					console.log('[AssetManager] Registered parsed model:', modelPath);
 				}
 				
 				if (file.type === 'material' && file.modelMaterial) {
 					const matId = file.path;
-					const matName = file.modelMaterial.name || file.name.replace('.material', '');
+					const matName = file.modelMaterial.name || file.name.replace( /\.mat$/, '' );
 					if (file.modelMaterial.material) {
 						assetManager.registerMaterial(matId, file.modelMaterial.material, {
 							name: matName,
@@ -524,13 +741,12 @@ function SidebarAssets( editor ) {
 							modelPath: file.modelPath,
 							source: 'user'
 						});
-						console.log('[AssetManager] Registered material:', matId);
 					}
 				}
 				
 				if (file.type === 'geometry' && file.modelGeometry) {
 					const geoId = file.path;
-					const geoName = file.modelGeometry.name || file.name.replace('.geometry', '');
+					const geoName = file.modelGeometry.name || file.name.replace( /\.geo$/, '' );
 					if (file.modelGeometry.geometry) {
 						assetManager.registerGeometry(geoId, file.modelGeometry.geometry, {
 							name: geoName,
@@ -538,19 +754,17 @@ function SidebarAssets( editor ) {
 							modelPath: file.modelPath,
 							source: 'user'
 						});
-						console.log('[AssetManager] Registered geometry:', geoId);
 					}
 				}
 				
 				if (file.type === 'model' && file.modelObject) {
 					const modelId = file.path;
 					assetManager.registerModel(modelId, file.modelObject, {
-						name: file.name.replace('.model', ''),
+						name: file.name.replace(/\.(model|mesh)$/, ''),
 						path: file.path,
 						modelPath: file.modelPath,
 						source: 'user'
 					});
-					console.log('[AssetManager] Registered model:', modelId);
 				}
 			});
 			
@@ -563,13 +777,29 @@ function SidebarAssets( editor ) {
 			traverseFolder(window.assetsRoot);
 		}
 		
-		console.log('[AssetManager] User assets initialized:', assetManager.getStats());
 	}
 	
 	window.initializeAssetManager = function() {
 		assetManager.clear();
-		initializeDefaultAssets();
-		initializeUserAssets();
+	async function refreshAssets() {
+		if ( isTauri && invoke ) {
+			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+			if ( projectPath ) {
+				await syncFilesystemWithMetadata();
+				refreshFolderTree();
+				refreshFiles();
+			}
+		} else if ( ! assetsDatabase ) {
+			return;
+		} else {
+			await loadAssets();
+		}
+	}
+
+	window.refreshAssets = refreshAssets;
+
+	initializeDefaultAssets();
+	initializeUserAssets();
 	};
 	
 	const isTauri = typeof window !== 'undefined' && window.__TAURI__;
@@ -596,7 +826,6 @@ function SidebarAssets( editor ) {
 		
 		const icon = document.createElement( 'span' );
 		icon.textContent = '📁';
-		// Icon margin is handled by CSS
 		folderItem.appendChild( icon );
 
 		
@@ -767,6 +996,34 @@ function SidebarAssets( editor ) {
 
 		if ( file.type === 'material' ) {
 			try {
+				const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
+				const materialAsset = editor.assets.getByUrl( assetPath );
+				
+				if ( materialAsset && materialAsset instanceof MaterialAsset ) {
+					const assetMaterial = materialAsset.getMaterial();
+					if ( assetMaterial ) {
+						const dataUrl = await previewRenderer.renderMaterialPreview( assetMaterial, size, size );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						img.className = 'asset-thumbnail-img-contain';
+						thumbnail.appendChild( img );
+						
+						materialAsset.on( 'changed', async function onMaterialAssetChanged() {
+							try {
+								const updatedMaterial = materialAsset.getMaterial();
+								if ( updatedMaterial ) {
+									const newDataUrl = await previewRenderer.renderMaterialPreview( updatedMaterial, size, size );
+									img.src = newDataUrl;
+								}
+							} catch ( error ) {
+								console.warn( '[Preview] Failed to update material preview:', error );
+							}
+						} );
+						
+						return thumbnail;
+					}
+				}
+				
 				let material = file.modelMaterial && file.modelMaterial.material;
 				
 				if ( !material && file.modelPath ) {
@@ -798,17 +1055,15 @@ function SidebarAssets( editor ) {
 					}
 					
 					if ( cachedModel && cachedModel.materials ) {
-						const matName = file.name.replace( '.material', '' );
+						const matName = file.name.replace( /\.mat$/, '' );
 						const matEntry = cachedModel.materials.find( m => m.name === matName );
 						if ( matEntry && matEntry.material ) {
 							material = matEntry.material;
-							console.log('[Preview] Found material:', matName);
 						}
 					}
 				}
 				
 				if ( material && material instanceof THREE.Material ) {
-					console.log('[Preview] Rendering material from model:', file.name);
 					const dataUrl = await previewRenderer.renderMaterialPreview( material, size, size );
 					const img = document.createElement( 'img' );
 					img.src = dataUrl;
@@ -847,7 +1102,7 @@ function SidebarAssets( editor ) {
 				if ( !geometry && file.modelPath ) {
 					const cachedModel = assetManager.getParsedModel( file.modelPath );
 					if ( cachedModel && cachedModel.geometries ) {
-						const geoName = file.name.replace( '.geometry', '' );
+						const geoName = file.name.replace( /\.geo$/, '' );
 						const geoEntry = cachedModel.geometries.find( g => g.name === geoName );
 						if ( geoEntry && geoEntry.geometry ) {
 							geometry = geoEntry.geometry;
@@ -974,12 +1229,7 @@ function SidebarAssets( editor ) {
 				url: file.url || null,
 				content: file.content || null,
 				modelPath: file.modelPath || null,
-				modelName: file.modelName || null,
-				modelGeometry: file.modelGeometry || null,
-				modelMaterial: file.modelMaterial || null,
-				modelTexture: file.modelTexture || null,
-				modelObject: file.modelObject || null,
-				modelContents: file.modelContents || null
+				modelName: file.modelName || null
 			};
 			try {
 				e.dataTransfer.setData( 'text/plain', JSON.stringify( assetData ) );
@@ -991,6 +1241,11 @@ function SidebarAssets( editor ) {
 		item.addEventListener( 'dragend', function ( e ) {
 			item.classList.remove( 'asset-item-dragging' );
 			item.classList.add( 'asset-item-normal' );
+		} );
+
+		item.addEventListener( 'dblclick', function ( e ) {
+			e.stopPropagation();
+			openFile( file.path );
 		} );
 
 		return item;
@@ -1290,12 +1545,7 @@ function SidebarAssets( editor ) {
 				url: file.url || null,
 				content: file.content || null,
 				modelPath: file.modelPath || null,
-				modelName: file.modelName || null,
-				modelGeometry: file.modelGeometry || null,
-				modelMaterial: file.modelMaterial || null,
-				modelTexture: file.modelTexture || null,
-				modelObject: file.modelObject || null,
-				modelContents: file.modelContents || null
+				modelName: file.modelName || null
 			};
 			try {
 				e.dataTransfer.setData( 'text/plain', JSON.stringify( assetData ) );
@@ -1322,17 +1572,15 @@ function SidebarAssets( editor ) {
 			window.selectedAsset = selectedAsset;
 		} );
 		
-		if ( isScript ) {
-			row.addEventListener( 'dblclick', function ( e ) {
-				e.stopPropagation();
-				openFileInEditor( file.path );
-			} );
-		}
+		row.addEventListener( 'dblclick', function ( e ) {
+			e.stopPropagation();
+			openFile( file.path );
+		} );
 
 		filesTableBody.appendChild( row );
 	}
 
-	async function openFileInEditor( filePath ) {
+	async function openFile( filePath ) {
 		if ( !isTauri || !invoke ) return;
 		
 		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
@@ -1345,11 +1593,12 @@ function SidebarAssets( editor ) {
 		assetPath = assetPath.replace( /\/+/g, '/' );
 		
 		try {
-			await invoke( 'open_file_in_editor', {
+			await invoke( 'open_file', {
 				projectPath: projectPath,
 				assetPath: assetPath
 			} );
 		} catch ( error ) {
+			console.warn( '[Assets] Failed to open file:', error );
 		}
 	}
 
@@ -1480,7 +1729,6 @@ function SidebarAssets( editor ) {
 	tableBody.addEventListener( 'dragleave', handleDragLeave, true );
 
 	function handleDrop( event ) {
-		console.log('[Assets] Drop event received', event.dataTransfer.files.length, event.target);
 		event.preventDefault();
 		event.stopPropagation();
 		event.stopImmediatePropagation();
@@ -1657,8 +1905,8 @@ function SidebarAssets( editor ) {
 									
 									modelContents.geometries.forEach( geo => {
 										modelFolder.files.push( {
-											name: geo.name + '.geometry',
-											path: modelFolder.path + '/' + geo.name + '.geometry',
+											name: geo.name + '.geo',
+											path: modelFolder.path + '/' + geo.name + '.geo',
 											type: 'geometry',
 											size: 0,
 											isBinary: false,
@@ -1683,8 +1931,8 @@ function SidebarAssets( editor ) {
 									
 									modelContents.materials.forEach( mat => {
 										const materialFile = {
-											name: mat.name + '.material',
-											path: modelFolder.path + '/' + mat.name + '.material',
+											name: mat.name + '.mat',
+											path: modelFolder.path + '/' + mat.name + '.mat',
 											type: 'material',
 											size: 0,
 											isBinary: false,
@@ -1697,8 +1945,8 @@ function SidebarAssets( editor ) {
 									
 									
 									modelFolder.files.push( {
-										name: baseName + '.model',
-										path: modelFolder.path + '/' + baseName + '.model',
+										name: baseName + '.mesh',
+										path: modelFolder.path + '/' + baseName + '.mesh',
 										type: 'model',
 										size: file.size || 0,
 										isBinary: true,
@@ -1860,9 +2108,9 @@ function SidebarAssets( editor ) {
 	tableBody.addEventListener( 'drop', handleDrop, true );
 
 	
-	function createNewFolder() {
+	async function createNewFolder() {
 
-		const folderName = prompt( 'Enter folder name:', 'New Folder' );
+		const folderName = await Modal.showPrompt( 'Enter Folder Name', '', 'New Folder', 'New Folder' );
 
 		if ( folderName && folderName.trim() !== '' ) {
 
@@ -2086,8 +2334,8 @@ function SidebarAssets( editor ) {
 										
 										modelContents.geometries.forEach( geo => {
 											modelFolder.files.push( {
-												name: geo.name + '.geometry',
-												path: modelFolder.path + '/' + geo.name + '.geometry',
+												name: geo.name + '.geo',
+												path: modelFolder.path + '/' + geo.name + '.geo',
 												type: 'geometry',
 												size: 0,
 												isBinary: false,
@@ -2112,8 +2360,8 @@ function SidebarAssets( editor ) {
 										
 										modelContents.materials.forEach( mat => {
 											const materialFile = {
-												name: mat.name + '.material',
-												path: modelFolder.path + '/' + mat.name + '.material',
+												name: mat.name + '.mat',
+												path: modelFolder.path + '/' + mat.name + '.mat',
 												type: 'material',
 												size: 0,
 												isBinary: false,
@@ -2126,8 +2374,8 @@ function SidebarAssets( editor ) {
 										
 										
 										modelFolder.files.push( {
-											name: baseName + '.model',
-											path: modelFolder.path + '/' + baseName + '.model',
+											name: baseName + '.mesh',
+											path: modelFolder.path + '/' + baseName + '.mesh',
 											type: 'model',
 											size: file.size || 0,
 											isBinary: true,
@@ -2274,7 +2522,7 @@ function SidebarAssets( editor ) {
 	}
 
 	
-	function createAssetFile( type, defaultContent ) {
+	async function createAssetFile( type, defaultContent ) {
 
 		const extMap = {
 			'css': 'css',
@@ -2283,15 +2531,21 @@ function SidebarAssets( editor ) {
 			'js': 'js',
 			'shader': 'glsl',
 			'txt': 'txt',
-			'material': 'material',
+			'material': 'mat',
 			'cubemap': 'cubemap'
 		};
 
 		const ext = extMap[ type ] || 'txt';
-		const fileName = prompt( `Enter ${type.toUpperCase()} file name:`, `new.${ext}` );
+		const defaultFileName = `new.${ext}`;
+		const fileName = await Modal.showPrompt( `Enter ${type.toUpperCase()} File Name`, '', defaultFileName, defaultFileName );
 
 		if ( fileName && fileName.trim() !== '' ) {
 
+			let finalFileName = fileName.trim();
+			
+			if ( !finalFileName.includes( '.' ) ) {
+				finalFileName = `${finalFileName}.${ext}`;
+			}
 			
 			let normalizedPath = currentFolder.path;
 			if ( normalizedPath === '/' ) {
@@ -2299,29 +2553,92 @@ function SidebarAssets( editor ) {
 			} else if ( normalizedPath.endsWith( '/' ) ) {
 				normalizedPath = normalizedPath.slice( 0, -1 );
 			}
-			const filePath = normalizedPath + '/' + fileName.trim();
+			const filePath = normalizedPath + '/' + finalFileName;
 			
+			let content = defaultContent;
+			
+			if ( !content && type === 'material' ) {
+				const defaultMaterial = new THREE.MeshStandardMaterial( { color: 0xffffff } );
+				defaultMaterial.name = finalFileName.replace( /\.[^/.]+$/, '' );
+				const materialJson = defaultMaterial.toJSON();
+				content = JSON.stringify( materialJson, null, '\t' );
+			} else if ( !content && type === 'html' ) {
+				content = `<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Document</title>
+</head>
+<body>
+	
+</body>
+</html>`;
+			} else if ( !content && type === 'css' ) {
+				content = `/* ${finalFileName} */`;
+			} else if ( !content && type === 'shader' ) {
+				content = `// Vertex Shader
+void main() {
+	gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+
+// Fragment Shader
+void main() {
+	gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+}`;
+			} else if ( !content && type === 'txt' ) {
+				content = '';
+			} else if ( !content && type === 'cubemap' ) {
+				content = JSON.stringify( {
+					type: 'cubemap',
+					images: {
+						px: '',
+						nx: '',
+						py: '',
+						ny: '',
+						pz: '',
+						nz: ''
+					}
+				}, null, '\t' );
+			}
+			
+			const now = Date.now();
 			const fileEntry = {
-				name: fileName.trim(),
-				content: defaultContent,
+				name: finalFileName,
+				content: content || '',
 				path: filePath,
-				size: defaultContent.length,
+				size: ( content || '' ).length,
 				type: type,
-				isBinary: false
+				isBinary: false,
+				dateCreated: now,
+				dateModified: now
 			};
 
 			currentFolder.files.push( fileEntry );
-			saveAssets().catch( error => {
+			await registerAssetFromFile( fileEntry );
+			await saveAssets().catch( error => {
 				console.error( '[Assets] Error saving assets:', error );
 			} );
 			refreshFiles();
+			
+			if ( type === 'material' ) {
+				window.selectedAsset = {
+					type: 'file',
+					path: fileEntry.path,
+					name: fileEntry.name,
+					folder: currentFolder
+				};
+				if ( editor.signals && editor.signals.sceneGraphChanged ) {
+					editor.signals.sceneGraphChanged.dispatch();
+				}
+			}
 
 		}
 
 	}
 
-	function createScriptAsset() {
-		const fileName = prompt( 'Enter script name:', 'NewScript.ts' );
+	async function createScriptAsset() {
+		const fileName = await Modal.showPrompt( 'Enter Script Name', '', 'NewScript.ts', 'NewScript.ts' );
 		
 		if ( fileName && fileName.trim() !== '' ) {
 			let name = fileName.trim();
@@ -2373,8 +2690,8 @@ export default class ${validClassName} extends Script {
 		}
 	}
 
-	function createFolder() {
-		const folderName = prompt( 'Enter folder name:', 'New Folder' );
+	async function createFolder() {
+		const folderName = await Modal.showPrompt( 'Enter Folder Name', '', 'New Folder', 'New Folder' );
 		
 		if ( folderName && folderName.trim() !== '' ) {
 			let normalizedPath = currentFolder.path;
@@ -2553,13 +2870,16 @@ export default class ${validClassName} extends Script {
 							fileType = 'video';
 						}
 						
+						const now = Date.now();
 						const fileEntry = {
 							name: fileInfo.name,
 							path: filePath,
 							size: fileInfo.size || 0,
 							type: fileType,
 							isBinary: [ 'image', 'model', 'audio', 'video' ].includes( fileType ),
-							content: ''
+							content: '',
+							dateCreated: now,
+							dateModified: now
 						};
 						
 						folder.files.push( fileEntry );
@@ -2682,17 +3002,59 @@ export default class ${validClassName} extends Script {
 					path: folder.path,
 					expanded: folder.expanded,
 					children: folder.children.map( serializeFolder ),
-					files: filesToSave.map( file => ( {
-						name: file.name,
-						path: file.path,
-						size: file.size,
-						type: file.type,
-						isBinary: file.isBinary || false,
-						content: '',
-						url: null,
-						modelPath: file.modelPath || null,
-						modelName: file.modelName || null
-					} ) )
+					files: filesToSave.map( file => {
+						const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
+						const asset = editor.assets.getByUrl( assetPath );
+						
+						const fileData = {
+							name: file.name,
+							path: file.path,
+							size: file.size,
+							type: file.type,
+							isBinary: file.isBinary || false,
+							content: '',
+							url: null,
+							modelPath: file.modelPath || null,
+							modelName: file.modelName || null,
+							metadata: file.metadata || null,
+							dateCreated: file.dateCreated || null,
+							dateModified: file.dateModified || null
+						};
+						
+						if ( asset ) {
+							fileData.assetId = asset.id;
+							fileData.assetType = asset.type;
+							fileData.dateCreated = asset.createdAt;
+							fileData.dateModified = asset.modifiedAt;
+							
+							if ( asset instanceof MaterialAsset ) {
+								fileData.metadata = {
+									...fileData.metadata,
+									material: {
+										materialType: asset.metadata.materialType
+									}
+								};
+							} else if ( asset instanceof TextureAsset ) {
+								fileData.metadata = {
+									...fileData.metadata,
+									texture: {
+										width: asset.metadata.width,
+										height: asset.metadata.height,
+										colorSpace: asset.metadata.colorSpace,
+										flipY: asset.metadata.flipY,
+										generateMipmaps: asset.metadata.generateMipmaps,
+										minFilter: asset.metadata.minFilter,
+										magFilter: asset.metadata.magFilter,
+										wrapS: asset.metadata.wrapS,
+										wrapT: asset.metadata.wrapT,
+										anisotropy: asset.metadata.anisotropy
+									}
+								};
+							}
+						}
+						
+						return fileData;
+					} )
 				};
 			}
 
@@ -2751,10 +3113,10 @@ export default class ${validClassName} extends Script {
 							}
 							
 							if ( file.path && (
-								file.path.endsWith( '.geometry' ) || 
+								file.path.endsWith( '.geo' ) ||
 								file.path.endsWith( '.texture' ) || 
-								file.path.endsWith( '.material' ) || 
-								file.path.endsWith( '.model' )
+								file.path.endsWith( '.mat' ) ||
+								file.path.endsWith( '.mesh' )
 							) ) {
 								
 								const pathMatch = file.path.match( /\/([^\/]+)\.(glb|gltf|fbx|obj)/ );
@@ -2819,6 +3181,11 @@ export default class ${validClassName} extends Script {
 								assetPath: assetPath,
 								content: fileContent
 							} );
+							
+							if ( file.dateCreated === undefined || file.dateCreated === null ) {
+								file.dateCreated = Date.now();
+							}
+							file.dateModified = Date.now();
 
 							if ( ( file.type === 'script' || file.name.endsWith( '.ts' ) || file.name.endsWith( '.tsx' ) ) && !file.isBinary ) {
 								try {
@@ -2903,7 +3270,9 @@ export default class ${validClassName} extends Script {
 					content: file.content || '',
 					url: null,
 					modelPath: file.modelPath || null,
-					modelName: file.modelName || null
+					modelName: file.modelName || null,
+					dateCreated: file.dateCreated || null,
+					dateModified: file.dateModified || null
 				} ) )
 			};
 		}
@@ -2989,20 +3358,19 @@ export default class ${validClassName} extends Script {
 									isBinary: fileData.isBinary || false,
 									content: '',
 									modelPath: fileData.modelPath || null,
-									modelName: fileData.modelName || null
+									modelName: fileData.modelName || null,
+									dateCreated: fileData.dateCreated || null,
+									dateModified: fileData.dateModified || null
 								};
 
 								try {
-									
-									
-									
 									const isVirtualFile = fileData.modelGeometry || fileData.modelTexture || 
 									                     fileData.modelMaterial || fileData.modelObject ||
 									                     ( fileData.path && (
-									                         fileData.path.endsWith( '.geometry' ) ||
+									                         fileData.path.endsWith( '.geo' ) ||
 									                         fileData.path.endsWith( '.texture' ) ||
-									                         fileData.path.endsWith( '.material' ) ||
-									                         fileData.path.endsWith( '.model' )
+									                         fileData.path.endsWith( '.mat' ) ||
+									                         fileData.path.endsWith( '.mesh' )
 									                     ) && (
 									                         fileData.path.includes( '/Geometries/' ) ||
 									                         fileData.path.includes( '/Textures/' ) ||
@@ -3062,8 +3430,8 @@ export default class ${validClassName} extends Script {
 													
 													modelContents.geometries.forEach( geo => {
 														modelFolder.files.push( {
-															name: geo.name + '.geometry',
-															path: modelFolder.path + '/' + geo.name + '.geometry',
+															name: geo.name + '.geo',
+															path: modelFolder.path + '/' + geo.name + '.geo',
 															type: 'geometry',
 															size: 0,
 															isBinary: false,
@@ -3088,8 +3456,8 @@ export default class ${validClassName} extends Script {
 													
 													modelContents.materials.forEach( mat => {
 														modelFolder.files.push( {
-															name: mat.name + '.material',
-															path: modelFolder.path + '/' + mat.name + '.material',
+															name: mat.name + '.mat',
+															path: modelFolder.path + '/' + mat.name + '.mat',
 															type: 'material',
 															size: 0,
 															isBinary: false,
@@ -3101,8 +3469,8 @@ export default class ${validClassName} extends Script {
 													
 													
 													modelFolder.files.push( {
-														name: baseName + '.model',
-														path: modelFolder.path + '/' + baseName + '.model',
+														name: baseName + '.mesh',
+														path: modelFolder.path + '/' + baseName + '.mesh',
 														type: 'model',
 														size: file.size || 0,
 														isBinary: true,
@@ -3137,9 +3505,17 @@ export default class ${validClassName} extends Script {
 										file.content = new TextDecoder().decode( new Uint8Array( fileBytes ) );
 									}
 								} catch ( error ) {
+									const errorMessage = error?.message || String( error );
+									if ( errorMessage && errorMessage.includes( 'File not found' ) ) {
+										return null;
+									}
 									console.warn( '[Assets] Failed to load file:', fileData.path, error );
+									return null;
 								}
 
+								if ( file ) {
+									await registerAssetFromFile( file );
+								}
 								return file;
 							} ) );
 							folder.files = loadedFiles.filter( f => f !== null );
@@ -3218,17 +3594,14 @@ export default class ${validClassName} extends Script {
 								content: fileData.content || ''
 							};
 
-							// In browser mode, don't create blob URLs - let the API handle loading
 							const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core?.invoke;
 							const isInBrowser = typeof window !== 'undefined' && window.location && window.location.protocol === 'http:';
 							
 							if ( file.isBinary && file.content && ( isTauri && !isInBrowser ) ) {
-								// Only create blob URLs in Tauri mode, not in browser mode
 								try {
 									const base64Data = file.content.includes( ',' ) ? file.content.split( ',' )[ 1 ] : file.content;
 									const base64DataTrimmed = base64Data.trim();
 									
-									// Validate base64
 									if ( /^[A-Za-z0-9+/]*={0,2}$/.test( base64DataTrimmed ) ) {
 										const byteCharacters = atob( base64DataTrimmed );
 										const byteNumbers = new Array( byteCharacters.length );
@@ -3245,7 +3618,6 @@ export default class ${validClassName} extends Script {
 									console.error( 'Failed to recreate blob for', file.name, e );
 								}
 							} else if ( file.isBinary && isInBrowser ) {
-								// In browser mode, set url to null so it will be loaded via API
 								file.url = null;
 							}
 
@@ -3361,8 +3733,9 @@ export default class ${validClassName} extends Script {
 		if ( assetsDropHandler(e) ) return;
 	}, true );
 	
-	// Initialize AssetManager with defaults on startup
 	initializeDefaultAssets();
+
+	window.loadAssets = loadAssets;
 
 	return container;
 

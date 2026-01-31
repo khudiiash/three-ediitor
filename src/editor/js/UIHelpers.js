@@ -235,7 +235,7 @@ export class UIHelpers {
 			modal.className += ` ${options.className}`;
 		}
 		
-		// Header
+		
 		const header = document.createElement( 'div' );
 		header.className = 'modal-header';
 		
@@ -256,12 +256,12 @@ export class UIHelpers {
 		
 		modal.appendChild( header );
 		
-		// Body
+		
 		const body = document.createElement( 'div' );
 		body.className = 'modal-body';
 		modal.appendChild( body );
 		
-		// Footer
+		
 		const footer = document.createElement( 'div' );
 		footer.className = 'modal-footer';
 		modal.appendChild( footer );

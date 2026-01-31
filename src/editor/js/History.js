@@ -31,7 +31,7 @@ class History {
 
 	}
 
-	execute( cmd, optionalName ) {
+	async execute( cmd, optionalName ) {
 
 		const lastCmd = this.undos[ this.undos.length - 1 ];
 		const timeDifference = Date.now() - this.lastCmdTime;
@@ -80,7 +80,10 @@ class History {
 		}
 
 		cmd.name = ( optionalName !== undefined ) ? optionalName : cmd.name;
-		cmd.execute();
+		const result = cmd.execute();
+		if ( result instanceof Promise ) {
+			await result;
+		}
 		cmd.inMemory = true;
 
 		if ( this.config.getKey( 'settings/history' ) ) {
@@ -98,7 +101,7 @@ class History {
 
 	}
 
-	undo() {
+	async undo() {
 
 		if ( this.historyDisabled ) {
 
@@ -123,7 +126,10 @@ class History {
 
 		if ( cmd !== undefined ) {
 
-			cmd.undo();
+			const result = cmd.undo();
+			if ( result instanceof Promise ) {
+				await result;
+			}
 			this.redos.push( cmd );
 			this.editor.signals.historyChanged.dispatch( cmd );
 
@@ -133,7 +139,7 @@ class History {
 
 	}
 
-	redo() {
+	async redo() {
 
 		if ( this.historyDisabled ) {
 
@@ -158,7 +164,10 @@ class History {
 
 		if ( cmd !== undefined ) {
 
-			cmd.execute();
+			const result = cmd.execute();
+			if ( result instanceof Promise ) {
+				await result;
+			}
 			this.undos.push( cmd );
 			this.editor.signals.historyChanged.dispatch( cmd );
 

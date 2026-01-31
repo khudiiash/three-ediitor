@@ -1,9 +1,9 @@
-import { UIPanel, UIBreak, UIButton, UIRow, UIInput, UISelect, UINumber, UIText, UICheckbox } from './libs/ui.js';
-import { UIColor } from './libs/ui.js';
+import { UIPanel, UIBreak, UIButton, UIRow, UIInput, UISelect, UINumber, UIText, UICheckbox, UIDiv } from './libs/ui.js';
 
 import { AddScriptAssetCommand } from './commands/AddScriptAssetCommand.js';
 import { RemoveScriptAssetCommand } from './commands/RemoveScriptAssetCommand.js';
 import { SetScriptAttributeCommand } from './commands/SetScriptAttributeCommand.js';
+import { Modal } from './Modal.js';
 
 function SidebarScript( editor ) {
 
@@ -37,7 +37,7 @@ function SidebarScript( editor ) {
 			return;
 		}
 
-		const fileName = prompt( 'Enter script name:', 'NewScript.ts' );
+		const fileName = await Modal.showPrompt( 'Enter Script Name', '', 'NewScript.ts', 'NewScript.ts' );
 		
 		if ( !fileName || fileName.trim() === '' ) {
 			return;
@@ -53,6 +53,7 @@ function SidebarScript( editor ) {
 
 		const scriptTemplate = `import { registerComponent, attribute } from '@engine/core/decorators';
 import { Script } from '@engine/core/Script';
+import * as THREE from 'three';
 
 @registerComponent
 export default class ${validClassName} extends Script {
@@ -121,7 +122,8 @@ export default class ${validClassName} extends Script {
 						content: fileContent
 					} );
 
-					const { ScriptCompiler } = await import( './ScriptCompiler.js' );
+					const ScriptCompilerModule = window.__scriptCompilerModule || await import( './ScriptCompiler.js' );
+					const { ScriptCompiler } = ScriptCompilerModule;
 					const compiled = await ScriptCompiler.compileScript( assetPath, scriptTemplate );
 					if ( compiled ) {
 						const compiledContent = Array.from( new TextEncoder().encode( compiled.content ) );
@@ -134,9 +136,9 @@ export default class ${validClassName} extends Script {
 
 					editor.execute( new AddScriptAssetCommand( editor, editor.selected, filePath ) );
 					update();
-					
-					if ( window.refreshAssetsFiles ) {
-						window.refreshAssetsFiles();
+					// Fire-and-forget: refresh assets panel without blocking the UI
+					if ( window.refreshAssets ) {
+						window.refreshAssets().catch( () => {} );
 					}
 				} catch ( error ) {
 					console.error( '[Script] Failed to create script asset:', error );
@@ -150,7 +152,7 @@ export default class ${validClassName} extends Script {
 		}
 	} );
 	
-	// Add select and button on the same line (no label)
+	
 	addScriptRow.add( addScriptSelect );
 	addScriptRow.add( addScriptButton );
 	container.add( addScriptRow );
@@ -204,7 +206,7 @@ export default class ${validClassName} extends Script {
 
 		updateScriptSelect();
 
-		const scripts = object.userData.scripts || [];
+		const scripts = ( object.userData && object.userData.scripts ) || [];
 
 		if ( scripts.length > 0 ) {
 
@@ -245,11 +247,12 @@ export default class ${validClassName} extends Script {
 						assetPath = assetPath.replace( /\/+/g, '/' );
 						
 						try {
-							await invoke( 'open_file_in_editor', {
+							await invoke( 'open_file', {
 								projectPath: projectPath,
 								assetPath: assetPath
 							} );
 						} catch ( error ) {
+							console.warn( '[Script] Failed to open file:', error );
 						}
 					} );
 					scriptRow.add( editButton );
@@ -257,10 +260,8 @@ export default class ${validClassName} extends Script {
 				const removeButton = new UIButton( '×' );
 				removeButton.dom.classList.add( 'script-remove-button' );
 					removeButton.onClick( function () {
-						if ( confirm( 'Remove this script?' ) ) {
-							editor.execute( new RemoveScriptAssetCommand( editor, object, index ) );
-							update();
-						}
+						editor.execute( new RemoveScriptAssetCommand( editor, object, index ) );
+						update();
 					} );
 					scriptRow.add( removeButton );
 
@@ -306,7 +307,8 @@ export default class ${validClassName} extends Script {
 					} );
 					
 					( async function ( scriptData ) {
-						const attributesFromFile = {};
+						const attributesMetadata = {};
+						const attributesDefaults = {};
 						
 						const isTauri = typeof window !== 'undefined' && window.__TAURI__;
 						const invoke = isTauri ? window.__TAURI__.core.invoke : null;
@@ -340,11 +342,19 @@ export default class ${validClassName} extends Script {
 										const attrOptions = match[ 1 ];
 										
 										let attrType = 'number';
+										let title = attrName;
 										let defaultValue = null;
+										let min = undefined, max = undefined, step = undefined;
+										let enumOpts = undefined;
 										
 										const typeMatch = attrOptions.match( /type\s*:\s*['"]([^'"]+)['"]/ );
 										if ( typeMatch ) {
 											attrType = typeMatch[ 1 ];
+										}
+										
+										const titleMatch = attrOptions.match( /title\s*:\s*['"]([^'"]+)['"]/ );
+										if ( titleMatch ) {
+											title = titleMatch[ 1 ];
 										}
 										
 										const defaultMatch = attrOptions.match( /default\s*:\s*([^,}]+)/ );
@@ -356,14 +366,49 @@ export default class ${validClassName} extends Script {
 												defaultValue = defaultStr === 'true';
 											} else if ( attrType === 'string' ) {
 												defaultValue = defaultStr.replace( /^['"]|['"]$/g, '' );
+											} else if ( attrType === 'entity' ) {
+												defaultValue = ( defaultStr === 'null' || defaultStr === 'undefined' ) ? null : defaultStr.replace( /^['"]|['"]$/g, '' );
 											}
 										}
 										
-										attributesFromFile[ attrName ] = defaultValue !== null ? defaultValue : ( attrType === 'number' ? 0 : attrType === 'boolean' ? false : '' );
+										const minMatch = attrOptions.match( /min\s*:\s*([^,}]+)/ );
+										if ( minMatch ) {
+											min = parseFloat( minMatch[ 1 ].trim() );
+										}
+										const maxMatch = attrOptions.match( /max\s*:\s*([^,}]+)/ );
+										if ( maxMatch ) {
+											max = parseFloat( maxMatch[ 1 ].trim() );
+										}
+										const stepMatch = attrOptions.match( /step\s*:\s*([^,}]+)/ );
+										if ( stepMatch ) {
+											step = parseFloat( stepMatch[ 1 ].trim() );
+										}
+										
+										const enumMatch = attrOptions.match( /enum\s*:\s*\{([^}]*)\}/ );
+										if ( enumMatch && attrType === 'enum' ) {
+											const pairs = enumMatch[ 1 ].split( ',' ).map( p => p.trim() );
+											enumOpts = { '': '—' };
+											for ( const p of pairs ) {
+												const kv = p.split( ':' ).map( s => s.trim() );
+												if ( kv.length >= 2 ) {
+													const k = kv[ 0 ].replace( /^['"]|['"]$/g, '' );
+													const v = kv[ 1 ].replace( /^['"]|['"]$/g, '' );
+													enumOpts[ v ] = k;
+												}
+											}
+										}
+										
+										if ( defaultValue === null && attrType === 'number' ) defaultValue = 0;
+										if ( defaultValue === null && attrType === 'boolean' ) defaultValue = false;
+										if ( defaultValue === null && attrType === 'string' ) defaultValue = '';
+										if ( defaultValue === null && attrType === 'entity' ) defaultValue = null;
+										
+										attributesMetadata[ attrName ] = { type: attrType, title: title, min: min, max: max, step: step, enum: enumOpts };
+										attributesDefaults[ attrName ] = defaultValue;
 									}
 									
-									if ( Object.keys( attributesFromFile ).length > 0 && !scriptData.attributes ) {
-										scriptData.attributes = attributesFromFile;
+									if ( Object.keys( attributesMetadata ).length > 0 && !scriptData.attributes ) {
+										scriptData.attributes = { ...attributesDefaults };
 										editor.signals.sceneGraphChanged.dispatch();
 									}
 								}
@@ -371,50 +416,133 @@ export default class ${validClassName} extends Script {
 							}
 						}
 						
-						const attributesToShow = { ...attributesFromFile, ...( scriptData.attributes || {} ) };
-						
-						if ( Object.keys( attributesToShow ).length === 0 ) {
+						const attrNames = Object.keys( attributesMetadata );
+						if ( attrNames.length === 0 ) {
 							return;
 						}
 						
-						for ( const attrName in attributesToShow ) {
-							const attrValue = attributesToShow[ attrName ];
+						const currentValues = scriptData.attributes || {};
+						
+						for ( const attrName of attrNames ) {
+							const meta = attributesMetadata[ attrName ];
+							const attrValue = currentValues[ attrName ] !== undefined ? currentValues[ attrName ] : attributesDefaults[ attrName ];
 							const attrRow = new UIRow();
 							attrRow.dom.classList.add( 'script-attribute-row' );
 
-							const attrLabel = new UIText( attrName );
+							const displayTitle = meta.title || attrName;
+							const attrLabel = new UIText( displayTitle );
 							attrLabel.dom.classList.add( 'script-attribute-label' );
 							attrRow.add( attrLabel );
 
 							let attrInput;
+							const attrType = meta.type;
 							
-							if ( typeof attrValue === 'number' ) {
+							if ( attrType === 'entity' ) {
+								const dropZone = document.createElement( 'div' );
+								dropZone.classList.add( 'script-attribute-entity-slot' );
+								const clearBtn = document.createElement( 'span' );
+								clearBtn.textContent = '×';
+								clearBtn.title = 'Clear';
+								clearBtn.style.cssText = 'margin-left: 6px; cursor: pointer; opacity: 0.6; font-size: 14px;';
+								clearBtn.addEventListener( 'click', function ( e ) {
+									e.stopPropagation();
+									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, null ) );
+									scriptData.attributes = scriptData.attributes || {};
+									scriptData.attributes[ attrName ] = null;
+									updateEntityLabel();
+								} );
+								function updateEntityLabel() {
+									const uuid = ( scriptData.attributes || {} )[ attrName ];
+									if ( uuid && editor.scene ) {
+										const obj = editor.scene.getObjectByProperty( 'uuid', uuid );
+										dropZone.textContent = obj ? ( obj.name || obj.uuid ) : ( uuid.slice( 0, 8 ) + '…' );
+										dropZone.style.color = '';
+										clearBtn.style.display = '';
+									} else {
+										dropZone.textContent = 'Drop entity...';
+										dropZone.style.color = '';
+										clearBtn.style.display = 'none';
+									}
+								}
+								updateEntityLabel();
+								dropZone.addEventListener( 'dragover', function ( e ) {
+									if ( e.dataTransfer.types.indexOf( 'application/x-scene-object' ) !== -1 ) {
+										e.preventDefault();
+										e.stopPropagation();
+										dropZone.classList.add( 'drag-over' );
+									}
+								} );
+								dropZone.addEventListener( 'dragleave', function ( e ) {
+									dropZone.classList.remove( 'drag-over' );
+								} );
+								dropZone.addEventListener( 'drop', function ( e ) {
+									e.preventDefault();
+									e.stopPropagation();
+									dropZone.classList.remove( 'drag-over' );
+									const raw = e.dataTransfer.getData( 'application/x-scene-object' );
+									if ( raw ) {
+										try {
+											const payload = JSON.parse( raw );
+											if ( payload.type === 'sceneObject' && payload.uuid ) {
+												editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, payload.uuid ) );
+												scriptData.attributes = scriptData.attributes || {};
+												scriptData.attributes[ attrName ] = payload.uuid;
+												updateEntityLabel();
+											}
+										} catch ( err ) {}
+									}
+								} );
+								const wrapper = new UIDiv();
+								wrapper.dom.style.display = 'flex';
+								wrapper.dom.style.alignItems = 'center';
+								wrapper.dom.style.flex = '1';
+								wrapper.dom.style.minWidth = '0';
+								wrapper.dom.appendChild( dropZone );
+								wrapper.dom.appendChild( clearBtn );
+								attrInput = wrapper;
+							} else if ( attrType === 'number' ) {
 								attrInput = new UINumber( attrValue );
 								attrInput.dom.classList.add( 'script-attribute-input' );
+								if ( meta.min != null ) attrInput.setRange( meta.min, meta.max != null ? meta.max : Infinity );
+								if ( meta.step != null ) attrInput.setStep( meta.step );
 								attrInput.onChange( function () {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
-							} else if ( typeof attrValue === 'boolean' ) {
+							} else if ( attrType === 'boolean' ) {
 								attrInput = new UICheckbox( attrValue );
 								attrInput.onChange( function () {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
-							} else if ( typeof attrValue === 'string' ) {
-								attrInput = new UIInput( attrValue );
+							} else if ( attrType === 'enum' && meta.enum ) {
+								attrInput = new UISelect();
+								attrInput.dom.classList.add( 'script-attribute-input' );
+								attrInput.setOptions( meta.enum );
+								attrInput.setValue( attrValue !== undefined && attrValue !== null ? String( attrValue ) : '' );
+								attrInput.onChange( function () {
+									const v = this.getValue();
+									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, v === '' ? null : v ) );
+								} );
+							} else if ( attrType === 'string' ) {
+								attrInput = new UIInput( attrValue !== undefined && attrValue !== null ? String( attrValue ) : '' );
 								attrInput.dom.classList.add( 'script-attribute-input-string' );
 								attrInput.onChange( function () {
 									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
 								} );
 							} else {
-								attrInput = new UIText( JSON.stringify( attrValue ) );
+								attrInput = new UIInput( attrValue !== undefined && attrValue !== null ? String( attrValue ) : '' );
 								attrInput.dom.classList.add( 'script-attribute-input-string' );
+								attrInput.onChange( function () {
+									editor.execute( new SetScriptAttributeCommand( editor, object, index, attrName, this.getValue() ) );
+								} );
 							}
 
-							attrRow.add( attrInput );
+							if ( attrInput && attrInput.dom ) {
+								attrRow.add( attrInput );
+							}
 							scriptAttributesContainer.add( attrRow );
 						}
 						
-						if ( Object.keys( attributesToShow ).length > 0 ) {
+						if ( attrNames.length > 0 ) {
 							if ( isExpanded ) {
 								scriptAttributesContainer.dom.classList.add( 'expanded' );
 							} else {

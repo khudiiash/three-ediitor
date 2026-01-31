@@ -20,10 +20,14 @@ export { registerComponent, attribute, getRegisteredComponent, getAllRegisteredC
 export type { ScriptAttribute } from './core/Script';
 export type { AttributeOptions } from './core/decorators';
 
-export { Asset, AssetState } from './core/Asset';
+export { Asset, AssetState, AssetType } from './core/Asset';
 export { AssetRegistry } from './core/AssetRegistry';
 export { AssetManager, assetManager } from './core/AssetManager';
 export { ScriptAsset } from './assets/ScriptAsset';
+export { TextureAsset } from './assets/TextureAsset';
+export { MaterialAsset } from './assets/MaterialAsset';
+export type { TextureAssetMetadata } from './assets/TextureAsset';
+export type { MaterialAssetMetadata } from './assets/MaterialAsset';
 
 export type { ComponentConstructor } from './core/Component';
 export type { ScriptConstructor } from './core/Script';

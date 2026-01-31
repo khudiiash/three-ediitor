@@ -90,7 +90,7 @@ class SetSceneCommand extends Command {
 		const cmds = json.cmds;
 		for ( let i = 0; i < cmds.length; i ++ ) {
 
-			const cmd = new window[ cmds[ i ].type ]();	// creates a new object of type "json.type"
+			const cmd = new window[ cmds[ i ].type ]();	
 			cmd.fromJSON( cmds[ i ] );
 			this.cmdArray.push( cmd );
 

@@ -10,6 +10,7 @@
     "core:default",
     "dialog:allow-open",
     "dialog:allow-save",
+    "dialog:allow-message",
     "fs:allow-read-file",
     "fs:allow-write-file",
     "fs:allow-read-dir",

@@ -409,7 +409,7 @@ function SidebarSettings( editor ) {
 				if ( editor.config && editor.config.loadProjectConfig ) {
 					editor.config.loadProjectConfig().then( function () {
 						updateDefaultsUI();
-						// Update accent color picker when config loads
+						
 						const loadedAccentColor = config.getKey( 'project/appearance/accentColor' ) || config.getKey( 'editor/appearance/accentColor' );
 						if ( loadedAccentColor ) {
 							const colorWithHash = loadedAccentColor.startsWith( '#' ) ? loadedAccentColor : '#' + loadedAccentColor;

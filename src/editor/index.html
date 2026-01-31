@@ -141,6 +141,8 @@
 
 			window.editor = editor; 
 			window.THREE = THREE;
+			// Preload ScriptCompiler so first script creation doesn't hang
+			import( './js/ScriptCompiler.js' ).then( function ( m ) { window.__scriptCompilerModule = m; } ).catch( function () {} );
 
 			function handleLoadError( error ) {
 				if ( error && typeof error === 'object' && error.type === 'error' && error.target && error.target.tagName === 'IMG' ) {
@@ -469,6 +471,16 @@
 			window.addEventListener( 'resize', onWindowResize );
 
 			onWindowResize();
+
+			// When returning to the editor window (e.g. from external script editor), refresh assets and script list
+			window.addEventListener( 'focus', function () {
+				if ( window.refreshAssets ) {
+					window.refreshAssets().catch( function () {} );
+				}
+				if ( editor && editor.signals ) {
+					editor.signals.sceneGraphChanged.dispatch();
+				}
+			} );
 
 			window.addEventListener( 'keydown', function ( event ) {
 				if ( event.key === 'F5' || ( event.key === 'r' && ( event.ctrlKey || event.metaKey ) ) ) {

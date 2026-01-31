@@ -7,12 +7,32 @@ export enum AssetState {
     FAILED = 'failed'
 }
 
+export enum AssetType {
+    GEOMETRY = 'geometry',
+    MATERIAL = 'material',
+    TEXTURE = 'texture',
+    MODEL = 'model',
+    AUDIO = 'audio',
+    SCRIPT = 'script',
+    DATA = 'data',
+    FONT = 'font',
+    SHADER = 'shader',
+    HTML = 'html',
+    CSS = 'css',
+    TEXT = 'text',
+    JSON = 'json',
+}
+
 export abstract class Asset {
-    public name: string;
-    public url: string;
+    public id: string = crypto.randomUUID().toString();
+    public name: string = '';
+    public url: string = '';
+    public type: AssetType = AssetType.DATA;
     public state: AssetState = AssetState.NOT_LOADED;
     public data: any = null;
     public error: string | null = null;
+    public createdAt: number = Date.now();
+    public modifiedAt: number = Date.now();
     protected events: SuperEvents;
 
     constructor(name: string, url: string) {
@@ -38,6 +58,10 @@ export abstract class Asset {
 
     emit(event: string, ...args: any[]): void {
         this.events.emit(event, ...args);
+    }
+
+    async emitAsync(event: string, ...args: any[]): Promise<void> {
+        await this.events.emitAsync(event, ...args);
     }
 
     destroy(): void {

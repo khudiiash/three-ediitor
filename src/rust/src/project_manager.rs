@@ -175,6 +175,23 @@ impl ProjectManager {
                 fs::write(&tsconfig_path, tsconfig_content)
                     .map_err(|e| format!("Failed to write tsconfig.json: {}", e))?;
 
+        let package_json_content = serde_json::json!({
+            "name": sanitized_name,
+            "version": "1.0.0",
+            "private": true,
+            "type": "module",
+            "dependencies": {
+                "three": "^0.170.0"
+            }
+        });
+        let package_json_path = project_path.join("package.json");
+        fs::write(
+            &package_json_path,
+            serde_json::to_string_pretty(&package_json_content)
+                .map_err(|e| format!("Failed to serialize package.json: {}", e))?
+        )
+        .map_err(|e| format!("Failed to write package.json: {}", e))?;
+
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()

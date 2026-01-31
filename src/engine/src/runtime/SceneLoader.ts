@@ -87,16 +87,11 @@ export class SceneLoader {
         const isInBrowser = typeof window !== 'undefined' && window.location.protocol === 'http:';
         const projectPath = ProjectLoader.getProjectPath();
         
-        console.log('[SceneLoader] hasTauri:', hasTauri, 'hasTauriInvoke:', hasTauriInvoke, 'isInBrowser:', isInBrowser, 'projectPath:', projectPath);
-        
         const useApiForAssets = isInBrowser || !hasTauriInvoke;
         
         if (useApiForAssets && projectPath) {
             const projectName = projectPath.split(/[/\\]/).pop();
-            console.log('[SceneLoader] Setting up asset loading for project:', projectName);
-            
             manager.setURLModifier((url: string) => {
-                console.log('[SceneLoader] URL modifier called with:', url);
                 
                 if (!url || typeof url !== 'string') {
                     return url;
@@ -123,7 +118,6 @@ export class SceneLoader {
                     const encodedProjectName = encodeURIComponent(projectName || '');
                     const encodedAssetPath = encodeURIComponent(assetPath);
                     const apiUrl = `/api/projects/${encodedProjectName}/assets/${encodedAssetPath}`;
-                    console.log('[SceneLoader] URL modifier transforming:', url, '->', apiUrl);
                     return apiUrl;
                 }
                 
@@ -136,8 +130,6 @@ export class SceneLoader {
                 ImageLoader.prototype[interceptionFlag] = true;
                 const originalImageLoaderLoad = ImageLoader.prototype.load;
                 ImageLoader.prototype.load = function(url: string, onLoad?: (image: HTMLImageElement) => void, onProgress?: (event: ProgressEvent) => void, onError?: (err: unknown) => void) {
-                    console.log('[SceneLoader] ImageLoader.load called with URL:', url, 'projectName:', projectName);
-                    
                     if (url && typeof url === 'string' && (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('/api/projects/'))) {
                         return originalImageLoaderLoad.call(this, url, onLoad, onProgress, onError);
                     }
@@ -162,12 +154,9 @@ export class SceneLoader {
                     }
                     
                     if (assetPathToLoad) {
-                        console.log('[SceneLoader] Intercepting asset load:', assetPathToLoad);
-                        
                         ProjectLoader.loadAsset(projectPath, assetPathToLoad)
                             .then((blob) => {
                                 const blobUrl = URL.createObjectURL(blob);
-                                console.log('[SceneLoader] Asset loaded successfully, creating blob URL:', blobUrl);
                                 originalImageLoaderLoad.call(this, blobUrl, onLoad, onProgress, onError);
                             })
                             .catch((error) => {
@@ -189,8 +178,6 @@ export class SceneLoader {
                 (FileLoader.prototype as any)[fileLoaderInterceptionFlag] = true;
                 const originalFileLoaderLoad = FileLoader.prototype.load;
                 FileLoader.prototype.load = function(url: string, onLoad?: (response: string | ArrayBuffer) => void, onProgress?: (event: ProgressEvent) => void, onError?: (err: unknown) => void) {
-                    console.log('[SceneLoader] FileLoader.load called with URL:', url, 'projectName:', projectName);
-                    
                     if (url && typeof url === 'string' && (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('/api/projects/'))) {
                         return originalFileLoaderLoad.call(this, url, onLoad, onProgress, onError);
                     }
@@ -226,12 +213,9 @@ export class SceneLoader {
                     }
                     
                     if (assetPathToLoad) {
-                        console.log('[SceneLoader] Intercepting file load:', assetPathToLoad);
-                        
                         ProjectLoader.loadAsset(projectPath, assetPathToLoad)
                             .then((blob) => {
                                 const blobUrl = URL.createObjectURL(blob);
-                                console.log('[SceneLoader] File loaded successfully, creating blob URL:', blobUrl);
                                 originalFileLoaderLoad.call(this, blobUrl, onLoad, onProgress, onError);
                             })
                             .catch((error) => {
@@ -262,7 +246,7 @@ export class SceneLoader {
         
         if (sceneData.scene) {
             const loadedScene = await loader.parseAsync(sceneData.scene);
-            app.loadScene(loadedScene);
+            await app.loadScene(loadedScene);
         }
 
     }
@@ -312,8 +296,15 @@ export class SceneLoader {
                         if (scriptAsset.scriptClass) {
                             const script = entity.addScriptFromAsset(scriptAsset);
                             if (script && scriptData.attributes) {
+                                const attrs = script.getAttributes();
+                                const scene = app.scene;
                                 for (const attrName in scriptData.attributes) {
-                                    script.setAttribute(attrName, scriptData.attributes[attrName]);
+                                    let value: any = scriptData.attributes[attrName];
+                                    const attr = attrs.get(attrName);
+                                    if (attr?.type === 'entity' && typeof value === 'string' && value) {
+                                        value = App.resolveEntityRef(scene, value);
+                                    }
+                                    script.setAttribute(attrName, value);
                                 }
                             }
                         }

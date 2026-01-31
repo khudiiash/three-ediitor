@@ -66,7 +66,7 @@ class SetMaterialMapCommand extends Command {
 
 		return output;
 
-		// serializes a map (THREE.Texture)
+		
 
 		function serializeMap( map ) {
 
@@ -88,11 +88,11 @@ class SetMaterialMapCommand extends Command {
 
 		}
 
-		// Note: The function 'extractFromCache' is copied from Object3D.toJSON()
+		
 
-		// extract data from the cache hash
-		// remove metadata on each item
-		// and return as array
+		
+		
+		
 		function extractFromCache( cache ) {
 
 			const values = [];

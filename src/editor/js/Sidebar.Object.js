@@ -19,6 +19,7 @@ import { SidebarObjectAnimation } from './Sidebar.Object.Animation.js';
 import { SidebarGeometry } from './Sidebar.Geometry.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
 import { SidebarSceneSettings } from './Sidebar.Scene.Settings.js';
+import { SidebarAsset } from './Sidebar.Asset.js';
 
 function SidebarObject( editor ) {
 
@@ -64,7 +65,10 @@ function SidebarObject( editor ) {
 	const sceneContent = new SidebarSceneSettings( editor );
 	scenePanel.add( sceneContent );
 
+	const assetContent = new SidebarAsset( editor );
+
 	const panelsContainer = new UIPanel();
+	panelsContainer.add( assetContent );
 	panelsContainer.add( entityPanel );
 	panelsContainer.add( meshPanel );
 	panelsContainer.add( lightPanel );
@@ -1200,15 +1204,25 @@ function SidebarObject( editor ) {
 		const isParticleSystem = object.userData && object.userData.isParticleSystem;
 		const isScene = object.isScene;
 
-		// Show/hide panels based on object type
+		
 		meshPanel.setHidden( ! isMesh );
 		lightPanel.setHidden( ! isLight );
 		cameraPanel.setHidden( ! isCamera );
-		particlePanel.setHidden( ! isParticleSystem );
-		scenePanel.setHidden( ! isScene );
-		
-		// Entity panel is always shown when an object is selected
-		entityPanel.setHidden( false );
+
+		const hasSelectedAsset = window.selectedAsset !== null && window.selectedAsset !== undefined;
+		assetContent.setDisplay( hasSelectedAsset ? 'block' : 'none' );
+		if ( hasSelectedAsset ) {
+			entityPanel.setHidden( true );
+			meshPanel.setHidden( true );
+			lightPanel.setHidden( true );
+			cameraPanel.setHidden( true );
+			particlePanel.setHidden( true );
+			scenePanel.setHidden( true );
+		} else {
+			entityPanel.setHidden( false );
+		}
+		particlePanel.setHidden( ! isParticleSystem || hasSelectedAsset );
+		scenePanel.setHidden( ! isScene || hasSelectedAsset );
 
 		if ( isMesh ) {
 			geometryPanel.setHidden( ! object.geometry );
@@ -1309,7 +1323,9 @@ function SidebarObject( editor ) {
 	signals.objectSelected.add( function ( object ) {
 
 		if ( object !== null ) {
-
+			if ( window.selectedAsset ) {
+				window.selectedAsset = null;
+			}
 			panelsContainer.setDisplay( 'block' );
 
 			updateRows( object );
@@ -1340,6 +1356,15 @@ function SidebarObject( editor ) {
 	} );
 
 	function updateUI( object ) {
+
+		const isMaterialOnly = object && object.isMaterial && object.material instanceof THREE.Material;
+		
+		if ( isMaterialOnly ) {
+			objectPositionRow.setDisplay( 'none' );
+			objectRotationRow.setDisplay( 'none' );
+			objectScaleRow.setDisplay( 'none' );
+			return;
+		}
 
 		const isBatchedRenderer = object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer';
 		
@@ -1395,17 +1420,23 @@ function SidebarObject( editor ) {
 			objectName.setValue( object.name );
 		}
 
-		objectPositionX.setValue( object.position.x );
-		objectPositionY.setValue( object.position.y );
-		objectPositionZ.setValue( object.position.z );
+		if ( object.position && object.position.x !== undefined ) {
+			objectPositionX.setValue( object.position.x );
+			objectPositionY.setValue( object.position.y );
+			objectPositionZ.setValue( object.position.z );
+		}
 
-		objectRotationX.setValue( object.rotation.x * THREE.MathUtils.RAD2DEG );
-		objectRotationY.setValue( object.rotation.y * THREE.MathUtils.RAD2DEG );
-		objectRotationZ.setValue( object.rotation.z * THREE.MathUtils.RAD2DEG );
+		if ( object.rotation && object.rotation.x !== undefined ) {
+			objectRotationX.setValue( object.rotation.x * THREE.MathUtils.RAD2DEG );
+			objectRotationY.setValue( object.rotation.y * THREE.MathUtils.RAD2DEG );
+			objectRotationZ.setValue( object.rotation.z * THREE.MathUtils.RAD2DEG );
+		}
 
-		objectScaleX.setValue( object.scale.x );
-		objectScaleY.setValue( object.scale.y );
-		objectScaleZ.setValue( object.scale.z );
+		if ( object.scale && object.scale.x !== undefined ) {
+			objectScaleX.setValue( object.scale.x );
+			objectScaleY.setValue( object.scale.y );
+			objectScaleZ.setValue( object.scale.z );
+		}
 
 		if ( object.isPerspectiveCamera || object.isOrthographicCamera ) {
 			const cameraType = object.isPerspectiveCamera ? 'PerspectiveCamera' : 'OrthographicCamera';
@@ -1743,6 +1774,26 @@ function SidebarObject( editor ) {
 		}
 
 	}
+
+	function checkAssetSelection() {
+		const asset = window.selectedAsset;
+		const hasSelectedAsset = asset !== null && asset !== undefined;
+		assetContent.setDisplay( hasSelectedAsset ? 'block' : 'none' );
+		
+		if ( hasSelectedAsset ) {
+			entityPanel.setHidden( true );
+			meshPanel.setHidden( true );
+			lightPanel.setHidden( true );
+			cameraPanel.setHidden( true );
+			particlePanel.setHidden( true );
+			scenePanel.setHidden( true );
+			panelsContainer.setDisplay( 'block' );
+		} else if ( editor.selected === null ) {
+			entityPanel.setHidden( false );
+		}
+	}
+
+	setInterval( checkAssetSelection, 100 );
 
 	return panelsContainer;
 

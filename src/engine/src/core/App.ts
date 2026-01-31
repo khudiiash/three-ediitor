@@ -3,6 +3,7 @@ import { SuperEvents } from '@khudiiash/super-events';
 import { Engine } from './Engine';
 import { Entity } from './Entity';
 import { AssetRegistry } from './AssetRegistry';
+import type { ScriptAttribute } from './Script';
 import { ScriptAsset } from '../assets/ScriptAsset';
 import { ParticleComponent } from '../components/ParticleComponent';
 import { ConstantValue, IntervalValue, ConstantColor, PointEmitter } from 'three.quarks';
@@ -138,7 +139,7 @@ export class App {
         }
     }
 
-    loadScene(sceneJsonOrScene: any | THREE.Scene): void {
+    async loadScene(sceneJsonOrScene: any | THREE.Scene): Promise<void> {
         let loadedScene: THREE.Object3D | THREE.Scene;
         
         if (sceneJsonOrScene instanceof THREE.Scene) {
@@ -203,9 +204,11 @@ export class App {
             });
 
             this.loadParticleSystems();
-            this.loadScriptsFromScene().catch((error) => {
+            try {
+                await this.loadScriptsFromScene();
+            } catch (error) {
                 console.warn('[App] Failed to load scripts from scene:', error);
-            });
+            }
         } else {
             while (this.scene.children.length > 0) {
                 this.scene.remove(this.scene.children[0]);
@@ -226,6 +229,11 @@ export class App {
             });
 
             this.loadParticleSystems();
+            try {
+                await this.loadScriptsFromScene();
+            } catch (error) {
+                console.warn('[App] Failed to load scripts from scene:', error);
+            }
         }
         
         this.events?.emit('scene:loaded', this);
@@ -249,9 +257,16 @@ export class App {
     }
 
 
+    static resolveEntityRef(scene: THREE.Scene | null, uuid: string): Entity | THREE.Object3D | null {
+        if (!scene) return null;
+        const obj = scene.getObjectByProperty('uuid', uuid);
+        return obj ? ((obj as any).__entity || obj) : null;
+    }
+
     private async loadScriptsFromScene(): Promise<void> {
         const assetRegistry = this.assets;
         const scriptAssets = new Map<string, ScriptAsset>();
+        const scene = this.scene;
 
         const promises: Promise<void>[] = [];
 
@@ -259,7 +274,8 @@ export class App {
             const scripts = (object3D.userData as any).scripts;
             if (!scripts || !Array.isArray(scripts)) return;
 
-            const entity = Entity.fromObject3D(object3D);
+            // Reuse existing entity from first traverse so scripts are on the same entity that receives update()
+            const entity = (object3D as any).__entity || Entity.fromObject3D(object3D);
             if (!entity) return;
 
             for (const scriptData of scripts) {
@@ -285,19 +301,28 @@ export class App {
                         scriptAsset = new ScriptAsset(assetPath.split('/').pop() || 'script', scriptUrl);
                         assetRegistry.register(scriptAsset);
                         scriptAssets.set(assetPath, scriptAsset);
-                        
-                        try {
-                            await assetRegistry.load(scriptAsset.name);
-                        } catch (error) {
-                            return;
-                        }
                     }
 
-                    if (scriptAsset.scriptClass) {
-                        const script = entity.addScriptFromAsset(scriptAsset);
+                    try {
+                        await assetRegistry.load(scriptAsset!.id);
+                    } catch (error) {
+                        console.warn('[App] Failed to load script asset:', assetPath, error);
+                        return;
+                    }
+
+                    if (scriptAsset!.scriptClass) {
+                        const script = entity.addScriptFromAsset(scriptAsset!);
                         if (script && scriptData.attributes) {
+                            const attrs = script.getAttributes();
                             for (const attrName in scriptData.attributes) {
-                                script.setAttribute(attrName, scriptData.attributes[attrName]);
+                                let value: any = scriptData.attributes[attrName];
+                                const attr = attrs.get(attrName);
+                                const uuid = typeof value === 'string' ? value : (value && typeof value === 'object' && value.uuid);
+                                if (uuid && (attr?.type === 'entity' || !attr)) {
+                                    const resolved = App.resolveEntityRef(scene, String(uuid));
+                                    if (resolved !== null) value = resolved;
+                                }
+                                script.setAttribute(attrName, value);
                             }
                         }
                     }
@@ -308,6 +333,27 @@ export class App {
         });
 
         await Promise.all(promises);
+
+        this.scene.traverse((object3D) => {
+            const scripts = (object3D.userData as any).scripts;
+            if (!scripts || !Array.isArray(scripts)) return;
+            const entity = (object3D as any).__entity || Entity.fromObject3D(object3D);
+            if (!entity || !entity.scripts) return;
+            for (const script of entity.scripts) {
+                const attrs = script.getAttributes();
+                attrs.forEach((attr: ScriptAttribute, attrName: string) => {
+                    if (attr.type !== 'entity') return;
+                    const value = script.getAttribute(attrName);
+                    const uuid = typeof value === 'string' ? value : (value && typeof value === 'object' && (value as any).uuid);
+                    if (uuid) {
+                        const resolved = App.resolveEntityRef(scene, String(uuid));
+                        if (resolved !== null) {
+                            script.setAttribute(attrName, resolved);
+                        }
+                    }
+                });
+            }
+        });
     }
 
     destroy(): void {

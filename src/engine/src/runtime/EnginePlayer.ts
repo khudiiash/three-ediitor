@@ -31,7 +31,7 @@ export class EnginePlayer {
     /**
      * Load scene from editor JSON (same format as APP.Player)
      */
-    load(json: any): void {
+    async load(json: any): Promise<void> {
         if (!this.app) {
             pc.init(this.canvas, {
                 antialias: true,
@@ -42,7 +42,7 @@ export class EnginePlayer {
             this.app = pc.createApp();
         }
 
-        SceneLoader.loadScene(this.app, json);
+        await SceneLoader.loadScene(this.app, json);
 
         if (json.project) {
             const renderer = pc.renderer;

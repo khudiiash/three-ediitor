@@ -160,8 +160,6 @@ function Storage() {
 							projectPath: currentProjectPath,
 							content: content
 						} );
-						const elapsed = ( performance.now() - start ).toFixed( 2 );
-						console.log( '[' + /\d\d\:\d\d\:\d\d/.exec( new Date() )[ 0 ] + ']', 'Saved state to file. ' + elapsed + 'ms' );
 					} catch (invokeError) {
 						console.error('[Storage] write_scene_file invoke error:', invokeError);
 						throw invokeError;

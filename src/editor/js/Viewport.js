@@ -524,7 +524,7 @@ function Viewport( editor ) {
 
 		controls.connect( newRenderer.domElement );
 		
-		
+
 		if ( transformControls.disconnect ) {
 			transformControls.disconnect();
 		}
@@ -612,8 +612,8 @@ function Viewport( editor ) {
 								const projectPath = editor.storage.getProjectPath();
 								let modelPath = asset.modelPath;
 								
-								if ( !modelPath && asset.path && asset.path.endsWith( '.model' ) ) {
-									const baseName = asset.name.replace( /\.model$/, '' );
+								if ( !modelPath && asset.path && asset.path.endsWith( '.mesh' ) ) {
+									const baseName = asset.name.replace( /\.mesh$/, '' );
 									const folderPath = asset.path.substring( 0, asset.path.lastIndexOf( '/' ) );
 									const folderName = folderPath.substring( folderPath.lastIndexOf( '/' ) + 1 );
 									if ( /\.(glb|gltf|fbx|obj)$/i.test( folderName ) ) {

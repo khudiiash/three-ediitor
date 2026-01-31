@@ -551,6 +551,13 @@ class UIOutliner extends UIDiv {
 		function onDragStart( event ) {
 
 			event.dataTransfer.setData( 'text', 'foo' );
+			if ( this.dataset && this.dataset.uuid ) {
+				event.dataTransfer.setData( 'application/x-scene-object', JSON.stringify( {
+					type: 'sceneObject',
+					uuid: this.dataset.uuid,
+					name: this.dataset.name || this.dataset.uuid || ''
+				} ) );
+			}
 
 		}
 

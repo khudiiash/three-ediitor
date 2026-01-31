@@ -165,8 +165,8 @@ class AssetPreviewRenderer {
 		
 		renderer.render(scene, camera);
 		
-		// Only dispose if we created a new instance (parsed from string)
-		// Don't dispose if it's the original geometry object
+		
+		
 		if (typeof geometry === 'string' && geometryInstance !== geometry) {
 			geometryInstance.dispose();
 		}
@@ -176,7 +176,6 @@ class AssetPreviewRenderer {
 	}
 
 	async renderModelPreview(modelData, width = 128, height = 128) {
-		console.log('[AssetPreviewRenderer] renderModelPreview called, model type:', typeof modelData, modelData instanceof THREE.Object3D);
 		const renderer = this.getRenderer(width, height);
 		const camera = this.getCamera(width, height);
 		

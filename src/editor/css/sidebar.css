@@ -745,14 +745,90 @@
 	position: relative;
 }
 
-/* Submenu Hidden State */
 .submenu-hidden {
-	display: none;
+	display: none !important;
 }
 
 .submenu-visible {
-	display: block;
+	display: block !important;
 }
 
-/* Folder Item Dynamic Padding (kept inline for level-based calculation) */
-/* Icon margin is handled by CSS variable */
+.context-menu {
+	position: fixed;
+	min-width: 150px;
+	max-width: 300px;
+	width: auto;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border-default);
+	border-radius: var(--radius-base);
+	box-shadow: var(--shadow-lg);
+	padding: var(--space-1) 0;
+	z-index: var(--z-popover);
+	display: none;
+}
+
+.context-menu.active {
+	display: block !important;
+}
+
+.context-menu-item {
+	padding: var(--space-2) var(--space-4);
+	font-size: var(--font-size-sm);
+	color: var(--text-secondary);
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	transition: background var(--transition-fast);
+	user-select: none;
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+}
+
+.context-menu-item:hover {
+	background: var(--bg-hover);
+	color: var(--text-primary);
+}
+
+.context-menu-item.disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+.context-menu-item.disabled:hover {
+	background: transparent;
+}
+
+.context-menu-divider {
+	height: 1px;
+	background: var(--border-subtle);
+	margin: var(--space-1) 0;
+}
+
+.menu .options,
+.options {
+	position: fixed;
+	min-width: 150px;
+	background: var(--bg-elevated);
+	border: 1px solid var(--border-strong);
+	border-radius: var(--radius-base);
+	box-shadow: var(--shadow-lg);
+	display: none;
+	z-index: calc(var(--z-popover) + 1);
+	padding: var(--space-1) 0;
+}
+
+.menu .option.submenu-title,
+.context-menu-item.submenu-title {
+	position: relative;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+}
+
+.menu .option.submenu-title::after,
+.context-menu-item.submenu-title::after {
+	content: '▶';
+	margin-left: auto;
+	font-size: 10px;
+	color: var(--text-tertiary);
+}

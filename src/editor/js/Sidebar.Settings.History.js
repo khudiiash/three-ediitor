@@ -1,4 +1,4 @@
-
+import { Modal } from './Modal.js';
 import { UIButton, UIPanel, UIBreak, UIText } from './libs/ui.js';
 import { UIBoolean, UIOutliner } from './libs/ui.three.js';
 
@@ -61,9 +61,10 @@ function SidebarSettingsHistory( editor ) {
 	
 
 	const option = new UIButton( strings.getKey( 'sidebar/history/clear' ) );
-	option.onClick( function () {
+	option.onClick( async function () {
 
-		if ( confirm( strings.getKey( 'prompt/history/clear' ) ) ) {
+		const confirmed = await Modal.showConfirm( 'Clear History', strings.getKey( 'prompt/history/clear' ) );
+		if ( confirmed ) {
 
 			editor.history.clear();
 

@@ -191,17 +191,6 @@ function Resizer( editor ) {
 			sidebarBottom.style.height = height + 'px';
 			viewport.style.bottom = height + 'px';
 			bottomResizer.style.bottom = height + 'px';
-			
-			const sidebarLeft = document.getElementById( 'sidebar-left' );
-			const sidebarRight = document.getElementById( 'sidebar-right' );
-			if ( sidebarLeft ) {
-				sidebarLeft.style.bottom = height + 'px';
-				leftResizer.style.bottom = height + 'px';
-			}
-			if ( sidebarRight ) {
-				sidebarRight.style.bottom = height + 'px';
-				rightResizer.style.bottom = height + 'px';
-			}
 
 			signals.windowResize.dispatch();
 

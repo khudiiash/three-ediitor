@@ -407,8 +407,8 @@ class ModelParser {
 		
 		contents.geometries.forEach( geo => {
 			modelFolder.files.push( {
-				name: geo.name + '.geometry',
-				path: modelFile.path + '/' + geo.name + '.geometry',
+				name: geo.name + '.geo',
+				path: modelFile.path + '/' + geo.name + '.geo',
 				type: 'geometry',
 				size: 0,
 				isBinary: false,
@@ -435,8 +435,8 @@ class ModelParser {
 		
 		contents.materials.forEach( mat => {
 			modelFolder.files.push( {
-				name: mat.name + '.material',
-				path: modelFile.path + '/' + mat.name + '.material',
+				name: mat.name + '.mat',
+				path: modelFile.path + '/' + mat.name + '.mat',
 				type: 'material',
 				size: 0,
 				isBinary: false,
@@ -448,8 +448,8 @@ class ModelParser {
 
 		
 		modelFolder.files.push( {
-			name: baseName + '.model',
-			path: modelFile.path + '/' + baseName + '.model',
+			name: baseName + '.mesh',
+			path: modelFile.path + '/' + baseName + '.mesh',
 			type: 'model',
 			size: modelFile.size || 0,
 			isBinary: true,
@@ -865,7 +865,7 @@ class ModelParser {
 				loader.parse( parseData, '', ( result ) => {
 					const model = result.scene.clone();
 					model.assetPath = modelPath;
-					model.name = modelEntry.name.replace( /\.model$/, '' );
+					model.name = modelEntry.name.replace( /\.mesh$/, '' );
 					
 					
 					if ( result.animations && result.animations.length > 0 ) {
@@ -883,7 +883,7 @@ class ModelParser {
 			const loader = new FBXLoader();
 			const model = loader.parse( fileBytes.buffer );
 			model.assetPath = modelPath;
-			model.name = modelEntry.name.replace( /\.model$/, '' );
+			model.name = modelEntry.name.replace( /\.mesh$/, '' );
 			return model;
 		} else if ( format === 'obj' ) {
 			const { OBJLoader } = await import( 'three/addons/loaders/OBJLoader.js' );
@@ -891,7 +891,7 @@ class ModelParser {
 			const text = new TextDecoder().decode( fileBytes );
 			const model = loader.parse( text );
 			model.assetPath = modelPath;
-			model.name = modelEntry.name.replace( /\.model$/, '' );
+			model.name = modelEntry.name.replace( /\.mesh$/, '' );
 			return model;
 		}
 

@@ -30,23 +30,65 @@ class SetMaterialColorCommand extends Command {
 
 	}
 
-	execute() {
+	async execute() {
 
-		const material = this.editor.getObjectMaterial( this.object, this.materialSlot );
+		let material = this.editor.getObjectMaterial( this.object, this.materialSlot );
+		
+		if ( material && material.assetPath ) {
+			const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+			const materialAsset = this.editor.assets.getByUrl( assetPath );
+			if ( materialAsset ) {
+				const assetMaterial = materialAsset.getMaterial();
+				if ( assetMaterial && assetMaterial !== material ) {
+					material = assetMaterial;
+					this.editor.setObjectMaterial( this.object, this.materialSlot, material );
+				}
+			}
+		}
 
 		material[ this.attributeName ].setHex( this.newValue );
 
 		this.editor.signals.materialChanged.dispatch( this.object, this.materialSlot );
+		
+		if ( material && material.assetPath ) {
+			const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+			const materialAsset = this.editor.assets.getByUrl( assetPath );
+			if ( materialAsset && materialAsset.emitAsync ) {
+				materialAsset.modifiedAt = Date.now();
+				await materialAsset.emitAsync( 'changed', materialAsset );
+			}
+		}
 
 	}
 
-	undo() {
+	async undo() {
 
-		const material = this.editor.getObjectMaterial( this.object, this.materialSlot );
+		let material = this.editor.getObjectMaterial( this.object, this.materialSlot );
+		
+		if ( material && material.assetPath ) {
+			const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+			const materialAsset = this.editor.assets.getByUrl( assetPath );
+			if ( materialAsset ) {
+				const assetMaterial = materialAsset.getMaterial();
+				if ( assetMaterial && assetMaterial !== material ) {
+					material = assetMaterial;
+					this.editor.setObjectMaterial( this.object, this.materialSlot, material );
+				}
+			}
+		}
 
 		material[ this.attributeName ].setHex( this.oldValue );
 
 		this.editor.signals.materialChanged.dispatch( this.object, this.materialSlot );
+		
+		if ( material && material.assetPath ) {
+			const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
+			const materialAsset = this.editor.assets.getByUrl( assetPath );
+			if ( materialAsset && materialAsset.emitAsync ) {
+				materialAsset.modifiedAt = Date.now();
+				await materialAsset.emitAsync( 'changed', materialAsset );
+			}
+		}
 
 	}
 

@@ -1,4 +1,4 @@
-import { Asset, AssetState } from '../core/Asset';
+import { Asset, AssetState, AssetType } from '../core/Asset';
 import { Script, ScriptConstructor } from '../core/Script';
 import { Entity } from '../core/Entity';
 import { registerComponent, attribute } from '../core/decorators';
@@ -9,6 +9,7 @@ export class ScriptAsset extends Asset {
 
     constructor(name: string, url: string) {
         super(name, url);
+        this.type = AssetType.SCRIPT;
     }
 
     async load(): Promise<void> {

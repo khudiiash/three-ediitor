@@ -200,6 +200,21 @@ body {
 	background: var(--accent-primary-active);
 }
 
+.btn-secondary {
+	background: var(--bg-elevated);
+	border-color: var(--border-default);
+	color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+	background: var(--bg-hover);
+	border-color: var(--border-strong);
+}
+
+.btn-secondary:active {
+	background: var(--bg-active);
+}
+
 .btn-ghost {
 	background: transparent;
 	border-color: transparent;
