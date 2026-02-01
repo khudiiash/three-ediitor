@@ -75,6 +75,9 @@ function Editor() {
 		
 		particleSystemChanged: new Signal(),
 
+		sceneLoaded: new Signal(),
+		sceneDeleted: new Signal(),
+
 		cameraAdded: new Signal(),
 		cameraRemoved: new Signal(),
 

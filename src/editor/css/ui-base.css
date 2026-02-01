@@ -35,7 +35,6 @@
 	cursor: default;
 	display: inline-block;
 	vertical-align: middle;
-	padding-left: var(--space-2);
 }
 
 #asset-inspector .Text {

@@ -15,7 +15,7 @@ function SidebarScene( editor ) {
 	const searchRow = new UIRow();
 	searchRow.addClass( 'outliner-header' );
 	const searchInput = new UIInput( '' );
-	searchInput.addClass( 'outliner-search' );
+	searchInput.addClass( 'input' );
 	searchInput.dom.placeholder = 'Search...';
 	searchRow.add( searchInput );
 	container.add( searchRow );

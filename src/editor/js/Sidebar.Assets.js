@@ -707,10 +707,8 @@ function SidebarAssets( editor ) {
 			{ name: 'LineDashedMaterial', create: () => new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 3, gapSize: 1 }) },
 			{ name: 'PointsMaterial', create: () => new THREE.PointsMaterial({ color: 0xffffff, size: 1 }) },
 			{ name: 'SpriteMaterial', create: () => new THREE.SpriteMaterial({ color: 0xffffff }) },
-			{ name: 'ShadowMaterial', create: () => new THREE.ShadowMaterial({ color: 0x000000 }) },
-			{ name: 'RawShaderMaterial', create: () => new THREE.RawShaderMaterial() },
-			{ name: 'ShaderMaterial', create: () => new THREE.ShaderMaterial() }
-		];
+			{ name: 'ShadowMaterial', create: () => new THREE.ShadowMaterial({ color: 0x000000 }) }
+	];
 		
 		defaultMaterials.forEach(({ name, create }) => {
 			const material = create();

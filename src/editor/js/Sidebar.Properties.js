@@ -23,7 +23,6 @@ function SidebarProperties( editor ) {
 
 	inspectorPanel.add( objectPanels );
 	inspectorPanel.add( scriptPanel );
-
 	
 	const projectPanel = new UIPanel();
 	const projectContent = new SidebarProject( editor );

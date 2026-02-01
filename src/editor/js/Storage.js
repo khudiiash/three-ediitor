@@ -1,6 +1,7 @@
 function Storage() {
 
 	let currentProjectPath = null;
+	let currentSceneName = 'Main.json';
 
 	function isTauri() {
 		return typeof window !== 'undefined' && window.__TAURI__;
@@ -57,7 +58,10 @@ function Storage() {
 						return;
 					}
 
-					const content = await invoke( 'read_scene_file', { projectPath: currentProjectPath } );
+					const content = await invoke( 'read_scene_file', { 
+						projectPath: currentProjectPath,
+						sceneName: currentSceneName
+					} );
 					
 					if ( !content || content.trim() === '' ) {
 						console.warn( 'Scene file is empty' );
@@ -71,6 +75,12 @@ function Storage() {
 						console.warn( 'Scene file does not contain valid scene data' );
 						callback( undefined );
 						return;
+					}
+					
+					if ( !currentSceneName ) {
+						const projectContent = await invoke( 'read_project_config', { projectPath: currentProjectPath } );
+						const projectConfig = JSON.parse( projectContent );
+						currentSceneName = projectConfig.defaultScene || 'Main.json';
 					}
 					
 					callback( data );
@@ -158,7 +168,8 @@ function Storage() {
 					try {
 						await invoke( 'write_scene_file', { 
 							projectPath: currentProjectPath,
-							content: content
+							content: content,
+							sceneName: currentSceneName
 						} );
 					} catch (invokeError) {
 						console.error('[Storage] write_scene_file invoke error:', invokeError);
@@ -180,6 +191,121 @@ function Storage() {
 			},
 			getProjectPath: function () {
 				return currentProjectPath;
+			},
+			setCurrentScene: function ( sceneName ) {
+				currentSceneName = sceneName;
+			},
+			getCurrentScene: function () {
+				return currentSceneName;
+			},
+			listScenes: async function () {
+				restoreProjectPath();
+				if ( !currentProjectPath ) return [];
+				
+				try {
+					const invoke = await tryGetTauriInvoke();
+					if ( !invoke ) return [];
+					
+					const scenes = await invoke( 'list_scenes', { projectPath: currentProjectPath } );
+					return scenes || [];
+				} catch ( error ) {
+					console.error( '[Storage] Failed to list scenes:', error );
+					return [];
+				}
+			},
+			deleteScene: async function ( sceneName ) {
+				restoreProjectPath();
+				if ( !currentProjectPath ) return false;
+				
+				try {
+					const invoke = await tryGetTauriInvoke();
+					if ( !invoke ) return false;
+					
+					await invoke( 'delete_scene_file', { 
+						projectPath: currentProjectPath,
+						sceneName: sceneName
+					} );
+					return true;
+				} catch ( error ) {
+					console.error( '[Storage] Failed to delete scene:', error );
+					return false;
+				}
+			},
+			renameScene: async function ( oldName, newName ) {
+				restoreProjectPath();
+				if ( !currentProjectPath ) return false;
+				
+				try {
+					const invoke = await tryGetTauriInvoke();
+					if ( !invoke ) return false;
+					
+					await invoke( 'rename_scene_file', { 
+						projectPath: currentProjectPath,
+						oldName: oldName,
+						newName: newName
+					} );
+					
+					if ( currentSceneName === oldName ) {
+						currentSceneName = newName;
+					}
+					
+					return true;
+				} catch ( error ) {
+					console.error( '[Storage] Failed to rename scene:', error );
+					return false;
+				}
+			},
+			updateSceneConfig: async function ( sceneName, config ) {
+				restoreProjectPath();
+				if ( !currentProjectPath ) return false;
+				
+				try {
+					const invoke = await tryGetTauriInvoke();
+					if ( !invoke ) return false;
+					
+					const content = await invoke( 'read_project_config', { projectPath: currentProjectPath } );
+					const projectConfig = JSON.parse( content );
+					
+					if ( !projectConfig.scenes ) {
+						projectConfig.scenes = {};
+					}
+					
+					projectConfig.scenes[ sceneName ] = config;
+					
+					await invoke( 'write_project_config', { 
+						projectPath: currentProjectPath,
+						content: JSON.stringify( projectConfig, null, '\t' )
+					} );
+					
+					return true;
+				} catch ( error ) {
+					console.error( '[Storage] Failed to update scene config:', error );
+					return false;
+				}
+			},
+			setDefaultScene: async function ( sceneName ) {
+				restoreProjectPath();
+				if ( !currentProjectPath ) return false;
+				
+				try {
+					const invoke = await tryGetTauriInvoke();
+					if ( !invoke ) return false;
+					
+					const content = await invoke( 'read_project_config', { projectPath: currentProjectPath } );
+					const projectConfig = JSON.parse( content );
+					
+					projectConfig.defaultScene = sceneName;
+					
+					await invoke( 'write_project_config', { 
+						projectPath: currentProjectPath,
+						content: JSON.stringify( projectConfig, null, '\t' )
+					} );
+					
+					return true;
+				} catch ( error ) {
+					console.error( '[Storage] Failed to set default scene:', error );
+					return false;
+				}
 			}
 		};
 

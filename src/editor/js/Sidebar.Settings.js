@@ -342,16 +342,14 @@ function SidebarSettings( editor ) {
 					'MeshNormalMaterial': THREE.MeshNormalMaterial,
 					'MeshLambertMaterial': THREE.MeshLambertMaterial,
 					'MeshMatcapMaterial': THREE.MeshMatcapMaterial,
-					'MeshPhongMaterial': THREE.MeshPhongMaterial,
-					'MeshToonMaterial': THREE.MeshToonMaterial,
-					'MeshStandardMaterial': THREE.MeshStandardMaterial,
-					'MeshPhysicalMaterial': THREE.MeshPhysicalMaterial,
-					'RawShaderMaterial': THREE.RawShaderMaterial,
-					'ShaderMaterial': THREE.ShaderMaterial,
-					'ShadowMaterial': THREE.ShadowMaterial,
-					'SpriteMaterial': THREE.SpriteMaterial,
-					'PointsMaterial': THREE.PointsMaterial
-				};
+				'MeshPhongMaterial': THREE.MeshPhongMaterial,
+				'MeshToonMaterial': THREE.MeshToonMaterial,
+				'MeshStandardMaterial': THREE.MeshStandardMaterial,
+				'MeshPhysicalMaterial': THREE.MeshPhysicalMaterial,
+				'ShadowMaterial': THREE.ShadowMaterial,
+				'SpriteMaterial': THREE.SpriteMaterial,
+				'PointsMaterial': THREE.PointsMaterial
+			};
 				const MaterialClass = materialClassesList[ assetData.materialType ];
 				if ( MaterialClass ) {
 					newMaterial = new MaterialClass();

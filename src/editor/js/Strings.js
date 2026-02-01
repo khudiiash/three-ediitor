@@ -518,6 +518,8 @@ function Strings( config ) {
 			'sidebar/scene/environment': 'Environment',
 			'sidebar/scene/fog': 'Fog',
 
+			'sidebar/scenes': 'Scenes',
+
 			'sidebar/properties/object': 'Object',
 			'sidebar/properties/geometry': 'Geometry',
 			'sidebar/properties/material': 'Material',

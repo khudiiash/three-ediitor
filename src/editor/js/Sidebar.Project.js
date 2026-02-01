@@ -1,7 +1,8 @@
 import { UISpan } from './libs/ui.js';
+import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
+import { SidebarScenes } from './Sidebar.Scenes.js';
 import { SidebarProjectApp } from './Sidebar.Project.App.js';
-/* import { SidebarProjectMaterials } from './Sidebar.Project.Materials.js'; */
 import { SidebarProjectRenderer } from './Sidebar.Project.Renderer.js';
 import { SidebarProjectImage } from './Sidebar.Project.Image.js';
 import { SidebarProjectVideo } from './Sidebar.Project.Video.js';
@@ -10,17 +11,32 @@ function SidebarProject( editor ) {
 
 	const container = new UISpan();
 
-	container.add( new SidebarProjectRenderer( editor ) );
+	const appPanel = new UICollapsiblePanel( 'App' );
+	const appContent = new SidebarProjectApp( editor );
+	appPanel.add( appContent );
+	container.add( appPanel );
 
-	/* container.add( new SidebarProjectMaterials( editor ) ); */
+	const scenesPanel = new UICollapsiblePanel( 'Scenes' );
+	const scenesContent = new SidebarScenes( editor );
+	scenesPanel.add( scenesContent );
+	container.add( scenesPanel );
 
-	container.add( new SidebarProjectApp( editor ) );
+	const rendererPanel = new UICollapsiblePanel( 'Renderer' );
+	const rendererContent = new SidebarProjectRenderer( editor );
+	rendererPanel.add( rendererContent );
+	container.add( rendererPanel );
 
-	container.add( new SidebarProjectImage( editor ) );
+	const imagePanel = new UICollapsiblePanel( 'Image' );
+	const imageContent = new SidebarProjectImage( editor );
+	imagePanel.add( imageContent );
+	container.add( imagePanel );
 
 	if ( 'SharedArrayBuffer' in window ) {
 
-		container.add( new SidebarProjectVideo( editor ) );
+		const videoPanel = new UICollapsiblePanel( 'Video' );
+		const videoContent = new SidebarProjectVideo( editor );
+		videoPanel.add( videoContent );
+		container.add( videoPanel );
 
 	}
 

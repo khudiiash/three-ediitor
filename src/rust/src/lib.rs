@@ -59,13 +59,27 @@ fn delete_project(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn read_scene_file(project_path: String) -> Result<String, String> {
+fn read_scene_file(project_path: String, scene_name: Option<String>) -> Result<String, String> {
     use std::fs;
     use std::path::PathBuf;
     
-    let path = PathBuf::from(&project_path).join("scene.json");
+    let filename = scene_name.unwrap_or_else(|| "scene.json".to_string());
+    let path = PathBuf::from(&project_path).join("scenes").join(&filename);
     
     if !path.exists() {
+        let legacy_path = PathBuf::from(&project_path).join("scene.json");
+        if legacy_path.exists() {
+            return match fs::read_to_string(&legacy_path) {
+                Ok(content) => {
+                    if content.trim().is_empty() {
+                        Err("File is empty".to_string())
+                    } else {
+                        Ok(content)
+                    }
+                },
+                Err(e) => Err(format!("Failed to read file: {}", e))
+            };
+        }
         return Err("File not found".to_string());
     }
     
@@ -92,8 +106,38 @@ fn copy_scene_to_engine(project_path: String) -> Result<(), String> {
     use std::fs;
     use std::path::PathBuf;
     
-    let scene_path = PathBuf::from(&project_path).join("scene.json");
-    // Get project root (go up from src/rust)
+    let project_json_path = PathBuf::from(&project_path).join("project.json");
+    let default_scene = if project_json_path.exists() {
+        if let Ok(content) = fs::read_to_string(&project_json_path) {
+            if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&content) {
+                metadata.get("defaultScene")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    
+	let scene_filename = default_scene.unwrap_or_else(|| "Main.json".to_string());
+	let mut scene_path = PathBuf::from(&project_path).join("scenes").join(&scene_filename);
+	
+	if !scene_path.exists() {
+		let legacy_path = PathBuf::from(&project_path).join("scene.json");
+		if !legacy_path.exists() {
+			scene_path = PathBuf::from(&project_path).join("scenes").join("Main.json");
+			if !scene_path.exists() {
+				return Err("Scene file not found".to_string());
+			}
+		} else {
+			let _ = fs::copy(&legacy_path, &scene_path);
+		}
+	}
+    
     let engine_public = std::env::current_dir()
         .unwrap()
         .parent()
@@ -116,12 +160,161 @@ fn copy_scene_to_engine(project_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn write_scene_file(project_path: String, content: String) -> Result<(), String> {
+fn list_scenes(project_path: String) -> Result<Vec<serde_json::Value>, String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let scenes_dir = PathBuf::from(&project_path).join("scenes");
+    
+	if !scenes_dir.exists() {
+		let legacy_scene = PathBuf::from(&project_path).join("scene.json");
+		if legacy_scene.exists() {
+			return Ok(vec![serde_json::json!({
+				"name": "Main.json",
+				"isDefault": true,
+				"includeInBuild": true
+			})]);
+		}
+		return Ok(Vec::new());
+	}
+	
+	let mut scenes = Vec::new();
+	let project_json_path = PathBuf::from(&project_path).join("project.json");
+	let mut scenes_config = serde_json::Map::new();
+	let mut default_scene = "Main.json".to_string();
+    
+    if project_json_path.exists() {
+        if let Ok(content) = fs::read_to_string(&project_json_path) {
+            if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(ds) = metadata.get("defaultScene").and_then(|s| s.as_str()) {
+                    default_scene = ds.to_string();
+                }
+                if let Some(sc) = metadata.get("scenes").and_then(|s| s.as_object()) {
+                    scenes_config = sc.clone();
+                }
+            }
+        }
+    }
+    
+    let entries = fs::read_dir(&scenes_dir)
+        .map_err(|e| format!("Failed to read scenes directory: {}", e))?;
+    
+    for entry in entries {
+        let entry = entry.map_err(|e| format!("Failed to read directory entry: {}", e))?;
+        let path = entry.path();
+        
+        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("json") {
+            if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
+                let scene_config = scenes_config.get(filename);
+                let include_in_build = scene_config
+                    .and_then(|c| c.get("includeInBuild"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                
+                scenes.push(serde_json::json!({
+                    "name": filename,
+                    "isDefault": filename == default_scene,
+                    "includeInBuild": include_in_build
+                }));
+            }
+        }
+    }
+    
+    scenes.sort_by(|a, b| {
+        let a_is_default = a.get("isDefault").and_then(|v| v.as_bool()).unwrap_or(false);
+        let b_is_default = b.get("isDefault").and_then(|v| v.as_bool()).unwrap_or(false);
+        
+        if a_is_default && !b_is_default {
+            std::cmp::Ordering::Less
+        } else if !a_is_default && b_is_default {
+            std::cmp::Ordering::Greater
+        } else {
+            let a_name = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let b_name = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            a_name.cmp(b_name)
+        }
+    });
+    
+    Ok(scenes)
+}
+
+#[tauri::command]
+fn delete_scene_file(project_path: String, scene_name: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let path = PathBuf::from(&project_path).join("scenes").join(&scene_name);
+    
+    if !path.exists() {
+        return Err("Scene file not found".to_string());
+    }
+    
+    fs::remove_file(&path)
+        .map_err(|e| format!("Failed to delete scene file: {}", e))?;
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn rename_scene_file(project_path: String, old_name: String, new_name: String) -> Result<(), String> {
+    use std::fs;
+    use std::path::PathBuf;
+    
+    let scenes_dir = PathBuf::from(&project_path).join("scenes");
+    let old_path = scenes_dir.join(&old_name);
+    let new_path = scenes_dir.join(&new_name);
+    
+    if !old_path.exists() {
+        return Err("Scene file not found".to_string());
+    }
+    
+    if new_path.exists() {
+        return Err("A scene with that name already exists".to_string());
+    }
+    
+    fs::rename(&old_path, &new_path)
+        .map_err(|e| format!("Failed to rename scene file: {}", e))?;
+    
+    let project_json_path = PathBuf::from(&project_path).join("project.json");
+    if project_json_path.exists() {
+        if let Ok(content) = fs::read_to_string(&project_json_path) {
+            if let Ok(mut metadata) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(default_scene) = metadata.get("defaultScene").and_then(|s| s.as_str()) {
+                    if default_scene == old_name {
+                        metadata["defaultScene"] = serde_json::Value::String(new_name.clone());
+                    }
+                }
+                
+                if let Some(scenes) = metadata.get_mut("scenes").and_then(|s| s.as_object_mut()) {
+                    if let Some(scene_config) = scenes.remove(&old_name) {
+                        scenes.insert(new_name.clone(), scene_config);
+                    }
+                }
+                
+                if let Ok(updated_content) = serde_json::to_string_pretty(&metadata) {
+                    let _ = fs::write(&project_json_path, updated_content);
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+fn write_scene_file(project_path: String, content: String, scene_name: Option<String>) -> Result<(), String> {
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
     
-    let path = PathBuf::from(&project_path).join("scene.json");
+    let scenes_dir = PathBuf::from(&project_path).join("scenes");
+    if !scenes_dir.exists() {
+        fs::create_dir_all(&scenes_dir)
+            .map_err(|e| format!("Failed to create scenes directory: {}", e))?;
+    }
+    
+    let filename = scene_name.unwrap_or_else(|| "scene.json".to_string());
+    let path = scenes_dir.join(&filename);
     fs::write(&path, content)
         .map_err(|e| format!("Failed to write file: {}", e))?;
     
@@ -996,6 +1189,10 @@ pub fn run() {
             open_project,
             read_scene_file,
             write_scene_file,
+            list_scenes,
+            delete_scene_file,
+            rename_scene_file,
+            copy_scene_to_engine,
             read_project_metadata,
             read_asset_file,
             write_asset_file,

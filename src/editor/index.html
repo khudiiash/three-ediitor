@@ -186,21 +186,26 @@
 						return;
 					}
 					
-					if ( state !== undefined && state.scene ) {
-						editor.clear();
-						
-						const onSceneGraphChanged = function () {
-							editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
-							loadingOverlay.style.display = 'none';
-						};
-						editor.signals.sceneGraphChanged.add( onSceneGraphChanged );
-						
-						await editor.fromJSON( state );
-					} else {
-						editor.clear();
+				if ( state !== undefined && state.scene ) {
+					editor.clear();
+					
+					const onSceneGraphChanged = function () {
+						editor.signals.sceneGraphChanged.remove( onSceneGraphChanged );
 						loadingOverlay.style.display = 'none';
+					};
+					editor.signals.sceneGraphChanged.add( onSceneGraphChanged );
+					
+					await editor.fromJSON( state );
+					
+					const sceneName = editor.storage.getCurrentScene();
+					if ( sceneName ) {
+						editor.signals.sceneLoaded.dispatch( sceneName );
 					}
-					sceneLoaded = true;
+				} else {
+					editor.clear();
+					loadingOverlay.style.display = 'none';
+				}
+				sceneLoaded = true;
 				} catch ( error ) {
 					loadErrorOccurred = true;
 					loadingOverlay.style.display = 'none';

@@ -72,8 +72,6 @@ function SidebarMaterial( editor ) {
 		'MeshToonMaterial': 'MeshToonMaterial',
 		'MeshStandardMaterial': 'MeshStandardMaterial',
 		'MeshPhysicalMaterial': 'MeshPhysicalMaterial',
-		'RawShaderMaterial': 'RawShaderMaterial',
-		'ShaderMaterial': 'ShaderMaterial',
 		'ShadowMaterial': 'ShadowMaterial',
 		'SpriteMaterial': 'SpriteMaterial',
 		'PointsMaterial': 'PointsMaterial'
@@ -815,8 +813,6 @@ const materialClasses = {
 	'MeshToonMaterial': THREE.MeshToonMaterial,
 	'MeshStandardMaterial': THREE.MeshStandardMaterial,
 	'MeshPhysicalMaterial': THREE.MeshPhysicalMaterial,
-	'RawShaderMaterial': THREE.RawShaderMaterial,
-	'ShaderMaterial': THREE.ShaderMaterial,
 	'ShadowMaterial': THREE.ShadowMaterial,
 	'SpriteMaterial': THREE.SpriteMaterial,
 	'PointsMaterial': THREE.PointsMaterial
@@ -838,28 +834,20 @@ const meshMaterialOptions = {
 	'MeshToonMaterial': 'MeshToonMaterial',
 	'MeshStandardMaterial': 'MeshStandardMaterial',
 	'MeshPhysicalMaterial': 'MeshPhysicalMaterial',
-	'RawShaderMaterial': 'RawShaderMaterial',
-	'ShaderMaterial': 'ShaderMaterial',
 	'ShadowMaterial': 'ShadowMaterial'
 };
 
 const lineMaterialOptions = {
 	'LineBasicMaterial': 'LineBasicMaterial',
-	'LineDashedMaterial': 'LineDashedMaterial',
-	'RawShaderMaterial': 'RawShaderMaterial',
-	'ShaderMaterial': 'ShaderMaterial'
+	'LineDashedMaterial': 'LineDashedMaterial'
 };
 
 const spriteMaterialOptions = {
-	'SpriteMaterial': 'SpriteMaterial',
-	'RawShaderMaterial': 'RawShaderMaterial',
-	'ShaderMaterial': 'ShaderMaterial'
+	'SpriteMaterial': 'SpriteMaterial'
 };
 
 const pointsMaterialOptions = {
-	'PointsMaterial': 'PointsMaterial',
-	'RawShaderMaterial': 'RawShaderMaterial',
-	'ShaderMaterial': 'ShaderMaterial'
+	'PointsMaterial': 'PointsMaterial'
 };
 
 export { SidebarMaterial };
