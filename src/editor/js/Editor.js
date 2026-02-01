@@ -13,6 +13,280 @@ import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
 import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
 import { AssetObjectLoader } from './AssetObjectLoader.js';
 import { AssetRegistry } from '../../engine/dist/three-engine.js';
+import { ModuleSystem } from './ModuleSystem.js';
+import { TSLEditor } from './TSLEditor.js';
+import { MaterialAsset } from '../../engine/dist/three-engine.js';
+
+// Helper function to generate a THREE.Material from NodeMaterial data
+function generateMaterialFromNodes( nodeMaterial ) {
+
+	if ( ! nodeMaterial || ! nodeMaterial.nodes ) {
+
+		return null;
+
+	}
+
+	// Find the output node
+	let outputNode = null;
+	let outputType = 'MeshStandardMaterial';
+	
+	for ( const nodeId in nodeMaterial.nodes ) {
+
+		const node = nodeMaterial.nodes[ nodeId ];
+		if ( node.type && node.type.startsWith( 'output' ) ) {
+
+			outputNode = node;
+			
+			// Determine material type from node type
+			if ( node.type === 'outputStandard' ) outputType = 'MeshStandardMaterial';
+			else if ( node.type === 'outputPhysical' ) outputType = 'MeshPhysicalMaterial';
+			else if ( node.type === 'outputBasic' ) outputType = 'MeshBasicMaterial';
+			else if ( node.type === 'outputPhong' ) outputType = 'MeshPhongMaterial';
+			
+			break;
+
+		}
+
+	}
+
+	if ( ! outputNode ) {
+
+		// No output node, use default material
+		return new THREE.MeshStandardMaterial( { color: 0xcccccc } );
+
+	}
+
+	// Create the material based on output type
+	let material;
+	if ( outputType === 'MeshStandardMaterial' ) {
+
+		material = new THREE.MeshStandardMaterial();
+
+	} else if ( outputType === 'MeshPhysicalMaterial' ) {
+
+		material = new THREE.MeshPhysicalMaterial();
+
+	} else if ( outputType === 'MeshBasicMaterial' ) {
+
+		material = new THREE.MeshBasicMaterial();
+
+	} else if ( outputType === 'MeshPhongMaterial' ) {
+
+		material = new THREE.MeshPhongMaterial();
+
+	} else {
+
+		material = new THREE.MeshStandardMaterial();
+
+	}
+
+	// Traverse connections to evaluate material properties
+	const connections = nodeMaterial.connections || [];
+	
+	// Helper function to evaluate a node output value
+	function evaluateNodeOutput( nodeId, outputIndex ) {
+
+		const node = nodeMaterial.nodes[ nodeId ];
+		if ( ! node ) return null;
+
+		// Handle constant value nodes
+		if ( node.type === 'color' ) {
+
+			if ( node.properties && node.properties.color ) {
+
+				const color = new THREE.Color( node.properties.color );
+				
+				// Return specific component if requested (R, G, B outputs)
+				if ( outputIndex === 0 ) return color.r; // R
+				if ( outputIndex === 1 ) return color.g; // G
+				if ( outputIndex === 2 ) return color.b; // B
+				if ( outputIndex === 3 ) return color; // RGB
+				
+				return color; // Default to full color
+
+			}
+
+		} else if ( node.type === 'float' ) {
+
+			return node.properties ? node.properties.value : 1.0;
+
+		} else if ( node.type === 'int' ) {
+
+			return node.properties ? node.properties.value : 0;
+
+		} else if ( node.type === 'vec2' ) {
+
+			if ( node.properties ) {
+
+				const x = node.properties.x || 0;
+				const y = node.properties.y || 0;
+				
+				if ( outputIndex === 0 ) return x; // X
+				if ( outputIndex === 1 ) return y; // Y
+				if ( outputIndex === 2 ) return new THREE.Vector2( x, y ); // XY
+				
+				return new THREE.Vector2( x, y );
+
+			}
+
+		} else if ( node.type === 'vec3' ) {
+
+			if ( node.properties ) {
+
+				const x = node.properties.x || 0;
+				const y = node.properties.y || 0;
+				const z = node.properties.z || 0;
+				
+				if ( outputIndex === 0 ) return x; // X
+				if ( outputIndex === 1 ) return y; // Y
+				if ( outputIndex === 2 ) return z; // Z
+				if ( outputIndex === 3 ) return new THREE.Vector3( x, y, z ); // XYZ
+				
+				return new THREE.Vector3( x, y, z );
+
+			}
+
+		} else if ( node.type === 'vec4' ) {
+
+			if ( node.properties ) {
+
+				const x = node.properties.x || 0;
+				const y = node.properties.y || 0;
+				const z = node.properties.z || 0;
+				const w = node.properties.w || 0;
+				
+				if ( outputIndex === 0 ) return x; // X
+				if ( outputIndex === 1 ) return y; // Y
+				if ( outputIndex === 2 ) return z; // Z
+				if ( outputIndex === 3 ) return w; // W
+				if ( outputIndex === 4 ) return new THREE.Vector4( x, y, z, w ); // XYZW
+				
+				return new THREE.Vector4( x, y, z, w );
+
+			}
+
+		} else if ( node.type === 'uv' ) {
+
+			// UV node: For now, return a default value
+			// In a real shader system, this would be handled by the GPU
+			// We'll return a mid-gray color as a placeholder
+			if ( outputIndex === 0 ) return 0.5; // X
+			if ( outputIndex === 1 ) return 0.5; // Y
+			if ( outputIndex === 2 ) return new THREE.Vector2( 0.5, 0.5 ); // XY
+			
+			return new THREE.Vector2( 0.5, 0.5 );
+
+		}
+
+		// For other geometry/texture nodes, return sensible defaults
+		// These would normally be computed per-pixel by the shader
+		if ( node.type && ( 
+			node.type.startsWith( 'normal' ) || 
+			node.type.startsWith( 'position' ) || 
+			node.type.startsWith( 'tangent' ) 
+		) ) {
+
+			// Return default values for geometry attributes
+			if ( outputIndex === 0 ) return 0.5; // X
+			if ( outputIndex === 1 ) return 0.5; // Y
+			if ( outputIndex === 2 ) return 0.5; // Z
+			if ( outputIndex === 3 ) return new THREE.Vector3( 0.5, 0.5, 0.5 ); // XYZ
+			
+			return new THREE.Vector3( 0.5, 0.5, 0.5 );
+
+		}
+
+		return null;
+
+	}	
+	// Helper function to find connected node for an input
+	function getConnectedValue( nodeId, inputIndex ) {
+
+		const connection = connections.find( c => c.toNode === parseInt( nodeId ) && c.toInput === inputIndex );
+		if ( ! connection ) return null;
+
+		// Evaluate the source node's output
+		return evaluateNodeOutput( connection.fromNode, connection.fromOutput );
+
+	}
+
+	// Find the output node ID
+	let outputNodeId = null;
+	for ( const nodeId in nodeMaterial.nodes ) {
+
+		if ( nodeMaterial.nodes[ nodeId ] === outputNode ) {
+
+			outputNodeId = nodeId;
+			break;
+
+		}
+
+	}
+
+	// Map input connections to material properties
+	if ( outputNodeId ) {
+
+		// Color (input 0)
+		const colorValue = getConnectedValue( outputNodeId, 0 );
+		if ( colorValue ) {
+
+			if ( colorValue instanceof THREE.Color ) {
+
+				material.color = colorValue;
+
+			} else if ( colorValue instanceof THREE.Vector2 ) {
+
+				// Vec2: use X, Y as R, G (useful for UV visualization)
+				material.color = new THREE.Color( colorValue.x, colorValue.y, 0 );
+
+			} else if ( colorValue instanceof THREE.Vector3 ) {
+
+				// Vec3: use X, Y, Z as R, G, B
+				material.color = new THREE.Color( colorValue.x, colorValue.y, colorValue.z );
+
+			} else if ( colorValue instanceof THREE.Vector4 ) {
+
+				// Vec4: use X, Y, Z as R, G, B (ignore W)
+				material.color = new THREE.Color( colorValue.x, colorValue.y, colorValue.z );
+
+			} else if ( typeof colorValue === 'number' ) {
+
+				// Single value, use as grayscale
+				material.color = new THREE.Color( colorValue, colorValue, colorValue );
+
+			}
+
+		}
+
+		// Roughness (input 1)
+		const roughnessValue = getConnectedValue( outputNodeId, 1 );
+		if ( roughnessValue !== null && material.roughness !== undefined ) {
+
+			if ( typeof roughnessValue === 'number' ) {
+
+				material.roughness = roughnessValue;
+
+			}
+
+		}
+
+		// Metalness (input 2)
+		const metalnessValue = getConnectedValue( outputNodeId, 2 );
+		if ( metalnessValue !== null && material.metalness !== undefined ) {
+
+			if ( typeof metalnessValue === 'number' ) {
+
+				material.metalness = metalnessValue;
+
+			}
+
+		}
+
+	}
+
+	return material;
+
+}
 
 var _DEFAULT_CAMERA = new THREE.PerspectiveCamera( 50, 1, 0.01, 1000 );
 _DEFAULT_CAMERA.name = 'Camera';
@@ -75,10 +349,15 @@ function Editor() {
 		
 		particleSystemChanged: new Signal(),
 
-		sceneLoaded: new Signal(),
-		sceneDeleted: new Signal(),
+	sceneLoaded: new Signal(),
+	sceneDeleted: new Signal(),
 
-		cameraAdded: new Signal(),
+	moduleRegistered: new Signal(),
+	moduleUnregistered: new Signal(),
+	moduleEnabled: new Signal(),
+	moduleDisabled: new Signal(),
+
+	cameraAdded: new Signal(),
 		cameraRemoved: new Signal(),
 
 		helperAdded: new Signal(),
@@ -113,6 +392,8 @@ function Editor() {
 	this.selector = new Selector( this );
 	this.strings = new Strings( this.config );
 	this.input = new Input( this );
+	this.modules = new ModuleSystem( this );
+	this.tslEditor = new TSLEditor( this );
 
 	this.setupKeyboardShortcuts();
 
@@ -618,6 +899,14 @@ Editor.prototype = {
 
 		}
 
+		// If the material has nodeMaterialData, return that for the inspector
+		// (but the actual rendering uses the generated THREE.Material)
+		if ( material && material.nodeMaterialData ) {
+
+			return material.nodeMaterialData;
+
+		}
+
 		return material;
 
 	},
@@ -627,12 +916,39 @@ Editor.prototype = {
 		if ( newMaterial && newMaterial.assetPath ) {
 			const assetPath = newMaterial.assetPath.startsWith( '/' ) ? newMaterial.assetPath.slice( 1 ) : newMaterial.assetPath;
 			const materialAsset = this.assets.getByUrl( assetPath );
-			if ( materialAsset && materialAsset.getMaterial ) {
-				const assetMaterial = materialAsset.getMaterial();
+			if ( materialAsset ) {
+				// For standard materials, get from getMaterial()
+				const assetMaterial = materialAsset.getMaterial ? materialAsset.getMaterial() : null;
 				if ( assetMaterial ) {
 					newMaterial = assetMaterial;
+				} 
+				// For NodeMaterials, get from .data and convert to THREE.Material
+				else if ( materialAsset.data && ( materialAsset.data.type === 'NodeMaterial' || materialAsset.data.isNodeMaterial ) ) {
+					const nodeMaterialData = materialAsset.data;
+					// Store a reference to the data for the inspector
+					newMaterial = nodeMaterialData;
 				}
 			}
+		}
+
+		// If newMaterial is a NodeMaterial data object, convert it to a real THREE.Material for rendering
+		if ( newMaterial && ( newMaterial.type === 'NodeMaterial' || newMaterial.isNodeMaterial ) ) {
+
+			const generatedMaterial = generateMaterialFromNodes( newMaterial );
+			if ( generatedMaterial ) {
+
+				// Store the original NodeMaterial data on the generated material
+				generatedMaterial.nodeMaterialData = newMaterial;
+				generatedMaterial.assetPath = newMaterial.assetPath;
+				newMaterial = generatedMaterial;
+
+			} else {
+
+				console.warn( '[Editor] Failed to generate material from NodeMaterial, using default' );
+				newMaterial = new THREE.MeshStandardMaterial( { color: 0xff0000 } );
+
+			}
+
 		}
 
 		if ( Array.isArray( object.material ) && slot !== undefined ) {
@@ -1558,4 +1874,4 @@ function formatNumber( number ) {
 
 }
 
-export { Editor };
+export { Editor, generateMaterialFromNodes };

@@ -37,6 +37,14 @@ function SidebarMaterialConstantProperty( editor, property, name, options ) {
 
 		material = editor.getObjectMaterial( object, materialSlot );
 
+		// Don't update for NodeMaterials
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+
+			container.setDisplay( 'none' );
+			return;
+
+		}
+
 		if ( property in material ) {
 
 			constant.setValue( material[ property ] );

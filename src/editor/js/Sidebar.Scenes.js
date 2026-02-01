@@ -595,7 +595,6 @@ function SidebarScenes( editor ) {
 			}
 			
 			signals.sceneLoaded.dispatch( sceneName );
-			refresh();
 		} catch ( error ) {
 			alert( 'Load failed: ' + error );
 		}
@@ -603,11 +602,11 @@ function SidebarScenes( editor ) {
 
 	signals.sceneGraphChanged.add( refresh );
 	signals.editorCleared.add( refresh );
-	signals.sceneLoaded.add( refresh );
 	signals.sceneLoaded.add( function ( sceneName ) {
 		if ( editor.scene && sceneName ) {
 			editor.scene.name = sceneName.replace( '.json', '' );
 		}
+		refresh();
 	} );
 
 	refresh();

@@ -61,9 +61,20 @@ class AssetPreviewRenderer {
 		if (typeof material === 'string') {
 			try {
 				const materialData = JSON.parse(material);
-				const loader = new THREE.MaterialLoader();
-				loader.setTextures({});
-				materialInstance = loader.parse(materialData);
+				
+				// Handle NodeMaterial - use default preview material
+				if (materialData.type === 'NodeMaterial') {
+					console.log('[AssetPreviewRenderer] NodeMaterial detected, using default preview');
+					materialInstance = new THREE.MeshStandardMaterial({ 
+						color: materialData.color || 0xffffff,
+						roughness: materialData.roughness !== undefined ? materialData.roughness : 1,
+						metalness: materialData.metalness !== undefined ? materialData.metalness : 0
+					});
+				} else {
+					const loader = new THREE.MaterialLoader();
+					loader.setTextures({});
+					materialInstance = loader.parse(materialData);
+				}
 			} catch (e) {
 				try {
 					const materialData = JSON.parse(material);
@@ -87,8 +98,18 @@ class AssetPreviewRenderer {
 					materialInstance = new THREE.MeshStandardMaterial({ color: 0x888888 });
 				}
 			}
-		} else if (material instanceof THREE.Material) {
-			materialInstance = material;
+		} else if (material instanceof THREE.Material || material.isNodeMaterial) {
+			// Handle both standard materials and node materials
+			if (material.isNodeMaterial) {
+				// Create preview material from node material data
+				materialInstance = new THREE.MeshStandardMaterial({ 
+					color: material.color || 0xffffff,
+					roughness: material.roughness !== undefined ? material.roughness : 1,
+					metalness: material.metalness !== undefined ? material.metalness : 0
+				});
+			} else {
+				materialInstance = material;
+			}
 		} else {
 			materialInstance = new THREE.MeshStandardMaterial({ color: 0x888888 });
 		}

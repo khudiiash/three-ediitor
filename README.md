@@ -12,6 +12,8 @@ This project is based on the official Three.js Editor source code, which is lice
 - TypeScript-based runtime engine
 - Project hub for managing multiple projects
 - Local file-based storage (no IndexedDB)
+- Modular plugin system for extensibility
+- WebGPU renderer with fallback to WebGL
 - Additional UI improvements and customizations
 
 ## Requirements

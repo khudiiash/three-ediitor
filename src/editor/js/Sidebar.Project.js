@@ -2,6 +2,7 @@ import { UISpan } from './libs/ui.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 
 import { SidebarScenes } from './Sidebar.Scenes.js';
+import { SidebarModules } from './Sidebar.Modules.js';
 import { SidebarProjectApp } from './Sidebar.Project.App.js';
 import { SidebarProjectRenderer } from './Sidebar.Project.Renderer.js';
 import { SidebarProjectImage } from './Sidebar.Project.Image.js';
@@ -20,6 +21,11 @@ function SidebarProject( editor ) {
 	const scenesContent = new SidebarScenes( editor );
 	scenesPanel.add( scenesContent );
 	container.add( scenesPanel );
+
+	const modulesPanel = new UICollapsiblePanel( 'Modules' );
+	const modulesContent = new SidebarModules( editor );
+	modulesPanel.add( modulesContent );
+	container.add( modulesPanel );
 
 	const rendererPanel = new UICollapsiblePanel( 'Renderer' );
 	const rendererContent = new SidebarProjectRenderer( editor );

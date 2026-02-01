@@ -35,6 +35,14 @@ function SidebarMaterialNumberProperty( editor, property, name, range = [ - Infi
 
 		material = editor.getObjectMaterial( object, materialSlot );
 
+		// Don't update for NodeMaterials
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+
+			container.setDisplay( 'none' );
+			return;
+
+		}
+
 		if ( property in material ) {
 
 			number.setValue( material[ property ] );

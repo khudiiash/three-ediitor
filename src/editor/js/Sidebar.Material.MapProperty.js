@@ -190,6 +190,14 @@ function SidebarMaterialMapProperty( editor, property, name ) {
 
 		material = editor.getObjectMaterial( object, materialSlot );
 
+		// Don't update for NodeMaterials
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+
+			container.setDisplay( 'none' );
+			return;
+
+		}
+
 		if ( property in material ) {
 
 			if ( material[ property ] !== null ) {

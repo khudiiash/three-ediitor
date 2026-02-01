@@ -216,9 +216,7 @@ class AssetSelector {
 			const emptyMessage = document.createElement( 'div' );
 			emptyMessage.className = 'asset-selector-empty-message';
 			if ( this.assetType === 'material' ) {
-				emptyMessage.textContent = 'No material assets in project. Create .mat files in the Assets panel.';
-			} else if ( this.assetType === 'geometry' ) {
-				emptyMessage.textContent = 'No geometry assets in project. Use .geo, .json, or geometries from imported models.';
+				emptyMessage.textContent = 'No material assets in project. Create .mat or .nodemat files in the Assets panel.';
 			} else {
 				emptyMessage.textContent = `No ${this.assetType} assets found in project. Import some files to get started.`;
 			}
@@ -285,12 +283,13 @@ class AssetSelector {
 					return;
 				}
 				
-				if ( assetType === 'material' && file.type === 'material' && file.name.endsWith( '.mat' ) ) {
+				if ( assetType === 'material' && file.type === 'material' && ( file.name.endsWith( '.mat' ) || file.name.endsWith( '.nodemat' ) ) ) {
+					const extension = file.name.endsWith( '.nodemat' ) ? 'nodemat' : 'mat';
 					assets.push( {
 						name: file.name,
 						path: file.path,
 						type: 'material',
-						extension: 'mat',
+						extension: extension,
 						modelMaterial: file.modelMaterial,
 						modelPath: file.modelPath,
 						isModelContent: true
@@ -440,7 +439,7 @@ class AssetSelector {
 					let material = asset.modelMaterial && asset.modelMaterial.material ? asset.modelMaterial.material : null;
 					
 					if ( !material && asset.modelPath ) {
-						const materialName = asset.name.replace( /\.mat$/, '' );
+						const materialName = asset.name.replace( /\.(mat|nodemat)$/, '' );
 						const matId = `${asset.modelPath}/${materialName}`;
 						material = assetManager.getMaterial(matId);
 						
@@ -452,12 +451,50 @@ class AssetSelector {
 						}
 					}
 					
-					if ( material ) {
-						const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
+					// Check if we have a cached preview first (for NodeMaterials especially)
+					if ( window.assetPreviewCache && window.assetPreviewCache.has( asset.path ) ) {
+
+						const cachedDataUrl = window.assetPreviewCache.get( asset.path );
 						const img = document.createElement( 'img' );
-						img.src = dataUrl;
+						img.src = cachedDataUrl;
 						thumbnail.appendChild( img );
 						return;
+
+					}
+					
+					if ( material ) {
+
+						// Check if it's a NodeMaterial (plain data object)
+						if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
+
+							// Use the generateMaterialFromNodes function if available
+							if ( window.generateAndCacheMaterialPreview ) {
+
+								// Find the file object to pass to the cache function
+								const file = { path: asset.path, name: asset.name };
+								const dataUrl = await window.generateAndCacheMaterialPreview( file, material, 200 );
+								if ( dataUrl ) {
+
+									const img = document.createElement( 'img' );
+									img.src = dataUrl;
+									thumbnail.appendChild( img );
+									return;
+
+								}
+
+							}
+
+						} else {
+
+							// Standard THREE.Material
+							const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
+							const img = document.createElement( 'img' );
+							img.src = dataUrl;
+							thumbnail.appendChild( img );
+							return;
+
+						}
+
 					}
 					
 					const projectPath = this.editor.storage && this.editor.storage.getProjectPath ? this.editor.storage.getProjectPath() : null;
@@ -470,6 +507,37 @@ class AssetSelector {
 							assetPath: assetPath
 						} );
 						const materialContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+						
+						// Try to parse as JSON to check if it's a NodeMaterial
+						try {
+
+							const materialData = JSON.parse( materialContent );
+							
+							if ( materialData.type === 'NodeMaterial' || materialData.isNodeMaterial ) {
+
+								// Use the cached preview generation for NodeMaterials
+								if ( window.generateAndCacheMaterialPreview ) {
+
+									const file = { path: asset.path, name: asset.name };
+									const dataUrl = await window.generateAndCacheMaterialPreview( file, materialData, 200 );
+									if ( dataUrl ) {
+
+										const img = document.createElement( 'img' );
+										img.src = dataUrl;
+										thumbnail.appendChild( img );
+										return;
+
+									}
+
+								}
+
+							}
+
+						} catch ( e ) {
+
+							// Not JSON or failed to parse, continue with standard rendering
+
+						}
 						
 						const dataUrl = await previewRenderer.renderMaterialPreview( materialContent, 128, 128 );
 						const img = document.createElement( 'img' );
@@ -1033,7 +1101,7 @@ class AssetSelector {
 	async selectMaterial( assetData, callback ) {
 
 		const assetPath = assetData.path.startsWith( '/' ) ? assetData.path.substring( 1 ) : assetData.path;
-		const assetName = assetData.name.replace( /\.mat$/, '' );
+		const assetName = assetData.name.replace( /\.(mat|nodemat)$/, '' );
 		
 		let materialAsset = this.editor.assets.getByUrl( assetPath );
 		
@@ -1073,56 +1141,86 @@ class AssetSelector {
 			}
 			
 			let material = null;
-			try {
-				const loader = new THREE.MaterialLoader();
-				loader.setTextures( {} );
-				material = loader.parse( materialData );
+			
+			// Check if it's a NodeMaterial
+			if ( materialData.type === 'NodeMaterial' || materialData.isNodeMaterial ) {
+
+				console.log( '[AssetSelector] NodeMaterial detected, storing as data object' );
+				
+				// NodeMaterials are stored as plain data objects, not THREE.Material instances
+				material = materialData;
+				material.assetPath = assetPath;
+				material.sourceFile = assetData.name;
+				material.isNodeMaterial = true;
+				
+				const { MaterialAsset } = await import( '@engine/three-engine.js' );
+				materialAsset = new MaterialAsset( assetName, assetPath, {
+					name: assetName,
+					path: assetPath,
+					source: assetData.name,
+					materialType: 'NodeMaterial'
+				} );
+				
+				// For NodeMaterials, store the data object directly
+				materialAsset.data = material;
+				this.editor.assets.register( materialAsset );
+
+			} else {
+				
+				// Standard THREE.Material handling
+				try {
+					const loader = new THREE.MaterialLoader();
+					loader.setTextures( {} );
+					material = loader.parse( materialData );
+					
+					if ( !material ) {
+						const objectLoader = new THREE.ObjectLoader();
+						const parsed = objectLoader.parseMaterials( [ materialData ] );
+						material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+					}
+					
+					if ( !material && materialData.type ) {
+						const MaterialClass = THREE[ materialData.type ];
+						if ( MaterialClass ) {
+							material = new MaterialClass();
+							if ( materialData.color !== undefined ) material.color.setHex( materialData.color );
+							if ( materialData.roughness !== undefined ) material.roughness = materialData.roughness;
+							if ( materialData.metalness !== undefined ) material.metalness = materialData.metalness;
+							if ( materialData.emissive !== undefined ) material.emissive.setHex( materialData.emissive );
+							material.name = materialData.name || assetName;
+						}
+					}
+				} catch ( parseError ) {
+					console.warn( '[AssetSelector] Failed to parse material:', parseError );
+					this.isProcessing = false;
+					return;
+				}
 				
 				if ( !material ) {
-					const objectLoader = new THREE.ObjectLoader();
-					const parsed = objectLoader.parseMaterials( [ materialData ] );
-					material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+					console.error( '[AssetSelector] Failed to create material' );
+					this.isProcessing = false;
+					return;
 				}
 				
-				if ( !material && materialData.type ) {
-					const MaterialClass = THREE[ materialData.type ];
-					if ( MaterialClass ) {
-						material = new MaterialClass();
-						if ( materialData.color !== undefined ) material.color.setHex( materialData.color );
-						if ( materialData.roughness !== undefined ) material.roughness = materialData.roughness;
-						if ( materialData.metalness !== undefined ) material.metalness = materialData.metalness;
-						if ( materialData.emissive !== undefined ) material.emissive.setHex( materialData.emissive );
-						material.name = materialData.name || assetName;
-					}
-				}
-			} catch ( parseError ) {
-				console.warn( '[AssetSelector] Failed to parse material:', parseError );
-				this.isProcessing = false;
-				return;
+				material.assetPath = assetPath;
+				material.sourceFile = assetData.name;
+				material.isMaterial = true;
+				
+				const { MaterialAsset } = await import( '@engine/three-engine.js' );
+				materialAsset = new MaterialAsset( assetName, assetPath, {
+					name: assetName,
+					path: assetPath,
+					source: assetData.name,
+					materialType: material.type
+				} );
+				materialAsset.setMaterial( material );
+				this.editor.assets.register( materialAsset );
+
 			}
-			
-			if ( !material ) {
-				console.error( '[AssetSelector] Failed to create material' );
-				this.isProcessing = false;
-				return;
-			}
-			
-			material.assetPath = assetPath;
-			material.sourceFile = assetData.name;
-			material.isMaterial = true;
-			
-			const { MaterialAsset } = await import( '@engine/three-engine.js' );
-			materialAsset = new MaterialAsset( assetName, assetPath, {
-				name: assetName,
-				path: assetPath,
-				source: assetData.name,
-				materialType: material.type
-			} );
-			materialAsset.setMaterial( material );
-			this.editor.assets.register( materialAsset );
 		}
 		
-		const material = materialAsset.getMaterial();
+		// For NodeMaterials, return the data object; for standard materials, return THREE.Material
+		const material = materialAsset.getMaterial() || materialAsset.data;
 		if ( material ) {
 			this.isProcessing = false;
 			callback( material );
@@ -1264,7 +1362,7 @@ class AssetSelector {
 				} else if (asset.type === 'material') {
 					let material = asset.modelMaterial?.material;
 					if (!material && asset.modelPath) {
-						const materialName = asset.name.replace( /\.mat$/, '' );
+						const materialName = asset.name.replace( /\.(mat|nodemat)$/, '' );
 						material = assetManager.getMaterial(`${asset.modelPath}/${materialName}`);
 					}
 					if (material) {

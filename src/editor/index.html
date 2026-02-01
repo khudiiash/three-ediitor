@@ -201,6 +201,8 @@
 					if ( sceneName ) {
 						editor.signals.sceneLoaded.dispatch( sceneName );
 					}
+
+					await editor.modules.loadProjectModules();
 				} else {
 					editor.clear();
 					loadingOverlay.style.display = 'none';

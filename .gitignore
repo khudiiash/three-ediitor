@@ -28,6 +28,10 @@ src/rust/gen/
 projects/*
 !projects/.gitkeep
 
+# modules
+# Editor modules are separate repositories
+modules/
+
 # OS files
 .DS_Store
 Thumbs.db

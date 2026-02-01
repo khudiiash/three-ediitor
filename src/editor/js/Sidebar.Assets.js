@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { UIPanel, UIRow, UIButton, UIText, UIInput, UISelect } from './libs/ui.js';
+import { UIPanel, UIRow, UIButton, UIText, UIInput, UISelect, UIBreak } from './libs/ui.js';
 import { ScriptCompiler } from './ScriptCompiler.js';
 import { ModelParser } from './ModelParser.js';
 import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
@@ -7,10 +7,11 @@ import { assetManager } from '@engine/three-engine.js';
 
 import { Modal } from './Modal.js';
 import { MaterialAsset, TextureAsset, AssetType } from '@engine/three-engine.js';
+import { generateMaterialFromNodes } from './Editor.js';
 
 	function getAssetTypeFromFile( file ) {
 		const ext = file.name ? file.name.split( '.' ).pop()?.toLowerCase() : '';
-		if ( file.type === 'material' || file.name.endsWith( '.mat' ) ) {
+		if ( file.type === 'material' || file.name.endsWith( '.mat' ) || file.name.endsWith( '.nodemat' ) ) {
 			return AssetType.MATERIAL;
 		}
 		if ( file.type === 'texture' || [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ].includes( ext ) ) {
@@ -89,9 +90,20 @@ import { MaterialAsset, TextureAsset, AssetType } from '@engine/three-engine.js'
 				try {
 					if ( file.content && existingAsset instanceof MaterialAsset ) {
 						try {
-							const materialData = JSON.parse( file.content );
-							if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
-								const loader = new THREE.MaterialLoader();
+						const materialData = JSON.parse( file.content );
+						if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
+							
+							// Handle NodeMaterial - store as data, don't instantiate
+							if ( materialData.type === 'NodeMaterial' ) {
+
+								existingAsset.data = materialData;
+								existingAsset.data.assetPath = assetPath;
+								existingAsset.data.sourceFile = file.name;
+								return;
+
+							}
+
+							const loader = new THREE.MaterialLoader();
 								loader.setTextures( {} );
 								let material = loader.parse( materialData );
 								if ( !material ) {
@@ -129,6 +141,16 @@ import { MaterialAsset, TextureAsset, AssetType } from '@engine/three-engine.js'
 					try {
 						const materialData = JSON.parse( file.content );
 						if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
+							
+							if ( materialData.type === 'NodeMaterial' ) {
+
+								asset.data = materialData;
+								asset.data.assetPath = assetPath;
+								asset.data.sourceFile = file.name;
+								return;
+
+							}
+
 							const loader = new THREE.MaterialLoader();
 							loader.setTextures( {} );
 							let material = loader.parse( materialData );
@@ -425,7 +447,8 @@ function SidebarAssets( editor ) {
 		{ name: 'CubeMap', icon: '🌐', action: async () => await createAssetFile( 'cubemap', '' ) },
 		{ name: 'HTML', icon: '🌐', action: async () => await createAssetFile( 'html', '' ) },
 		{ name: 'JSON', icon: '📄', action: async () => await createAssetFile( 'json', '{}' ) },
-		{ name: 'Material', icon: '🎨', action: async () => await createAssetFile( 'material', '' ) },
+		{ name: 'Material', icon: '🎨', action: async () => await createMaterialOfType( 'standard' ) },
+		{ name: 'Node Material', icon: '🎨', action: async () => await createMaterialOfType( 'node' ) },
 		{ name: 'Script', icon: '📜', action: async () => await createScriptAsset() },
 		{ name: 'Shader', icon: '📄', action: async () => await createAssetFile( 'shader', '' ) },
 		{ name: 'Text', icon: '📝', action: async () => await createAssetFile( 'txt', '' ) }
@@ -526,7 +549,40 @@ function SidebarAssets( editor ) {
 	contextMenu.add( copyItem );
 	contextMenu.add( pasteItem );
 
-	function showContextMenu( x, y ) {
+	function showContextMenu( x, y, asset = null ) {
+
+		contextMenu.clear();
+		contextMenu.add( newFolderItem );
+		contextMenu.add( newAssetSubmenuTitle );
+
+		if ( asset && asset.assetType ) {
+
+			const extensions = editor.modules.getAssetMenuExtensions( asset.assetType );
+
+			if ( extensions.length > 0 ) {
+
+				const separator = new UIBreak();
+				separator.dom.style.margin = '4px 0';
+				separator.dom.style.borderTop = '1px solid #444';
+				contextMenu.add( separator );
+
+				extensions.forEach( ext => {
+
+					const extItem = createMenuItem( `${ext.icon ? ext.icon + ' ' : ''}${ext.label}`, function () {
+
+						ext.callback( asset );
+
+					} );
+					contextMenu.add( extItem );
+
+				} );
+
+			}
+
+		}
+
+		contextMenu.add( copyItem );
+		contextMenu.add( pasteItem );
 
 		contextMenu.dom.style.left = x + 'px';
 		contextMenu.dom.style.top = y + 'px';
@@ -581,7 +637,7 @@ function SidebarAssets( editor ) {
 
 		event.preventDefault();
 		event.stopPropagation();
-		showContextMenu( event.clientX, event.clientY );
+		showContextMenu( event.clientX, event.clientY, selectedAsset );
 
 	} );
 
@@ -589,7 +645,7 @@ function SidebarAssets( editor ) {
 
 		event.preventDefault();
 		event.stopPropagation();
-		showContextMenu( event.clientX, event.clientY );
+		showContextMenu( event.clientX, event.clientY, selectedAsset );
 
 	} );
 
@@ -597,7 +653,7 @@ function SidebarAssets( editor ) {
 
 		event.preventDefault();
 		event.stopPropagation();
-		showContextMenu( event.clientX, event.clientY );
+		showContextMenu( event.clientX, event.clientY, selectedAsset );
 
 	} );
 
@@ -618,7 +674,7 @@ function SidebarAssets( editor ) {
 		                         container.dom.contains( event.target ) ) ) {
 			event.preventDefault();
 			event.stopPropagation();
-			showContextMenu( event.clientX, event.clientY );
+			showContextMenu( event.clientX, event.clientY, selectedAsset );
 		}
 	};
 
@@ -662,9 +718,88 @@ function SidebarAssets( editor ) {
 	let viewMode = 'list'; 
 	let selectedAsset = null;
 	window.selectedAsset = selectedAsset;
+	
+	// Global preview cache: filePath -> dataUrl (200px, scaled down by CSS for thumbnails)
+	const previewCache = new Map();
+	window.assetPreviewCache = previewCache;
+	
+	// Store references to preview images for live updates: filePath -> Set of img elements
+	const previewImageRefs = new Map();
+	window.assetPreviewImageRefs = previewImageRefs;
+
+	function getAssetType( filename ) {
+
+		if ( filename.endsWith( '.mat' ) || filename.endsWith( '.nodemat' ) ) return 'material';
+		if ( filename.endsWith( '.glb' ) || filename.endsWith( '.gltf' ) ) return 'model';
+		if ( filename.endsWith( '.png' ) || filename.endsWith( '.jpg' ) || filename.endsWith( '.jpeg' ) ) return 'texture';
+		if ( filename.endsWith( '.js' ) ) return 'script';
+		return 'file';
+
+	}
 	const previewRenderer = getAssetPreviewRenderer();
 	
 	window.assetManager = assetManager;
+	
+	// Function to generate and cache material preview
+	async function generateAndCacheMaterialPreview( file, material, size = 200 ) {
+
+		const filePath = file.path;
+		
+		console.log( '[Preview Cache] Generating preview for:', filePath, 'size:', size );
+		
+		// Generate THREE.Material from NodeMaterial if needed
+		let previewMaterial = material;
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+
+			previewMaterial = generateMaterialFromNodes( material );
+			if ( ! previewMaterial ) {
+
+				console.warn( '[Preview Cache] Failed to generate material from nodes' );
+				return null;
+
+			}
+
+		}
+		
+		// Render preview at requested size (always 200px for quality)
+		const dataUrl = await previewRenderer.renderMaterialPreview( previewMaterial, size, size );
+		
+		if ( dataUrl ) {
+
+			// Cache the preview
+			previewCache.set( filePath, dataUrl );
+			console.log( '[Preview Cache] Cached preview for:', filePath, 'Length:', dataUrl.length );
+			
+			// Store in file object too for persistence
+			file.previewUrl = dataUrl;
+			file.previewTimestamp = Date.now();
+			
+			// Update all existing img elements that reference this preview
+			if ( previewImageRefs.has( filePath ) ) {
+
+				const imgElements = previewImageRefs.get( filePath );
+				
+				imgElements.forEach( img => {
+
+					if ( img && img.parentNode ) {
+
+						// Only update if the element is still in the DOM
+						img.src = dataUrl;
+
+					}
+
+				} );
+
+			}
+
+		}
+		
+		return dataUrl;
+
+	}
+	
+	// Export for use in other modules
+	window.generateAndCacheMaterialPreview = generateAndCacheMaterialPreview;
 	
 	function initializeDefaultAssets() {
 		const defaultGeometries = [
@@ -731,7 +866,7 @@ function SidebarAssets( editor ) {
 				
 				if (file.type === 'material' && file.modelMaterial) {
 					const matId = file.path;
-					const matName = file.modelMaterial.name || file.name.replace( /\.mat$/, '' );
+							const matName = file.modelMaterial.name || file.name.replace( /\.(mat|nodemat)$/, '' );
 					if (file.modelMaterial.material) {
 						assetManager.registerMaterial(matId, file.modelMaterial.material, {
 							name: matName,
@@ -997,9 +1132,144 @@ function SidebarAssets( editor ) {
 				const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
 				const materialAsset = editor.assets.getByUrl( assetPath );
 				
+				// Check cache first
+				const cachedPreview = previewCache.get( file.path );
+				
+				if ( cachedPreview ) {
+
+					console.log( '[createAssetPreview] Using cached preview for:', file.path );
+					const img = document.createElement( 'img' );
+					img.src = cachedPreview;
+					img.className = 'asset-thumbnail-img-contain';
+					thumbnail.appendChild( img );
+					
+					// Register this img element for live updates
+					if ( ! previewImageRefs.has( file.path ) ) {
+
+						previewImageRefs.set( file.path, new Set() );
+
+					}
+					previewImageRefs.get( file.path ).add( img );
+					
+					// Add "NODES" badge for NodeMaterials
+					if ( file.name.endsWith( '.nodemat' ) ) {
+
+						const badge = document.createElement( 'div' );
+						badge.style.cssText = `
+							position: absolute;
+							bottom: 4px;
+							right: 4px;
+							background: rgba(139, 92, 246, 0.9);
+							color: white;
+							padding: 2px 6px;
+							border-radius: 4px;
+							font-size: 10px;
+							font-weight: 600;
+						`;
+						badge.textContent = 'NODES';
+						thumbnail.style.position = 'relative';
+						thumbnail.appendChild( badge );
+
+					}
+					
+					return thumbnail;
+
+				}
+				
 				if ( materialAsset && materialAsset instanceof MaterialAsset ) {
-					const assetMaterial = materialAsset.getMaterial();
-					if ( assetMaterial ) {
+					let assetMaterial = materialAsset.getMaterial();
+					
+					if ( ! assetMaterial && file.content ) {
+						
+						try {
+							const materialData = JSON.parse( file.content );
+							if ( materialData.type === 'NodeMaterial' ) {
+								materialAsset.data = materialData;
+								materialAsset.data.assetPath = assetPath;
+								assetMaterial = materialAsset.data;
+								console.log( '[createAssetPreview] Loaded NodeMaterial from file:', assetMaterial );
+
+							}
+
+						} catch ( e ) {
+
+							console.error( '[createAssetPreview] Failed to parse material:', e );
+
+						}
+
+					}
+					
+					if ( assetMaterial && ( assetMaterial.type === 'NodeMaterial' || assetMaterial.isNodeMaterial ) ) {
+
+						console.log( '[createAssetPreview] NodeMaterial detected in assets panel' );
+
+						// Generate and cache preview (at 200px, scaled by CSS)
+						const dataUrl = await generateAndCacheMaterialPreview( file, assetMaterial, 200 );
+						
+						if ( dataUrl ) {
+
+							const img = document.createElement( 'img' );
+							img.src = dataUrl;
+							img.className = 'asset-thumbnail-img-contain';
+							thumbnail.appendChild( img );
+							
+							// Register this img element for live updates
+							if ( ! previewImageRefs.has( file.path ) ) {
+
+								previewImageRefs.set( file.path, new Set() );
+
+							}
+							previewImageRefs.get( file.path ).add( img );
+							
+							// Add "NODES" badge overlay
+							const badge = document.createElement( 'div' );
+							badge.style.cssText = `
+								position: absolute;
+								bottom: 4px;
+								right: 4px;
+								background: rgba(139, 92, 246, 0.9);
+								color: white;
+								padding: 2px 6px;
+								border-radius: 4px;
+								font-size: 10px;
+								font-weight: 600;
+							`;
+							badge.textContent = 'NODES';
+							thumbnail.style.position = 'relative';
+							thumbnail.appendChild( badge );
+							
+							// Note: Live updates now handled by previewImageRefs system
+							// No need for materialAsset.on('changed') listener here
+							
+							return thumbnail;
+
+						} else {
+
+							// Fallback to badge if material generation fails
+							thumbnail.appendChild( createFileBadge( file.name, size ) );
+							
+							const badge = document.createElement( 'div' );
+							badge.style.cssText = `
+								position: absolute;
+								bottom: 4px;
+								right: 4px;
+								background: #8b5cf6;
+								color: white;
+								padding: 2px 6px;
+								border-radius: 4px;
+								font-size: 10px;
+								font-weight: 600;
+							`;
+							badge.textContent = 'NODES';
+							thumbnail.style.position = 'relative';
+							thumbnail.appendChild( badge );
+							
+							return thumbnail;
+
+						}
+
+					} else if ( assetMaterial ) {
+
 						const dataUrl = await previewRenderer.renderMaterialPreview( assetMaterial, size, size );
 						const img = document.createElement( 'img' );
 						img.src = dataUrl;
@@ -1019,6 +1289,7 @@ function SidebarAssets( editor ) {
 						} );
 						
 						return thumbnail;
+
 					}
 				}
 				
@@ -1053,7 +1324,7 @@ function SidebarAssets( editor ) {
 					}
 					
 					if ( cachedModel && cachedModel.materials ) {
-						const matName = file.name.replace( /\.mat$/, '' );
+						const matName = file.name.replace( /\.(mat|nodemat)$/, '' );
 						const matEntry = cachedModel.materials.find( m => m.name === matName );
 						if ( matEntry && matEntry.material ) {
 							material = matEntry.material;
@@ -1210,7 +1481,13 @@ function SidebarAssets( editor ) {
 				r.classList.remove( 'selected' );
 			} );
 			item.classList.add( 'selected' );
-			selectedAsset = { type: 'file', path: file.path, name: file.name, folder: currentFolder };
+			selectedAsset = { 
+				type: 'file', 
+				assetType: getAssetType( file.name ),
+				path: file.path, 
+				name: file.name, 
+				folder: currentFolder 
+			};
 			window.selectedAsset = selectedAsset;
 		} );
 
@@ -1465,6 +1742,30 @@ function SidebarAssets( editor ) {
 
 	function createListRow( file ) {
 
+		// Ensure file has a type set based on extension
+		if ( ! file.type || file.type === 'file' ) {
+
+			const ext = file.name ? file.name.split( '.' ).pop()?.toLowerCase() : '';
+			if ( file.name.endsWith( '.mat' ) || file.name.endsWith( '.nodemat' ) ) {
+
+				file.type = 'material';
+
+			} else if ( [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ].includes( ext ) ) {
+
+				file.type = 'texture';
+
+			} else if ( [ 'ts', 'tsx', 'js', 'jsx' ].includes( ext ) ) {
+
+				file.type = 'script';
+
+			} else if ( [ 'glb', 'gltf', 'fbx', 'obj' ].includes( ext ) ) {
+
+				file.type = 'model';
+
+			}
+
+		}
+
 		const row = document.createElement( 'tr' );
 		row.className = 'assets-table-row';
 		row.draggable = true;
@@ -1566,7 +1867,13 @@ function SidebarAssets( editor ) {
 				r.classList.remove( 'selected' );
 			} );
 			row.classList.add( 'selected' );
-			selectedAsset = { type: 'file', path: file.path, name: file.name, folder: currentFolder };
+			selectedAsset = { 
+				type: 'file', 
+				assetType: getAssetType( file.name ),
+				path: file.path, 
+				name: file.name, 
+				folder: currentFolder 
+			};
 			window.selectedAsset = selectedAsset;
 		} );
 		
@@ -2519,8 +2826,40 @@ function SidebarAssets( editor ) {
 
 	}
 
+	async function createMaterialOfType( materialType ) {
+
+		if ( materialType === 'standard' ) {
+
+			// Default standard material
+			await createAssetFile( 'material', '', 'standard' );
+
+		} else if ( materialType === 'node' ) {
+
+			// Node material with TSL support
+			await createAssetFile( 'material', '', 'node' );
+
+		} else {
+
+			// Check if it's a module-provided material type
+			const extensions = editor.modules.getMaterialTypeExtensions();
+			const extension = extensions.find( ext => ext.type === materialType );
+
+			if ( extension && typeof extension.createMaterial === 'function' ) {
+
+				await extension.createMaterial( createAssetFile );
+
+			} else {
+
+				console.warn( `Unknown material type: ${materialType}` );
+				await createAssetFile( 'material', '', 'standard' );
+
+			}
+
+		}
+
+	}
 	
-	async function createAssetFile( type, defaultContent ) {
+	async function createAssetFile( type, defaultContent, materialSubType = null ) {
 
 		const extMap = {
 			'css': 'css',
@@ -2533,7 +2872,14 @@ function SidebarAssets( editor ) {
 			'cubemap': 'cubemap'
 		};
 
-		const ext = extMap[ type ] || 'txt';
+		// Use different extension for node materials
+		let ext = extMap[ type ] || 'txt';
+		if ( type === 'material' && materialSubType === 'node' ) {
+
+			ext = 'nodemat';
+
+		}
+
 		const defaultFileName = `new.${ext}`;
 		const fileName = await Modal.showPrompt( `Enter ${type.toUpperCase()} File Name`, '', defaultFileName, defaultFileName );
 
@@ -2556,10 +2902,36 @@ function SidebarAssets( editor ) {
 			let content = defaultContent;
 			
 			if ( !content && type === 'material' ) {
-				const defaultMaterial = new THREE.MeshStandardMaterial( { color: 0xffffff } );
-				defaultMaterial.name = finalFileName.replace( /\.[^/.]+$/, '' );
-				const materialJson = defaultMaterial.toJSON();
-				content = JSON.stringify( materialJson, null, '\t' );
+				
+				if ( materialSubType === 'node' ) {
+
+					// Create node material structure
+					const nodeMaterial = {
+						metadata: {
+							version: 4.6,
+							type: 'Material',
+							generator: 'Material.toJSON'
+						},
+						uuid: THREE.MathUtils.generateUUID(),
+						type: 'NodeMaterial',
+						name: finalFileName.replace( /\.[^/.]+$/, '' ),
+						color: 16777215,
+						metalness: 0,
+						roughness: 1,
+						nodes: {}
+					};
+					content = JSON.stringify( nodeMaterial, null, '\t' );
+
+				} else {
+
+					// Standard Three.js material
+					const defaultMaterial = new THREE.MeshStandardMaterial( { color: 0xffffff } );
+					defaultMaterial.name = finalFileName.replace( /\.[^/.]+$/, '' );
+					const materialJson = defaultMaterial.toJSON();
+					content = JSON.stringify( materialJson, null, '\t' );
+
+				}
+
 			} else if ( !content && type === 'html' ) {
 				content = `<!DOCTYPE html>
 <html lang="en">
@@ -2796,8 +3168,115 @@ export default class ${validClassName} extends Script {
 
 	}
 
-	
 	window.saveAssets = saveAssets;
+	
+	// Function to update file content in memory (for TSL editor saves)
+	window.updateFileContent = function( filePath, newContent ) {
+
+		console.log( '[Assets] Updating file content in memory for:', filePath, 'Length:', newContent ? newContent.length : 0 );
+		
+		// Find and update the file in the folder structure
+		function findAndUpdateFile( folder, targetPath ) {
+
+			// Check files in current folder
+			if ( folder.files ) {
+
+				const file = folder.files.find( f => f.path === targetPath );
+				if ( file ) {
+
+					console.log( '[Assets] Found file to update:', file.name, 'Old length:', file.content ? file.content.length : 0, 'New length:', newContent.length );
+					file.content = newContent;
+					file.size = newContent.length;
+					file.dateModified = Date.now();
+					
+					// Invalidate preview cache
+					if ( previewCache.has( targetPath ) ) {
+
+						console.log( '[Assets] Invalidating cached preview for:', targetPath );
+						previewCache.delete( targetPath );
+
+					}
+					
+					// Regenerate preview if it's a material
+					if ( file.type === 'material' && file.name.endsWith( '.nodemat' ) ) {
+
+						console.log( '[Assets] Regenerating preview for NodeMaterial:', file.name );
+						
+						// Parse the material data
+						try {
+
+							const materialData = JSON.parse( newContent );
+							
+							// Generate preview at highest quality (200px) only
+							// Smaller sizes will scale down via CSS
+							generateAndCacheMaterialPreview( file, materialData, 200 ).then( dataUrl => {
+
+								if ( dataUrl ) {
+
+									console.log( '[Assets] Preview regenerated and cached (200x200):', file.name );
+
+								}
+
+							} ).catch( err => {
+
+								console.error( '[Assets] Failed to regenerate preview:', err );
+
+							} );
+
+						} catch ( e ) {
+
+							console.error( '[Assets] Failed to parse material for preview:', e );
+
+						}
+
+					}
+					
+					return true;
+
+				}
+
+			}
+
+			// Recursively search child folders
+			if ( folder.children ) {
+
+				for ( const child of folder.children ) {
+
+					if ( findAndUpdateFile( child, targetPath ) ) {
+
+						return true;
+
+					}
+
+				}
+
+			}
+
+			return false;
+
+		}
+
+		// Update the file content
+		const updated = findAndUpdateFile( window.assetsRoot, filePath );
+		
+		if ( updated ) {
+
+			console.log( '[Assets] File content updated in memory successfully' );
+			
+			// Trigger asset file changed signal
+			if ( editor.signals && editor.signals.assetFileChanged ) {
+
+				editor.signals.assetFileChanged.dispatch( filePath );
+
+			}
+
+		} else {
+
+			console.warn( '[Assets] File not found in folder structure:', filePath );
+
+		}
+
+	};
 	
 	async function syncFilesystemWithMetadata() {
 		if ( !isTauri || !invoke ) return;
@@ -3114,6 +3593,7 @@ export default class ${validClassName} extends Script {
 								file.path.endsWith( '.geo' ) ||
 								file.path.endsWith( '.texture' ) || 
 								file.path.endsWith( '.mat' ) ||
+								file.path.endsWith( '.nodemat' ) ||
 								file.path.endsWith( '.mesh' )
 							) ) {
 								
@@ -3368,6 +3848,7 @@ export default class ${validClassName} extends Script {
 									                         fileData.path.endsWith( '.geo' ) ||
 									                         fileData.path.endsWith( '.texture' ) ||
 									                         fileData.path.endsWith( '.mat' ) ||
+									                         fileData.path.endsWith( '.nodemat' ) ||
 									                         fileData.path.endsWith( '.mesh' )
 									                     ) && (
 									                         fileData.path.includes( '/Geometries/' ) ||

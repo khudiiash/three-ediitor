@@ -55,6 +55,14 @@ function SidebarMaterialColorProperty( editor, property, name ) {
 
 		material = editor.getObjectMaterial( object, materialSlot );
 
+		// Don't update for NodeMaterials (they don't have THREE.Color properties)
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+
+			container.setDisplay( 'none' );
+			return;
+
+		}
+
 		if ( property in material ) {
 
 			color.setHexValue( material[ property ].getHexString() );

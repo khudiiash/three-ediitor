@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { UIPanel, UIRow, UIInput, UIText, UINumber, UISelect, UICheckbox, UIDiv } from './libs/ui.js';
+import { UIPanel, UIRow, UIInput, UIText, UINumber, UISelect, UICheckbox, UIDiv, UIButton } from './libs/ui.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
 import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
 import { assetManager, TextureAsset, MaterialAsset } from '@engine/three-engine.js';
 import { ModelParser } from './ModelParser.js';
+import { generateMaterialFromNodes } from './Editor.js';
 
 function SidebarAsset( editor ) {
 
@@ -356,6 +357,23 @@ function SidebarAsset( editor ) {
 	const materialContent = new SidebarMaterial( editor );
 	materialPanel.add( materialContent );
 
+	// Add Edit Nodes button for node materials in asset inspector
+	const editNodesRow = new UIRow();
+	editNodesRow.setDisplay( 'none' ); // Hidden by default
+	const editNodesButton = new UIButton( 'Edit Nodes' );
+	editNodesButton.onClick( function () {
+
+		if ( currentMaterial && ( currentMaterial.type === 'NodeMaterial' || currentMaterial.isNodeMaterial ) ) {
+
+			editor.tslEditor.open( currentMaterial );
+
+		}
+
+	} );
+	editNodesRow.add( new UIText( '' ).setClass( 'Label' ) );
+	editNodesRow.add( editNodesButton );
+	materialPanel.add( editNodesRow );
+
 
 	function getAssetUrl( file, assetPath ) {
 		if ( file.url ) {
@@ -467,7 +485,7 @@ function SidebarAsset( editor ) {
 						if ( !material && file.modelPath ) {
 							const cachedModel = assetManager.getParsedModel( file.modelPath );
 							if ( cachedModel && cachedModel.materials ) {
-								const matName = file.name.replace( /\.mat$/, '' );
+								const matName = file.name.replace( /\.(mat|nodemat)$/, '' );
 								const matEntry = cachedModel.materials.find( m => m.name === matName );
 								if ( matEntry && matEntry.material ) {
 									material = matEntry.material;
@@ -510,12 +528,85 @@ function SidebarAsset( editor ) {
 		console.log( '[Asset Inspector] updateMaterialPreview called with material:', material.type, material );
 
 		try {
-			const dataUrl = await previewRenderer.renderMaterialPreview( material, 200, 200 );
+			// Check if we have a cached preview
+			const assetPath = material.assetPath || ( currentAsset ? currentAsset.path : null );
+			const cachedPreview = assetPath && window.assetPreviewCache ? window.assetPreviewCache.get( assetPath ) : null;
+			
+			if ( cachedPreview ) {
+
+				console.log( '[Asset Inspector] Using cached preview from assetPreviewCache:', assetPath );
+				
+				const img = document.createElement( 'img' );
+				img.src = cachedPreview;
+				img.style.maxWidth = '100%';
+				img.style.maxHeight = '100%';
+				img.style.objectFit = 'contain';
+				img.style.display = 'block';
+				img.style.margin = '0 auto';
+				
+				// Register this img element for live updates
+				if ( window.assetPreviewImageRefs ) {
+
+					if ( ! window.assetPreviewImageRefs.has( assetPath ) ) {
+
+						window.assetPreviewImageRefs.set( assetPath, new Set() );
+
+					}
+					window.assetPreviewImageRefs.get( assetPath ).add( img );
+					console.log( '[Asset Inspector] Registered img element for live updates:', assetPath );
+
+				}
+				
+				previewContainer.clear();
+				const imgContainer = new UIDiv();
+				imgContainer.dom.style.width = '100%';
+				imgContainer.dom.style.height = '100%';
+				imgContainer.dom.style.display = 'flex';
+				imgContainer.dom.style.alignItems = 'center';
+				imgContainer.dom.style.justifyContent = 'center';
+				imgContainer.dom.appendChild( img );
+				previewContainer.add( imgContainer );
+				console.log( '[Asset Inspector] Cached preview displayed' );
+				return;
+
+			}
+			
+			// If it's a NodeMaterial, generate a THREE.Material from it
+			let materialToRender = material;
+			
+			if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
+
+				console.log( '[Asset Inspector] NodeMaterial detected, generating THREE.Material...' );
+				materialToRender = generateMaterialFromNodes( material );
+				
+				if ( ! materialToRender ) {
+
+					console.warn( '[Asset Inspector] Failed to generate material from nodes, using default' );
+					materialToRender = new THREE.MeshStandardMaterial( { color: 0xcccccc } );
+
+				} else {
+
+					console.log( '[Asset Inspector] Generated material for preview:', materialToRender );
+
+				}
+
+			}
+
+			const dataUrl = await previewRenderer.renderMaterialPreview( materialToRender, 200, 200 );
 			console.log( '[Asset Inspector] Material preview rendered, dataUrl length:', dataUrl ? dataUrl.length : 0 );
 			if ( !dataUrl ) {
 				console.warn( '[Asset Inspector] Preview renderer returned empty dataUrl' );
 				return;
 			}
+			
+			// Cache the preview if we have an asset path
+			if ( assetPath && window.assetPreviewCache ) {
+
+				console.log( '[Asset Inspector] Caching preview in assetPreviewCache:', assetPath );
+				window.assetPreviewCache.set( assetPath, dataUrl );
+
+			}
+			
 			const img = document.createElement( 'img' );
 			img.src = dataUrl;
 			img.style.maxWidth = '100%';
@@ -523,6 +614,20 @@ function SidebarAsset( editor ) {
 			img.style.objectFit = 'contain';
 			img.style.display = 'block';
 			img.style.margin = '0 auto';
+			
+			// Register this img element for live updates
+			if ( assetPath && window.assetPreviewImageRefs ) {
+
+				if ( ! window.assetPreviewImageRefs.has( assetPath ) ) {
+
+					window.assetPreviewImageRefs.set( assetPath, new Set() );
+
+				}
+				window.assetPreviewImageRefs.get( assetPath ).add( img );
+				console.log( '[Asset Inspector] Registered img element for live updates:', assetPath );
+
+			}
+			
 			previewContainer.clear();
 			const imgContainer = new UIDiv();
 			imgContainer.dom.style.width = '100%';
@@ -822,17 +927,40 @@ function SidebarAsset( editor ) {
 					signals.materialChanged.dispatch( materialObject, 0 );
 					
 					materialAsset.on( 'changed', async function onMaterialAssetChanged() {
+						console.log( '[Asset Inspector] MaterialAsset changed event fired! Current asset:', currentMaterialAsset === materialAsset, 'isSavingMaterial:', isSavingMaterial );
+						
 						if ( currentMaterialAsset === materialAsset && !isSavingMaterial ) {
 							const updatedMaterial = materialAsset.getMaterial();
-							if ( updatedMaterial && updatedMaterial !== currentMaterial ) {
+							
+							console.log( '[Asset Inspector] Got updated material:', updatedMaterial );
+							
+							// For NodeMaterial, always update (data object is same reference)
+							const isNodeMaterial = updatedMaterial && ( updatedMaterial.type === 'NodeMaterial' || updatedMaterial.isNodeMaterial );
+							
+							console.log( '[Asset Inspector] IsNodeMaterial:', isNodeMaterial, 'updatedMaterial !== currentMaterial:', updatedMaterial !== currentMaterial );
+							
+							if ( updatedMaterial && ( isNodeMaterial || updatedMaterial !== currentMaterial ) ) {
+
+								console.log( '[Asset Inspector] Material changed event, updating preview. IsNodeMaterial:', isNodeMaterial );
 								currentMaterial = updatedMaterial;
+								
+								editor.syncMaterialAssetToScene( materialAsset );
+								await updateMaterialPreview( currentMaterial ).catch( error => {
+									console.error( '[Asset Inspector] Failed to update material preview after asset change:', error );
+								} );
+								
+								const materialObject = { material: currentMaterial, isMaterial: true };
+								signals.materialChanged.dispatch( materialObject, 0 );
+
+							} else {
+
+								console.log( '[Asset Inspector] Skipped preview update - conditions not met' );
+
 							}
-							editor.syncMaterialAssetToScene( materialAsset );
-							await updateMaterialPreview( currentMaterial ).catch( error => {
-								console.error( '[Asset Inspector] Failed to update material preview after asset change:', error );
-							} );
-							const materialObject = { material: currentMaterial, isMaterial: true };
-							signals.materialChanged.dispatch( materialObject, 0 );
+						} else {
+
+							console.log( '[Asset Inspector] Skipped - not current asset or is saving' );
+
 						}
 					} );
 					
@@ -856,7 +984,7 @@ function SidebarAsset( editor ) {
 					} else if ( file.modelPath ) {
 						const cachedModel = assetManager.getParsedModel( file.modelPath );
 						if ( cachedModel && cachedModel.materials ) {
-							const matName = file.name.replace( /\.mat$/, '' );
+							const matName = file.name.replace( /\.(mat|nodemat)$/, '' );
 							const matEntry = cachedModel.materials.find( m => m.name === matName );
 							if ( matEntry && matEntry.material ) {
 								material = matEntry.material;
@@ -869,7 +997,7 @@ function SidebarAsset( editor ) {
 								try {
 									const modelContents = await ModelParser.parseModel( file.modelPath, file.name, projectPath );
 									if ( modelContents && modelContents.materials ) {
-										const matName = file.name.replace( /\.mat$/, '' );
+										const matName = file.name.replace( /\.(mat|nodemat)$/, '' );
 										const matEntry = modelContents.materials.find( m => m.name === matName );
 										if ( matEntry && matEntry.material ) {
 											material = matEntry.material;
@@ -883,8 +1011,8 @@ function SidebarAsset( editor ) {
 						}
 					} else {
 						const fileExt = file.name ? file.name.split( '.' ).pop()?.toLowerCase() : '';
-						console.log( '[Asset Inspector] Checking material file. fileExt:', fileExt, 'file.type:', file.type, 'hasContent:', !!file.content, 'name ends with .mat:', file.name.endsWith( '.mat' ) );
-						if ( file.type === 'material' || file.name.endsWith( '.mat' ) || ( file.content && fileExt === 'json' ) ) {
+						console.log( '[Asset Inspector] Checking material file. fileExt:', fileExt, 'file.type:', file.type, 'hasContent:', !!file.content, 'name ends with .mat/.nodemat:', file.name.endsWith( '.mat' ) || file.name.endsWith( '.nodemat' ) );
+						if ( file.type === 'material' || file.name.endsWith( '.mat' ) || file.name.endsWith( '.nodemat' ) || ( file.content && fileExt === 'json' ) ) {
 							try {
 								let materialData = null;
 								if ( file.content ) {
@@ -907,32 +1035,47 @@ function SidebarAsset( editor ) {
 								
 								if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
 									console.log( '[Asset Inspector] Material data valid, parsing. Type:', materialData.type, 'Full data:', materialData );
-									try {
-										const materialType = materialData.type;
-										const MaterialClass = THREE[ materialType ];
+									
+									// Handle NodeMaterial - store as data object, don't instantiate with MaterialLoader
+									if ( materialData.type === 'NodeMaterial' ) {
+
+										console.log( '[Asset Inspector] NodeMaterial detected, storing as data object' );
+										material = {
+											...materialData,
+											isNodeMaterial: true,
+											assetPath: file.path,
+											sourceFile: file.name
+										};
 										
-										if ( !MaterialClass ) {
-											console.warn( '[Asset Inspector] Material class not found:', materialType );
-											return;
-										}
-										
-										const loader = new THREE.MaterialLoader();
-										loader.setTextures( {} );
-										
+									} else {
+
+										// Standard Three.js material - use MaterialLoader
 										try {
-											material = loader.parse( materialData );
-											console.log( '[Asset Inspector] MaterialLoader parsed material:', material ? { type: material.type, name: material.name } : 'null' );
-										} catch ( loaderError ) {
-											console.warn( '[Asset Inspector] MaterialLoader failed, trying ObjectLoader:', loaderError );
-											const objectLoader = new THREE.ObjectLoader();
-											const parsed = objectLoader.parseMaterials( [ materialData ] );
-											material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
-											console.log( '[Asset Inspector] ObjectLoader parsed material:', material ? { type: material.type, name: material.name } : 'null' );
-										}
-										
-										if ( !material ) {
-											console.warn( '[Asset Inspector] Both loaders failed, creating material directly from data' );
-											material = new MaterialClass();
+											const materialType = materialData.type;
+											const MaterialClass = THREE[ materialType ];
+											
+											if ( !MaterialClass ) {
+												console.warn( '[Asset Inspector] Material class not found:', materialType );
+												return;
+											}
+											
+											const loader = new THREE.MaterialLoader();
+											loader.setTextures( {} );
+											
+											try {
+												material = loader.parse( materialData );
+												console.log( '[Asset Inspector] MaterialLoader parsed material:', material ? { type: material.type, name: material.name } : 'null' );
+											} catch ( loaderError ) {
+												console.warn( '[Asset Inspector] MaterialLoader failed, trying ObjectLoader:', loaderError );
+												const objectLoader = new THREE.ObjectLoader();
+												const parsed = objectLoader.parseMaterials( [ materialData ] );
+												material = parsed && parsed.length > 0 ? parsed[ 0 ] : null;
+												console.log( '[Asset Inspector] ObjectLoader parsed material:', material ? { type: material.type, name: material.name } : 'null' );
+											}
+											
+											if ( !material ) {
+												console.warn( '[Asset Inspector] Both loaders failed, creating material directly from data' );
+												material = new MaterialClass();
 											
 											if ( materialData.color !== undefined ) {
 												if ( typeof materialData.color === 'number' ) {
@@ -973,6 +1116,9 @@ function SidebarAsset( editor ) {
 									} catch ( createError ) {
 										console.error( '[Asset Inspector] Failed to create material:', createError );
 									}
+
+									} // End of standard material handling
+
 								} else {
 									console.warn( '[Asset Inspector] Material data invalid or not a material. materialData:', materialData, 'type:', materialData?.type );
 								}
@@ -984,13 +1130,32 @@ function SidebarAsset( editor ) {
 				}
 			}
 
-			if ( material && material instanceof THREE.Material ) {
+			if ( material && ( material instanceof THREE.Material || material.isNodeMaterial ) ) {
 				console.log( '[Asset Inspector] Material loaded successfully:', material.type, material.name );
 				currentMaterial = material;
 				editor.selected = null;
 				signals.objectSelected.dispatch( null );
-				const materialObject = { material: material, isMaterial: true };
-				signals.materialChanged.dispatch( materialObject, 0 );
+				
+				// Only dispatch materialChanged for standard THREE.Material instances
+				// Node materials are plain data objects and don't work with SidebarMaterial UI
+				if ( material instanceof THREE.Material ) {
+
+					const materialObject = { material: material, isMaterial: true };
+					signals.materialChanged.dispatch( materialObject, 0 );
+
+				}
+				
+				// Show/hide Edit Nodes button based on material type
+				if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
+
+					editNodesRow.setDisplay( '' );
+
+				} else {
+
+					editNodesRow.setDisplay( 'none' );
+
+				}
+				
 				try {
 					await updateMaterialPreview( material );
 				} catch ( previewError ) {
