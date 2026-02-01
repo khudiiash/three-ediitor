@@ -25,13 +25,13 @@
 		<script type="importmap">
 			{
 				"imports": {
-					"three": "./build/three.module.js",
-					"three/addons/": "./examples/jsm/",
-					"three/examples/": "./examples/",
+					"three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
+					"three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.webgpu.js",
+					"three/tsl": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.tsl.js",
+					"three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/",
+					"three/examples/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/",
 					"three-gpu-pathtracer": "https://cdn.jsdelivr.net/npm/three-gpu-pathtracer@0.0.23/build/index.module.js",
 					"three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js",
-					"quarks.core": "https://cdn.jsdelivr.net/npm/quarks.core@0.16.0/dist/quarks.core.esm.js",
-					"three.quarks": "https://cdn.jsdelivr.net/npm/three.quarks@0.16.0/dist/three.quarks.esm.js",
 					"@engine/": "../engine/dist/"
 				}
 			}
@@ -300,7 +300,7 @@
 			viewport.dom.appendChild( toolbar.dom );
 			document.body.appendChild( viewport.dom );
 
-			loadingText.textContent = 'Loading scene...';
+			loadingText.textContent = 'Initializing renderer...';
 
 			const script = new Script( editor );
 			document.body.appendChild( script.dom );
@@ -310,6 +310,20 @@
 			const sidebar = new Sidebar( editor );
 			sidebar.dom.style.display = 'none';
 			document.body.appendChild( sidebar.dom );
+
+			// Wait for renderer to be fully initialized before continuing
+			await new Promise( resolve => {
+				const checkRenderer = () => {
+					if ( window.rendererInitialized ) {
+						resolve();
+					} else {
+						setTimeout( checkRenderer, 50 );
+					}
+				};
+				checkRenderer();
+			} );
+
+			loadingText.textContent = 'Loading scene...';
 
 			if ( tauriAvailable && window.__TAURI__ ) {
 				window.__TAURI__.event.listen( 'project-opened', async ( event ) => {

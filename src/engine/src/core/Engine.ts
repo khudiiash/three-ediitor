@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 import { App } from './App';
 import { Script } from './Script';
 import { registerComponent, attribute } from './decorators';
@@ -6,7 +7,7 @@ import { registerComponent, attribute } from './decorators';
 export class Engine {
     private static instance: Engine | null = null;
     public app: App | null = null;
-    public renderer: THREE.WebGLRenderer | null = null;
+    public renderer: WebGPURenderer | null = null;
     private isRunning: boolean = false;
 
     private constructor() {
@@ -22,24 +23,27 @@ export class Engine {
         return Engine.instance;
     }
 
-    init(canvas: HTMLCanvasElement, options?: {
+    async init(canvas: HTMLCanvasElement, options?: {
         antialias?: boolean;
         alpha?: boolean;
-        powerPreference?: 'default' | 'high-performance' | 'low-power';
-    }): void {
+        powerPreference?: 'high-performance' | 'low-power';
+    }): Promise<void> {
         const opts = {
             antialias: true,
             alpha: false,
-            powerPreference: 'high-performance' as const,
+            powerPreference: 'high-performance' as 'high-performance' | 'low-power',
             ...options
         };
 
-        this.renderer = new THREE.WebGLRenderer({
+        // WebGPURenderer automatically falls back to WebGL if WebGPU not available
+        this.renderer = new WebGPURenderer({
             canvas,
             antialias: opts.antialias,
             alpha: opts.alpha,
             powerPreference: opts.powerPreference
         });
+        
+        await this.renderer.init();
         
         this.renderer.setPixelRatio(window.devicePixelRatio);
         

@@ -1,7 +1,10 @@
 import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 
 import { UINumber, UIPanel, UIRow, UISelect, UIText } from './libs/ui.js';
 import { UIBoolean } from './libs/ui.three.js';
+
+let rendererCreationPromise = null;
 
 function SidebarProjectRenderer( editor ) {
 
@@ -17,36 +20,56 @@ function SidebarProjectRenderer( editor ) {
 	
 	
 
-	function createRenderer() {
+	async function createRenderer() {
 
-		const antialias = config.getKey( 'project/renderer/antialias' ) !== undefined ? config.getKey( 'project/renderer/antialias' ) : true;
-		const shadows = config.getKey( 'project/renderer/shadows' ) !== undefined ? config.getKey( 'project/renderer/shadows' ) : true;
-		const shadowType = config.getKey( 'project/renderer/shadowType' ) !== undefined ? config.getKey( 'project/renderer/shadowType' ) : 1;
-		const toneMapping = config.getKey( 'project/renderer/toneMapping' ) !== undefined ? config.getKey( 'project/renderer/toneMapping' ) : 0;
-		const toneMappingExposure = config.getKey( 'project/renderer/toneMappingExposure' ) !== undefined ? config.getKey( 'project/renderer/toneMappingExposure' ) : 1;
+		if ( rendererCreationPromise ) {
+			console.log('[SidebarProjectRenderer] Renderer creation already in progress, waiting...');
+			await rendererCreationPromise;
+			console.log('[SidebarProjectRenderer] Using already created renderer');
+			return;
+		}
 
-		currentRenderer = new THREE.WebGLRenderer( { antialias: antialias } );
-		currentRenderer.shadowMap.enabled = shadows;
-		currentRenderer.shadowMap.type = shadowType;
-		currentRenderer.toneMapping = toneMapping;
-		currentRenderer.toneMappingExposure = toneMappingExposure;
+		rendererCreationPromise = (async () => {
+			const antialias = config.getKey( 'project/renderer/antialias' ) !== undefined ? config.getKey( 'project/renderer/antialias' ) : true;
+			const shadows = config.getKey( 'project/renderer/shadows' ) !== undefined ? config.getKey( 'project/renderer/shadows' ) : true;
+			const shadowType = config.getKey( 'project/renderer/shadowType' ) !== undefined ? config.getKey( 'project/renderer/shadowType' ) : 1;
+			const toneMapping = config.getKey( 'project/renderer/toneMapping' ) !== undefined ? config.getKey( 'project/renderer/toneMapping' ) : 0;
+			const toneMappingExposure = config.getKey( 'project/renderer/toneMappingExposure' ) !== undefined ? config.getKey( 'project/renderer/toneMappingExposure' ) : 1;
 
-		
-		const shadowMapSize = config.getKey( 'project/shadowMapSize' ) || 2048;
-		currentRenderer.shadowMap.width = shadowMapSize;
-		currentRenderer.shadowMap.height = shadowMapSize;
+			currentRenderer = new WebGPURenderer( { antialias: antialias } );
+			await currentRenderer.init();
+			
+			currentRenderer.shadowMap.enabled = shadows;
+			currentRenderer.shadowMap.type = shadowType;
+			currentRenderer.toneMapping = toneMapping;
+			currentRenderer.toneMappingExposure = toneMappingExposure;
 
-		signals.rendererCreated.dispatch( currentRenderer );
-		signals.rendererUpdated.dispatch();
+			
+			const shadowMapSize = config.getKey( 'project/shadowMapSize' ) || 2048;
+			currentRenderer.shadowMap.width = shadowMapSize;
+			currentRenderer.shadowMap.height = shadowMapSize;
+
+			window.rendererInitialized = true;
+			console.log('[SidebarProjectRenderer] Renderer fully initialized');
+
+			signals.rendererCreated.dispatch( currentRenderer );
+			signals.rendererUpdated.dispatch();
+		})();
+
+		await rendererCreationPromise;
 
 	}
 
-	createRenderer();
+	createRenderer().catch( err => {
+		console.error( '[SidebarProjectRenderer] Failed to create renderer:', err );
+	} );
 
 
 	
 
 	signals.editorCleared.add( function () {
+
+		if ( ! currentRenderer ) return;
 
 		currentRenderer.shadowMap.enabled = true;
 		currentRenderer.shadowMap.type = THREE.PCFShadowMap;

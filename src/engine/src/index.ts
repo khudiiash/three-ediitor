@@ -29,5 +29,8 @@ export { MaterialAsset } from './assets/MaterialAsset';
 export type { TextureAssetMetadata } from './assets/TextureAsset';
 export type { MaterialAssetMetadata } from './assets/MaterialAsset';
 
+export { ParticleSystem } from './utils/ParticleSystem';
+export type { ParticleSystemConfig } from './utils/ParticleSystem';
+
 export type { ComponentConstructor } from './core/Component';
 export type { ScriptConstructor } from './core/Script';

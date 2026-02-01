@@ -2,7 +2,8 @@ import { UIPanel, UIRow, UISelect, UIText, UINumber, UIButton, UIColor, UIDiv } 
 import { UIBoolean } from './libs/ui.three.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 import { AssetSelector } from './AssetSelector.js';
-import * as THREE from 'three';
+import * as THREE from 'three/webgpu';
+import { WebGPURenderer } from 'three/webgpu';
 
 function SidebarSettings( editor ) {
 
@@ -20,7 +21,7 @@ function SidebarSettings( editor ) {
 
 	
 	const antialiasRow = new UIRow();
-	const antialiasBoolean = new UIBoolean( config.getKey( 'project/renderer/antialias' ) || true ).onChange( function () {
+	const antialiasBoolean = new UIBoolean( config.getKey( 'project/renderer/antialias' ) || true ).onChange( async function () {
 
 		if ( currentRenderer ) {
 
@@ -30,7 +31,8 @@ function SidebarSettings( editor ) {
 			const toneMapping = currentRenderer.toneMapping;
 			const toneMappingExposure = currentRenderer.toneMappingExposure;
 
-			currentRenderer = new THREE.WebGLRenderer( { antialias: this.getValue() } );
+			currentRenderer = new WebGPURenderer( { antialias: this.getValue() } );
+			await currentRenderer.init();
 			if ( currentRenderer.shadowMap ) {
 
 				currentRenderer.shadowMap.enabled = wasEnabled;

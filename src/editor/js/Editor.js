@@ -72,6 +72,8 @@ function Editor() {
 		objectAdded: new Signal(),
 		objectChanged: new Signal(),
 		objectRemoved: new Signal(),
+		
+		particleSystemChanged: new Signal(),
 
 		cameraAdded: new Signal(),
 		cameraRemoved: new Signal(),
@@ -119,6 +121,7 @@ function Editor() {
 	this.scene.name = 'Scene';
 
 	this.sceneHelpers = new THREE.Scene();
+	// Helper scene lighting - these warnings are expected with WebGPU
 	this.sceneHelpers.add( new THREE.HemisphereLight( 0xffffff, 0x888888, 2 ) );
 
 	this.object = {};

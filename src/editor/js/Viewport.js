@@ -18,8 +18,16 @@ import { SetScaleCommand } from './commands/SetScaleCommand.js';
 
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ViewportPathtracer } from './Viewport.Pathtracer.js';
-import { ParticleSystem, BatchedRenderer } from 'three.quarks';
-import { ParticleSystemFactory } from './ParticleSystemFactory.js';
+
+let ParticleSystem = null;
+(async () => {
+	try {
+		const engine = await import('../../engine/dist/three-engine.js');
+		ParticleSystem = engine.ParticleSystem;
+	} catch (e) {
+		console.warn('[Viewport] Could not import ParticleSystem:', e);
+	}
+})();
 
 function Viewport( editor ) {
 
@@ -33,43 +41,15 @@ function Viewport( editor ) {
 	container.add( new ViewportControls( editor ) );
 	container.add( new ViewportInfo( editor ) );
 
-	//
+let renderer = null;
+let pmremGenerator = null;
+let pathtracer = null;
+let currentParticleSystem = null; // Currently visible particle system
 
-	let renderer = null;
-	let pmremGenerator = null;
-	let pathtracer = null;
-	let particleRenderer = null;
-	let currentParticleSystem = null;
-	let particleTexture = null;
-
-	const camera = editor.camera;
+const camera = editor.camera;
 	const scene = editor.scene;
 	const sceneHelpers = editor.sceneHelpers;
 	
-	function createParticleTexture() {
-		if ( particleTexture ) return particleTexture;
-		
-		const canvas = document.createElement( 'canvas' );
-		canvas.width = 64;
-		canvas.height = 64;
-		const context = canvas.getContext( '2d' );
-		
-		const gradient = context.createRadialGradient( 32, 32, 0, 32, 32, 32 );
-		gradient.addColorStop( 0, 'rgba(255, 255, 255, 1)' );
-		gradient.addColorStop( 0.5, 'rgba(255, 255, 255, 0.8)' );
-		gradient.addColorStop( 1, 'rgba(255, 255, 255, 0)' );
-		
-		context.fillStyle = gradient;
-		context.fillRect( 0, 0, 64, 64 );
-		
-		particleTexture = new THREE.CanvasTexture( canvas );
-		particleTexture.needsUpdate = true;
-		
-		return particleTexture;
-	}
-
-	
-
 	const GRID_COLORS_LIGHT = [ 0x999999, 0x777777 ];
 	const GRID_COLORS_DARK = [ 0x555555, 0x888888 ];
 
@@ -156,6 +136,10 @@ function Viewport( editor ) {
 		const object = transformControls.object;
 		if ( !object ) return;
 
+		if ( object.userData && object.userData.isParticleSystem ) {
+			console.log('[TransformControls] objectChange - particle system position:', object.position.x.toFixed(2), object.position.y.toFixed(2), object.position.z.toFixed(2));
+		}
+
 		if ( isCtrlPressed ) {
 			const mode = transformControls.getMode();
 
@@ -182,6 +166,9 @@ function Viewport( editor ) {
 
 		const object = transformControls.object;
 
+		console.log('[TransformControls] mouseDown - object:', object?.name, 'isParticleSystem:', object?.userData?.isParticleSystem);
+		console.log('[TransformControls] controls.enabled BEFORE disable:', controls.enabled);
+
 		objectPositionOnDown = object.position.clone();
 		objectRotationOnDown = object.rotation.clone();
 		objectScaleOnDown = object.scale.clone();
@@ -190,25 +177,30 @@ function Viewport( editor ) {
 		transformObject = object;
 
 		controls.enabled = false;
+		console.log('[TransformControls] controls.enabled AFTER disable:', controls.enabled);
 
 	} );
 	transformControls.addEventListener( 'mouseUp', function () {
 
 		const object = transformControls.object;
 
-		if ( object !== undefined ) {
+		console.log('[TransformControls] mouseUp - object:', object?.name, 'isParticleSystem:', object?.userData?.isParticleSystem);
 
-			switch ( transformControls.getMode() ) {
+		try {
+			if ( object !== undefined ) {
 
-				case 'translate':
+				switch ( transformControls.getMode() ) {
 
-					if ( ! objectPositionOnDown.equals( object.position ) ) {
+					case 'translate':
 
-						editor.execute( new SetPositionCommand( editor, object, object.position, objectPositionOnDown ) );
+						if ( ! objectPositionOnDown.equals( object.position ) ) {
 
-					}
+							console.log('[TransformControls] Position changed from', objectPositionOnDown, 'to', object.position);
+							editor.execute( new SetPositionCommand( editor, object, object.position, objectPositionOnDown ) );
 
-					break;
+						}
+
+						break;
 
 				case 'rotate':
 
@@ -233,10 +225,15 @@ function Viewport( editor ) {
 			}
 
 		}
+		} catch ( error ) {
+			console.error('[TransformControls] Error in mouseUp handler:', error);
+		}
 
 		isTransformInProgress = false;
 		transformObject = null;
 		controls.enabled = true;
+		
+		console.log('[TransformControls] mouseUp complete - controls.enabled:', controls.enabled);
 
 	} );
 
@@ -380,7 +377,7 @@ function Viewport( editor ) {
 
 		
 
-		if ( event.target !== renderer.domElement ) return;
+		if ( !renderer || event.target !== renderer.domElement ) return;
 
 		const array = getMousePosition( container.dom, event.clientX, event.clientY );
 		onDownPosition.fromArray( array );
@@ -464,7 +461,7 @@ function Viewport( editor ) {
 	signals.editorCleared.add( function () {
 
 		controls.center.set( 0, 0, 0 );
-		pathtracer.reset();
+		if ( pathtracer ) pathtracer.reset();
 
 		initPT();
 		render();
@@ -516,7 +513,7 @@ function Viewport( editor ) {
 
 			renderer.setAnimationLoop( null );
 			renderer.dispose();
-			pmremGenerator.dispose();
+			if ( pmremGenerator ) pmremGenerator.dispose();
 
 			container.dom.removeChild( renderer.domElement );
 
@@ -536,6 +533,8 @@ function Viewport( editor ) {
 		if ( previewRenderer !== null ) {
 			previewRenderer.dispose();
 		}
+		// Use WebGL for small camera preview window (not main viewport)
+		// This is intentional - the preview doesn't need WebGPU overhead
 		previewRenderer = new THREE.WebGLRenderer( { canvas: previewCanvas, antialias: true } );
 		previewRenderer.setSize( 200, 150 );
 		previewRenderer.setPixelRatio( window.devicePixelRatio );
@@ -558,8 +557,8 @@ function Viewport( editor ) {
 			mediaQuery.addEventListener( 'change', function ( event ) {
 
 				const newClearColor = event.matches ? 0x333333 : 0xaaaaaa;
-				renderer.setClearColor( newClearColor );
-				previewRenderer.setClearColor( newClearColor );
+				if ( renderer ) renderer.setClearColor( newClearColor );
+				if ( previewRenderer ) previewRenderer.setClearColor( newClearColor );
 				updateGridColors( grid1, grid2, event.matches ? GRID_COLORS_DARK : GRID_COLORS_LIGHT );
 
 				render();
@@ -571,8 +570,16 @@ function Viewport( editor ) {
 		}
 
 		renderer.setPixelRatio( window.devicePixelRatio );
-		renderer.setSize( container.dom.offsetWidth, container.dom.offsetHeight );
+		
+		// Ensure container has valid dimensions before setting renderer size
+		const width = Math.max( container.dom.offsetWidth, 1 );
+		const height = Math.max( container.dom.offsetHeight, 1 );
+		renderer.setSize( width, height );
 
+		// Note: WebGPU renderer requires node-based materials and lights
+		// Legacy lights (HemisphereLight, DirectionalLight, etc.) will show warnings
+		// but basic lighting should still work through fallback systems
+		
 		pmremGenerator = new THREE.PMREMGenerator( renderer );
 		pmremGenerator.compileEquirectangularShader();
 
@@ -699,22 +706,6 @@ function Viewport( editor ) {
 
 	} );
 
-	signals.objectAdded.add( function ( object ) {
-
-		if ( object && object.userData && object.userData.isParticleSystem ) {
-			if ( !particleRenderer ) {
-				particleRenderer = new BatchedRenderer();
-				particleRenderer.visible = true;
-				particleRenderer.name = 'BatchedRenderer';
-				particleRenderer.userData.skipSerialization = true;
-				scene.add( particleRenderer );
-			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
-				scene.add( particleRenderer );
-			}
-		}
-
-	} );
-
 	signals.sceneGraphChanged.add( function () {
 
 		initPT();
@@ -724,7 +715,7 @@ function Viewport( editor ) {
 
 	signals.cameraChanged.add( function () {
 
-		pathtracer.reset();
+		if ( pathtracer ) pathtracer.reset();
 
 		render();
 
@@ -732,59 +723,65 @@ function Viewport( editor ) {
 
 	signals.objectSelected.add( function ( object ) {
 
+		console.log('[Viewport] objectSelected -', object?.name, 'isParticleSystem:', object?.userData?.isParticleSystem);
+
 		selectionBox.visible = false;
 		transformControls.detach();
 
-		if ( currentParticleSystem && particleRenderer ) {
-			if ( particleRenderer.removeSystem ) {
-					particleRenderer.removeSystem( currentParticleSystem );
+		// Hide previous particle system when selecting something else
+		if ( currentParticleSystem ) {
+			const particles = currentParticleSystem.getPointsObject();
+			if ( particles ) {
+				particles.visible = false;
 			}
-			if ( currentParticleSystem.emitter.parent ) {
-				currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
-			}
-			currentParticleSystem = null;
 		}
 
 		if ( object !== null && object.userData && object.userData.isParticleSystem ) {
-			if ( !particleRenderer ) {
-				particleRenderer = new BatchedRenderer();
-				particleRenderer.visible = true;
-				particleRenderer.name = 'BatchedRenderer';
-				particleRenderer.userData.skipSerialization = true;
-				scene.add( particleRenderer );
-			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
-				scene.add( particleRenderer );
+			const particleData = object.userData.particleSystem || {};
+			
+			if ( ParticleSystem && renderer && renderer.backend && renderer.backend.isWebGPUBackend ) {
+				
+				const config = {
+					maxParticles: Math.min(particleData.maxParticles || 1000, 1000),
+					emissionRate: particleData.emissionRate || 50,
+					lifetime: particleData.lifetime || 2,
+					startSize: particleData.startSize || 0.1,
+					endSize: particleData.endSize || 0.05,
+					startColor: particleData.startColor ? new THREE.Color(particleData.startColor) : new THREE.Color(0xffffff),
+					endColor: particleData.endColor ? new THREE.Color(particleData.endColor) : new THREE.Color(0x888888),
+					velocity: particleData.velocity ? new THREE.Vector3().fromArray(particleData.velocity) : new THREE.Vector3(0, 1, 0),
+					gravity: particleData.gravity ? new THREE.Vector3().fromArray(particleData.gravity) : new THREE.Vector3(0, -9.8, 0),
+					spread: particleData.spread !== undefined ? particleData.spread : 0.5
+				};
+				
+				currentParticleSystem = new ParticleSystem(config);
+				
+				currentParticleSystem.initializeWithRenderer(renderer).then(() => {
+					const particles = currentParticleSystem.getPointsObject();
+					if ( particles ) {
+						particles.name = 'ParticlePreview_WebGPU';
+						particles.userData.skipSerialization = true;
+						particles.userData.particleEntityUuid = object.uuid; // Track which entity this belongs to
+						
+						// Position at the particle system object
+						object.getWorldPosition(particles.position);
+						object.getWorldQuaternion(particles.quaternion);
+						
+						// Update emitter position
+						object.getWorldPosition(currentParticleSystem.emitter.position);
+						
+						scene.add(particles);
+						render();
+						
+						console.log('[Viewport] WebGPU particle system ready for entity:', object.uuid);
+					}
+				}).catch(e => {
+					console.warn('[Viewport] Failed to initialize WebGPU particles:', e);
+					currentParticleSystem = null;
+				});
+				
+				return;
 			}
-
-		const particleData = object.userData.particleSystem || {};
-
-		
-		if ( !particleTexture ) {
-			particleTexture = ParticleSystemFactory.createParticleTexture();
-		}
-		
-		currentParticleSystem = ParticleSystemFactory.createParticleSystem( particleData, particleTexture );
-			
-			currentParticleSystem.emitter.name = object.name || 'ParticleSystem';
-			currentParticleSystem.emitter.__entity = null;
-			currentParticleSystem.emitter.userData.skipSerialization = true;
-			currentParticleSystem.emitter.visible = true;
-			
-			object.getWorldPosition( currentParticleSystem.emitter.position );
-			object.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
-
-			scene.add( currentParticleSystem.emitter );
-			particleRenderer.addSystem( currentParticleSystem );
-			
-			if ( scene.children.indexOf( particleRenderer ) === -1 ) {
-				scene.add( particleRenderer );
-			}
-			
-			for ( let i = 0; i < 20; i++ ) {
-				particleRenderer.update( 0.016 );
-			}
-			
-			render();
 		}
 
 		if ( object !== null && ( object.isPerspectiveCamera || object.isOrthographicCamera ) && object !== camera ) {
@@ -801,78 +798,29 @@ function Viewport( editor ) {
 
 		if ( object !== null && object !== scene && object !== camera ) {
 
-			box.setFromObject( object, true );
+			console.log('[Viewport] Setting up selection box and transform controls for:', object.name);
 
-			if ( box.isEmpty() === false ) {
+			// Skip bounding box for particle systems to prevent camera issues
+			if ( !( object.userData && object.userData.isParticleSystem ) ) {
+				box.setFromObject( object, true );
+				console.log('[Viewport] Box from object:', box.min, box.max);
 
-				selectionBox.visible = true;
+				if ( box.isEmpty() === false ) {
 
+					selectionBox.visible = true;
+
+				}
+			} else {
+				console.log('[Viewport] Particle system - skipping bounding box');
+				selectionBox.visible = false;
 			}
 
 			transformControls.attach( object );
+			console.log('[Viewport] TransformControls attached to:', object.name);
 
 		}
 
 		render();
-
-	} );
-
-	signals.objectChanged.add( function ( object ) {
-
-		if ( object && object.userData && object.userData.isParticleSystem ) {
-			if ( !currentParticleSystem && editor.selected === object ) {
-				signals.objectSelected.dispatch( object );
-				return;
-			}
-			
-			if ( !currentParticleSystem ) return;
-			if ( !particleRenderer ) {
-				particleRenderer = new BatchedRenderer();
-				particleRenderer.visible = true;
-				particleRenderer.name = 'BatchedRenderer';
-				particleRenderer.userData.skipSerialization = true;
-				scene.add( particleRenderer );
-			} else if ( scene.children.indexOf( particleRenderer ) === -1 ) {
-				scene.add( particleRenderer );
-			}
-
-			const particleData = object.userData.particleSystem || {};
-			
-			if ( particleRenderer.removeSystem ) {
-				particleRenderer.removeSystem( currentParticleSystem );
-			}
-			if ( currentParticleSystem.emitter.parent ) {
-				currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
-			}
-
-			
-			if ( !particleTexture ) {
-				particleTexture = ParticleSystemFactory.createParticleTexture();
-			}
-			
-			currentParticleSystem = ParticleSystemFactory.createParticleSystem( particleData, particleTexture );
-			
-			currentParticleSystem.emitter.name = object.name || 'ParticleSystem';
-			currentParticleSystem.emitter.__entity = null;
-			currentParticleSystem.emitter.userData.skipSerialization = true;
-			currentParticleSystem.emitter.visible = true;
-			
-			object.getWorldPosition( currentParticleSystem.emitter.position );
-			object.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
-			
-
-			scene.add( currentParticleSystem.emitter );
-			particleRenderer.addSystem( currentParticleSystem );
-			
-			if ( scene.children.indexOf( particleRenderer ) === -1 ) {
-				scene.add( particleRenderer );
-			}
-			
-			for ( let i = 0; i < 20; i++ ) {
-				particleRenderer.update( 0.016 );
-			}
-			render();
-		}
 
 	} );
 
@@ -886,7 +834,10 @@ function Viewport( editor ) {
 
 		if ( object !== undefined ) {
 
-			box.setFromObject( object, true );
+			// Skip bounding box for particle systems
+			if ( !( object.userData && object.userData.isParticleSystem ) ) {
+				box.setFromObject( object, true );
+			}
 
 		}
 
@@ -899,7 +850,10 @@ function Viewport( editor ) {
 
 		if ( editor.selected === object ) {
 
-			box.setFromObject( object, true );
+			// Skip bounding box for particle systems
+			if ( !( object.userData && object.userData.isParticleSystem ) ) {
+				box.setFromObject( object, true );
+			}
 
 		}
 
@@ -922,6 +876,69 @@ function Viewport( editor ) {
 
 	} );
 
+	// Handle particle system parameter changes - recreate particle system immediately
+	signals.particleSystemChanged.add( function ( object ) {
+		if ( !object || !object.userData || !object.userData.isParticleSystem ) {
+			return;
+		}
+		
+		const entityUuid = object.uuid;
+		const particleData = object.userData.particleSystem || {};
+		
+		console.log('[Viewport] Particle system parameters changed, recreating...', entityUuid);
+		
+		// Dispose current system if it exists
+		if ( currentParticleSystem ) {
+			const particles = currentParticleSystem.getPointsObject();
+			if ( particles && particles.parent ) {
+				particles.parent.remove(particles);
+			}
+			currentParticleSystem.dispose();
+			currentParticleSystem = null;
+		}
+		
+		// Recreate particle system with new parameters
+		if ( ParticleSystem && renderer && renderer.backend && renderer.backend.isWebGPUBackend ) {
+			const config = {
+				maxParticles: Math.min(particleData.maxParticles || 1000, 1000),
+				emissionRate: particleData.emissionRate || 50,
+				lifetime: particleData.lifetime || 2,
+				startSize: particleData.startSize || 0.1,
+				endSize: particleData.endSize || 0.05,
+				startColor: particleData.startColor ? new THREE.Color(particleData.startColor) : new THREE.Color(0xffffff),
+				endColor: particleData.endColor ? new THREE.Color(particleData.endColor) : new THREE.Color(0x888888),
+				velocity: particleData.velocity ? new THREE.Vector3().fromArray(particleData.velocity) : new THREE.Vector3(0, 1, 0),
+				gravity: particleData.gravity ? new THREE.Vector3().fromArray(particleData.gravity) : new THREE.Vector3(0, -9.8, 0),
+				spread: particleData.spread !== undefined ? particleData.spread : 0.5
+			};
+			
+			currentParticleSystem = new ParticleSystem(config);
+			
+			// Initialize and add to scene
+			currentParticleSystem.initializeWithRenderer(renderer).then(() => {
+				const particles = currentParticleSystem.getPointsObject();
+				if ( particles ) {
+					particles.name = 'ParticlePreview_WebGPU';
+					particles.userData.skipSerialization = true;
+					particles.userData.particleEntityUuid = entityUuid;
+					
+					// Position at the particle system object
+					object.getWorldPosition(particles.position);
+					object.getWorldQuaternion(particles.quaternion);
+					object.getWorldPosition(currentParticleSystem.emitter.position);
+					
+					scene.add(particles);
+					render();
+					
+					console.log('[Viewport] Recreated WebGPU particle system with new parameters');
+				}
+			}).catch(e => {
+				console.warn('[Viewport] Failed to recreate particle system:', e);
+				currentParticleSystem = null;
+			});
+		}
+	} );
+
 	signals.objectRemoved.add( function ( object ) {
 
 		if ( object === transformControls.object ) {
@@ -931,79 +948,18 @@ function Viewport( editor ) {
 		}
 
 		if ( object && object.userData && object.userData.isParticleSystem ) {
-			if ( currentParticleSystem && currentParticleSystem.emitter ) {
-				const emitterParent = currentParticleSystem.emitter.parent;
-				if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
-					if ( particleRenderer && particleRenderer.removeSystem ) {
-						particleRenderer.removeSystem( currentParticleSystem );
+			// Dispose current particle system if it matches this object
+			if ( currentParticleSystem ) {
+				try {
+					const particles = currentParticleSystem.getPointsObject();
+					if ( particles && particles.parent ) {
+						particles.parent.remove(particles);
 					}
-					if ( currentParticleSystem.emitter.parent ) {
-						currentParticleSystem.emitter.parent.remove( currentParticleSystem.emitter );
-					}
-					if ( scene.children.indexOf( currentParticleSystem.emitter ) !== -1 ) {
-						scene.remove( currentParticleSystem.emitter );
-					}
+					currentParticleSystem.dispose();
 					currentParticleSystem = null;
+				} catch (e) {
+					console.warn('[Viewport] Error disposing particle system:', e);
 				}
-			}
-			
-			if ( particleRenderer && particleRenderer.systems ) {
-				for ( let i = particleRenderer.systems.length - 1; i >= 0; i-- ) {
-					const system = particleRenderer.systems[ i ];
-					if ( system && system.emitter ) {
-						const emitterParent = system.emitter.parent;
-						if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
-							if ( particleRenderer.removeSystem ) {
-								particleRenderer.removeSystem( system );
-							}
-							if ( system.emitter.parent ) {
-								system.emitter.parent.remove( system.emitter );
-							}
-							if ( scene.children.indexOf( system.emitter ) !== -1 ) {
-								scene.remove( system.emitter );
-							}
-						}
-					}
-				}
-			}
-			
-			const emittersToRemove = [];
-			scene.traverse( function ( child ) {
-				if ( child.type === 'ParticleEmitter' ) {
-					const emitterParent = child.parent;
-					if ( emitterParent === object || ( emitterParent && emitterParent.uuid === object.uuid ) ) {
-						emittersToRemove.push( child );
-					}
-				}
-			} );
-			
-			for ( let i = 0; i < emittersToRemove.length; i++ ) {
-				const emitter = emittersToRemove[ i ];
-				if ( emitter.parent ) {
-					emitter.parent.remove( emitter );
-				}
-				if ( scene.children.indexOf( emitter ) !== -1 ) {
-					scene.remove( emitter );
-				}
-			}
-			
-			const entityObject = object;
-			if ( entityObject && entityObject.parent ) {
-				entityObject.parent.remove( entityObject );
-			}
-			if ( scene.children.indexOf( entityObject ) !== -1 ) {
-				scene.remove( entityObject );
-			}
-			
-			let hasParticleSystem = false;
-			scene.traverse( function ( child ) {
-				if ( child.userData && child.userData.isParticleSystem && child.parent !== null ) {
-					hasParticleSystem = true;
-				}
-			} );
-			
-			if ( !hasParticleSystem && particleRenderer && scene.children.indexOf( particleRenderer ) !== -1 ) {
-				scene.remove( particleRenderer );
 			}
 		}
 
@@ -1201,7 +1157,7 @@ function Viewport( editor ) {
 		switch ( viewportShading ) {
 
 			case 'realistic':
-				pathtracer.init( scene, editor.viewportCamera );
+				if ( pathtracer ) pathtracer.init( scene, editor.viewportCamera );
 				break;
 
 			case 'solid':
@@ -1228,8 +1184,16 @@ function Viewport( editor ) {
 
 		updateAspectRatio();
 
-		renderer.setSize( container.dom.offsetWidth, container.dom.offsetHeight );
-		pathtracer.setSize( container.dom.offsetWidth, container.dom.offsetHeight );
+		if ( renderer ) {
+			const width = Math.max( container.dom.offsetWidth, 1 );
+			const height = Math.max( container.dom.offsetHeight, 1 );
+			renderer.setSize( width, height );
+		}
+		if ( pathtracer ) {
+			const width = Math.max( container.dom.offsetWidth, 1 );
+			const height = Math.max( container.dom.offsetHeight, 1 );
+			pathtracer.setSize( width, height );
+		}
 
 		render();
 
@@ -1305,14 +1269,19 @@ function Viewport( editor ) {
 
 		let needsUpdate = false;
 
-		if ( particleRenderer ) {
-			try {
-				particleRenderer.update( delta );
-				if ( currentParticleSystem ) {
+		// Update WebGPU particle system if active
+		if ( currentParticleSystem ) {
+			const particles = currentParticleSystem.getPointsObject();
+			// Only update if particles are visible (i.e., particle system is selected)
+			if ( particles && particles.visible && editor.selected && editor.selected.userData && editor.selected.userData.isParticleSystem ) {
+				try {
+					// Update emitter position to follow selected object
+					editor.selected.getWorldPosition(currentParticleSystem.emitter.position);
+					currentParticleSystem.update(delta);
 					needsUpdate = true;
+				} catch (e) {
+					console.warn('[Viewport] Error updating WebGPU particle system:', e);
 				}
-			} catch ( e ) {
-				console.error( '[Viewport] Error updating particle system:', e );
 			}
 		}
 
@@ -1325,13 +1294,6 @@ function Viewport( editor ) {
 			mixer.update( delta );
 			needsUpdate = true;
 
-			if ( editor.selected !== null ) {
-
-				editor.selected.updateWorldMatrix( false, true );
-				selectionBox.box.setFromObject( editor.selected, true );
-
-			}
-
 		}
 
 		if ( ! isPlaying && viewHelper.animating === true ) {
@@ -1341,7 +1303,7 @@ function Viewport( editor ) {
 
 		}
 
-		if ( renderer.xr.isPresenting === true ) {
+		if ( renderer && renderer.xr && renderer.xr.isPresenting === true ) {
 
 			needsUpdate = true;
 
@@ -1355,7 +1317,7 @@ function Viewport( editor ) {
 
 	function initPT() {
 
-		if ( editor.viewportShading === 'realistic' ) {
+		if ( editor.viewportShading === 'realistic' && pathtracer ) {
 
 			pathtracer.init( scene, editor.viewportCamera );
 
@@ -1365,7 +1327,7 @@ function Viewport( editor ) {
 
 	function updatePTBackground() {
 
-		if ( editor.viewportShading === 'realistic' ) {
+		if ( editor.viewportShading === 'realistic' && pathtracer ) {
 
 			pathtracer.setBackground( scene.background, scene.backgroundBlurriness );
 
@@ -1375,7 +1337,7 @@ function Viewport( editor ) {
 
 	function updatePTEnvironment() {
 
-		if ( editor.viewportShading === 'realistic' ) {
+		if ( editor.viewportShading === 'realistic' && pathtracer ) {
 
 			pathtracer.setEnvironment( scene.environment );
 
@@ -1385,7 +1347,7 @@ function Viewport( editor ) {
 
 	function updatePTMaterials() {
 
-		if ( editor.viewportShading === 'realistic' ) {
+		if ( editor.viewportShading === 'realistic' && pathtracer ) {
 
 			pathtracer.updateMaterials();
 
@@ -1395,7 +1357,7 @@ function Viewport( editor ) {
 
 	function updatePT() {
 
-		if ( editor.viewportShading === 'realistic' ) {
+		if ( editor.viewportShading === 'realistic' && pathtracer ) {
 
 			pathtracer.update();
 			editor.signals.pathTracerUpdated.dispatch( pathtracer.getSamples() );
@@ -1411,13 +1373,10 @@ function Viewport( editor ) {
 
 	function render() {
 
-		startTime = performance.now();
+		// Don't render if renderer isn't ready yet
+		if ( ! renderer ) return;
 
-		if ( currentParticleSystem && currentParticleSystem.emitter && editor.selected && editor.selected.userData && editor.selected.userData.isParticleSystem ) {
-			editor.selected.getWorldPosition( currentParticleSystem.emitter.position );
-			editor.selected.getWorldQuaternion( currentParticleSystem.emitter.quaternion );
-			
-		}
+		startTime = performance.now();
 
 		renderer.setViewport( 0, 0, container.dom.offsetWidth, container.dom.offsetHeight );
 		renderer.render( scene, editor.viewportCamera );
@@ -1427,7 +1386,7 @@ function Viewport( editor ) {
 		renderer.autoClear = false;
 		if ( grid.visible === true ) renderer.render( grid, camera );
 		if ( ! isPlaying && sceneHelpers.visible === true ) renderer.render( sceneHelpers, camera );
-		if ( ! isPlaying && renderer.xr.isPresenting !== true ) viewHelper.render( renderer );
+		if ( ! isPlaying && renderer.xr && renderer.xr.isPresenting !== true ) viewHelper.render( renderer );
 		renderer.autoClear = true;
 
 		}

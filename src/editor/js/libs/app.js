@@ -1,9 +1,9 @@
 var APP = {
 
-	Player: function () {
+	Player: async function () {
 
-		var renderer = new THREE.WebGLRenderer( { antialias: true } );
-		renderer.setPixelRatio( window.devicePixelRatio ); // TODO: Use player.setPixelRatio()
+		var renderer = await WebGPURenderer.createRenderer( { antialias: true } );
+		renderer.setPixelRatio( window.devicePixelRatio );
 
 		var loader = new THREE.ObjectLoader();
 		var camera, scene;

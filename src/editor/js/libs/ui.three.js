@@ -17,7 +17,6 @@ class UITexture extends UISpan {
 		const scope = this;
 		this.editor = editor;
 
-		// Initialize asset selector (lazy load)
 		if ( ! editor.assetSelector ) {
 			editor.assetSelector = new AssetSelector( editor );
 		}
@@ -42,16 +41,13 @@ class UITexture extends UISpan {
 		canvas.style.border = '1px solid #888';
 		canvas.style.position = 'relative';
 		
-		// Click to open asset selector
 		canvas.addEventListener( 'click', function ( event ) {
 
-			// Right click or Ctrl+click for file input fallback
 			if ( event.ctrlKey || event.metaKey || event.button === 2 ) {
 				input.click();
 				return;
 			}
 
-			// Show asset selector
 			editor.assetSelector.show( function ( texture ) {
 
 				if ( texture !== null ) {
@@ -63,7 +59,6 @@ class UITexture extends UISpan {
 
 		} );
 
-		// Drag and drop support
 		canvas.addEventListener( 'dragover', function ( event ) {
 
 			event.preventDefault();
@@ -89,27 +84,22 @@ class UITexture extends UISpan {
 			canvas.style.borderColor = '#888';
 			canvas.style.background = 'transparent';
 
-			// Check if it's an asset drop (from asset panel)
 			const assetData = event.dataTransfer.getData( 'text/plain' );
 			if ( assetData ) {
 				try {
 					const asset = JSON.parse( assetData );
-					// Check if it's a texture asset or a file that looks like a texture
 					const isTextureAsset = asset.type === 'texture' || 
 					                      ( asset.type === 'file' && asset.name && 
 					                        [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ]
 					                          .includes( asset.name.split( '.' ).pop()?.toLowerCase() ) );
 					if ( isTextureAsset ) {
-						// Load texture from asset path
 						loadTextureFromAsset( asset );
 						return;
 					}
 				} catch ( e ) {
-					// Not JSON, continue with file drop
 				}
 			}
 
-			// Fallback to file drop
 			if ( event.dataTransfer.files && event.dataTransfer.files.length > 0 ) {
 				loadFile( event.dataTransfer.files[ 0 ] );
 			}
@@ -137,7 +127,6 @@ class UITexture extends UISpan {
 
 				reader.addEventListener( 'load', async function ( event ) {
 
-					// assuming RGBE/Radiance HDR image format
 
 					const { HDRLoader } = await import( 'three/addons/loaders/HDRLoader.js' );
 
@@ -275,7 +264,6 @@ class UITexture extends UISpan {
 		this.texture = null;
 		this.onChangeCallback = null;
 
-		// Helper function to load texture from asset
 		async function loadTextureFromAsset( asset ) {
 
 			const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
@@ -635,24 +623,19 @@ class UIOutliner extends UIDiv {
 
 			if ( this === currentDrag || currentDrag === undefined ) return;
 
-			// Preserve existing classes and styles
 			const hasSceneTreeItem = this.classList.contains( 'scene-tree-item' );
 			const treeIndent = this.style.getPropertyValue( '--tree-indent' );
 
-			// Remove drag classes
 			this.classList.remove( 'dragTop', 'dragBottom', 'drag' );
 
-			// Ensure scene-tree-item class is preserved
 			if ( hasSceneTreeItem && !this.classList.contains( 'scene-tree-item' ) ) {
 				this.classList.add( 'scene-tree-item' );
 			}
 
-			// Ensure option class is present
 			if ( !this.classList.contains( 'option' ) ) {
 				this.classList.add( 'option' );
 			}
 
-			// Restore tree indent if it was set
 			if ( treeIndent ) {
 				this.style.setProperty( '--tree-indent', treeIndent );
 			}
@@ -725,7 +708,6 @@ class UIOutliner extends UIDiv {
 		for ( let i = 0; i < options.length; i ++ ) {
 
 			const div = options[ i ];
-			// Preserve existing classes (like 'scene-tree-item') and add 'option'
 			if ( !div.classList.contains( 'option' ) ) {
 				div.classList.add( 'option' );
 			}
@@ -738,7 +720,7 @@ class UIOutliner extends UIDiv {
 			if ( div.draggable === true && !div.classList.contains( 'system-entity' ) ) {
 
 				div.addEventListener( 'drag', onDrag );
-				div.addEventListener( 'dragstart', onDragStart ); // Firefox needs this
+				div.addEventListener( 'dragstart', onDragStart );
 
 				div.addEventListener( 'dragover', onDragOver );
 				div.addEventListener( 'dragleave', onDragLeave );
@@ -1102,6 +1084,8 @@ function renderToCanvas( texture ) {
 
 	if ( renderer === undefined ) {
 
+		// Use async renderer creation, but for this simple canvas render we can use WebGL
+		// as it's just for texture preview, not main scene rendering
 		renderer = new THREE.WebGLRenderer();
 
 	}

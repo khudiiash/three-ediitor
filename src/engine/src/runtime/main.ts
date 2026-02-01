@@ -12,7 +12,7 @@ async function main() {
         return;
     }
 
-    pc.init(canvas, {
+    await pc.init(canvas, {
         antialias: true,
         alpha: false,
         powerPreference: 'high-performance'

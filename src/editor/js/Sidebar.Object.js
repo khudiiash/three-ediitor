@@ -20,6 +20,7 @@ import { SidebarGeometry } from './Sidebar.Geometry.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
 import { SidebarSceneSettings } from './Sidebar.Scene.Settings.js';
 import { SidebarAsset } from './Sidebar.Asset.js';
+import { SidebarParticleSystem } from './Sidebar.ParticleSystem.js';
 
 function SidebarObject( editor ) {
 
@@ -39,9 +40,11 @@ function SidebarObject( editor ) {
 
 	const geometryContent = new SidebarGeometry( editor );
 	const materialContent = new SidebarMaterial( editor );
+	const particleContent = new SidebarParticleSystem( editor );
 
 	geometryPanel.add( geometryContent );
 	materialPanel.add( materialContent );
+	particlePanel.add( particleContent );
 
 	geometryPanel.collapse();
 	materialPanel.collapse();
@@ -229,6 +232,8 @@ function SidebarObject( editor ) {
 	objectNearFarRow.add( nearFarInputsContainer );
 	cameraPanel.add( objectNearFarRow );
 
+	// Old particle system UI removed - now using Sidebar.ParticleSystem.js
+	/*
 	const particleDurationRow = new UIRow();
 	const particleDuration = new UINumber( 1 ).setRange( 0, Infinity ).onChange( update );
 	particleDurationRow.add( new UIText( 'Duration' ).setClass( 'Label' ) );
@@ -535,6 +540,8 @@ function SidebarObject( editor ) {
 	}
 	
 	particlePanel.add( behaviorsContainer );
+	*/
+	// End of old particle system UI
 
 	const objectIntensityRow = new UIRow();
 	const objectIntensity = new UINumber().onChange( update );
@@ -907,6 +914,7 @@ function SidebarObject( editor ) {
 
 			}
 
+			/* Old particle system update code removed - now handled by Sidebar.ParticleSystem.js
 			if ( object.userData && object.userData.isParticleSystem ) {
 
 				if ( !object.userData.particleSystem ) {
@@ -1100,6 +1108,8 @@ function SidebarObject( editor ) {
 				}
 
 			}
+			*/
+			// End of old particle system update code
 
 			if ( object.castShadow !== undefined && object.castShadow !== objectCastShadow.getValue() ) {
 
@@ -1624,6 +1634,7 @@ function SidebarObject( editor ) {
 		objectFrustumCulled.setValue( object.frustumCulled );
 		objectRenderOrder.setValue( object.renderOrder );
 
+		/* Old particle system UI population code removed - now handled by Sidebar.ParticleSystem.js
 		if ( object.userData && object.userData.isParticleSystem ) {
 
 			const particleData = object.userData.particleSystem || {};
@@ -1772,6 +1783,8 @@ function SidebarObject( editor ) {
 			}
 
 		}
+		*/
+		// End of old particle system UI population code
 
 	}
 

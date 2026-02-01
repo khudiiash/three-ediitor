@@ -6,7 +6,13 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = resolve(__dirname, '../..');
 
 export default defineConfig({
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext' // Support top-level await
+    }
+  },
   build: {
+    target: 'esnext', // Support top-level await and modern features
     lib: {
       entry: resolve(process.cwd(), 'src/index.ts'),
       name: 'ThreeEngine',
@@ -15,7 +21,7 @@ export default defineConfig({
     },
     rollupOptions: {
       
-      external: ['three'],
+      external: ['three', 'three/webgpu', 'three/examples/jsm/capabilities/WebGPU.js'],
       output: {
         
         preserveModules: false,

@@ -18,21 +18,21 @@
 			"name": "Camera",
 			"layers": 1,
 			"matrix": [
-				1,
+				0.9997468856785308,
+				-4.336808689942014e-19,
+				-0.022498101610511564,
 				0,
+				-0.0021038152410779738,
+				0.9956182663401312,
+				-0.09348712045677825,
 				0,
+				0.02239952092140165,
+				0.09351078937678128,
+				0.9953662610982046,
 				0,
-				0,
-				0.8944271909999153,
-				-0.44721359549995787,
-				0,
-				0,
-				0.44721359549995787,
-				0.8944271909999153,
-				0,
-				0,
-				1.6718842844495843,
-				3.3437685688991197,
+				0.532639114346068,
+				3.823478777788546,
+				9.813308266532536,
 				1
 			],
 			"up": [
@@ -52,9 +52,9 @@
 	},
 	"controls": {
 		"center": [
-			0,
-			0,
-			0
+			0.29953846604490436,
+			2.8503586068988684,
+			-0.5449722330031715
 		]
 	},
 	"scene": {
@@ -65,7 +65,7 @@
 		},
 		"geometries": [
 			{
-				"uuid": "888e0f6c-f827-4de2-b5d5-430f87e252e8",
+				"uuid": "51f9eb6d-7cfc-4558-8034-ade9e5f936bc",
 				"type": "BoxGeometry",
 				"width": 1,
 				"height": 1,
@@ -73,11 +73,38 @@
 				"widthSegments": 1,
 				"heightSegments": 1,
 				"depthSegments": 1
+			},
+			{
+				"uuid": "4052ae9a-013e-48f9-ab35-73bdbf88c263",
+				"type": "CapsuleGeometry",
+				"radius": 1,
+				"height": 1,
+				"capSegments": 4,
+				"radialSegments": 8,
+				"heightSegments": 1
 			}
 		],
 		"materials": [
 			{
-				"uuid": "0ce2fbdf-e1c3-4806-874f-7c42131e0b46",
+				"uuid": "2e45bddb-4d57-4a19-9180-5149d0549556",
+				"type": "MeshPhongMaterial",
+				"name": "LineDashedMaterial",
+				"color": 16777215,
+				"emissive": 0,
+				"specular": 1118481,
+				"shininess": 30,
+				"envMapRotation": [
+					0,
+					0,
+					0,
+					"XYZ"
+				],
+				"reflectivity": 1,
+				"refractionRatio": 0.98,
+				"blendColor": 0
+			},
+			{
+				"uuid": "eb2d1b70-5f43-4f7c-90a8-4b050e2760f0",
 				"type": "MeshStandardMaterial",
 				"color": 16777215,
 				"roughness": 1,
@@ -123,9 +150,17 @@
 			],
 			"children": [
 				{
-					"uuid": "0f07348b-780e-4202-86e4-0513d593e103",
+					"uuid": "a66cf4b7-1a18-4af1-b16f-5da023651821",
 					"type": "Mesh",
 					"name": "Box",
+					"userData": {
+						"scripts": [
+							{
+								"assetPath": "/Move.ts",
+								"attributes": {}
+							}
+						]
+					},
 					"layers": 1,
 					"matrix": [
 						1,
@@ -140,7 +175,7 @@
 						0,
 						1,
 						0,
-						-0.17144069754553987,
+						1.554727461166213,
 						0,
 						0,
 						1
@@ -150,11 +185,11 @@
 						1,
 						0
 					],
-					"geometry": "888e0f6c-f827-4de2-b5d5-430f87e252e8",
-					"material": "0ce2fbdf-e1c3-4806-874f-7c42131e0b46"
+					"geometry": "51f9eb6d-7cfc-4558-8034-ade9e5f936bc",
+					"material": "2e45bddb-4d57-4a19-9180-5149d0549556"
 				},
 				{
-					"uuid": "6845a435-6d81-4189-81a3-641753cfba13",
+					"uuid": "a316c898-8cdd-4350-bde3-d39870fe088e",
 					"type": "DirectionalLight",
 					"name": "DirectionalLight",
 					"layers": 1,
@@ -185,7 +220,7 @@
 					"intensity": 1,
 					"shadow": {
 						"camera": {
-							"uuid": "a2394749-7302-47e5-8a88-a571b9b43d31",
+							"uuid": "8d73e2f7-23eb-46d8-a93a-0b2bcced3a4c",
 							"type": "OrthographicCamera",
 							"layers": 1,
 							"up": [
@@ -202,7 +237,141 @@
 							"far": 500
 						}
 					},
-					"target": "2b08cfb2-34d0-4a62-a16a-5da6cfaec099"
+					"target": "85e902e9-68ff-4b32-af06-8da169820b86"
+				},
+				{
+					"uuid": "d98c7d9e-229c-45a1-8436-10fe56dba0a8",
+					"type": "Mesh",
+					"name": "Capsule",
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						-3.819389541741745,
+						0,
+						0,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					],
+					"geometry": "4052ae9a-013e-48f9-ab35-73bdbf88c263",
+					"material": "eb2d1b70-5f43-4f7c-90a8-4b050e2760f0"
+				},
+				{
+					"uuid": "b0c30f0b-450d-4661-a839-93a25701280d",
+					"type": "DirectionalLight",
+					"name": "DirectionalLight",
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						5,
+						10,
+						7.5,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					],
+					"color": 16777215,
+					"intensity": 1,
+					"shadow": {
+						"camera": {
+							"uuid": "a220c4c3-11ad-4ea7-a311-7b95c04ebe4e",
+							"type": "OrthographicCamera",
+							"layers": 1,
+							"up": [
+								0,
+								1,
+								0
+							],
+							"zoom": 1,
+							"left": -5,
+							"right": 5,
+							"top": 5,
+							"bottom": -5,
+							"near": 0.5,
+							"far": 500
+						}
+					},
+					"target": "234e59ce-3b27-49e6-a7aa-fc939bd3ca77"
+				},
+				{
+					"uuid": "95892942-9dbf-4e30-9350-2b244e042d1d",
+					"type": "Object3D",
+					"name": "ParticleSystem",
+					"userData": {
+						"isParticleSystem": true,
+						"particleSystem": {
+							"maxParticles": 1000,
+							"emissionRate": 50,
+							"lifetime": 2,
+							"startSize": 0.01,
+							"endSize": 0.05,
+							"startColor": 16711680,
+							"endColor": 65310,
+							"velocity": [
+								0,
+								10,
+								0
+							],
+							"gravity": [
+								0,
+								0,
+								0
+							],
+							"spread": 0.5
+						}
+					},
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					]
 				}
 			],
 			"backgroundRotation": [

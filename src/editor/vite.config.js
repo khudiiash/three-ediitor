@@ -9,12 +9,23 @@ const projectsRoot = resolve(projectRoot, '..', 'projects');
 
 export default defineConfig({
   root: projectRoot,
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext' // Support top-level await
+    }
+  },
+  build: {
+    target: 'esnext', // Support top-level await in build
+    outDir: resolve(__dirname, 'dist'),
+    emptyOutDir: false
+  },
   plugins: [
     {
       name: 'resolve-importmap',
       resolveId(id) {
         if (id === 'three') {
-          return resolve(projectRoot, 'editor/build/three.module.js');
+          // Use minified WebGPU build (standalone, no three.core.js dependency)
+          return resolve(projectRoot, 'editor/build/three.webgpu.min.js');
         }
         if (id.startsWith('three/addons/')) {
           const subpath = id.replace('three/addons/', '');
@@ -29,12 +40,6 @@ export default defineConfig({
         }
         if (id === 'three-mesh-bvh') {
           return 'https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.4/build/index.module.js';
-        }
-        if (id === 'quarks.core') {
-          return 'https://cdn.jsdelivr.net/npm/quarks.core@0.16.0/dist/quarks.core.esm.js';
-        }
-        if (id === 'three.quarks') {
-          return 'https://cdn.jsdelivr.net/npm/three.quarks@0.16.0/dist/three.quarks.esm.js';
         }
         if (id.startsWith('@engine/')) {
           const subpath = id.replace('@engine/', '');
@@ -232,10 +237,6 @@ export default defineConfig({
     fs: {
       allow: ['..']
     }
-  },
-  build: {
-    outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false
   },
   publicDir: false
 });

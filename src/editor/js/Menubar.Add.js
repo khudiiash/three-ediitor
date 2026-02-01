@@ -133,8 +133,7 @@ function MenubarAdd( editor ) {
 	option.onClick( function () {
 
 		const geometry = new THREE.CapsuleGeometry( 1, 1, 4, 8, 1 );
-		const material = new THREE.MeshStandardMaterial();
-		const mesh = new THREE.Mesh( geometry, material );
+		const mesh = new THREE.Mesh( geometry, new THREE.MeshStandardMaterial() );
 		mesh.name = 'Capsule';
 
 		editor.execute( new AddObjectCommand( editor, mesh ) );
@@ -670,36 +669,16 @@ function MenubarAdd( editor ) {
 		object.name = 'ParticleSystem';
 		object.userData.isParticleSystem = true;
 		object.userData.particleSystem = {
-			duration: 1,
-			looping: true,
-			maxParticle: 1000,
-			emissionRate: 10,
-			startLifeMin: 0.1,
-			startLifeMax: 0.2,
-			startSpeedMin: 1,
-			startSpeedMax: 1,
-			startRotationMin: 0,
-			startRotationMax: 0,
-			startSizeMin: 0.1,
-			startSizeMax: 0.3,
-			endSizeMin: 0.1,
-			endSizeMax: 0.3,
-			startColorR: 1, startColorG: 1, startColorB: 1, startColorA: 1,
-			endColorR: 1, endColorG: 1, endColorB: 1, endColorA: 1,
-			materialColor: 0xffffff,
-			worldSpace: true,
-			renderMode: 0,
-			emitterShape: 'point',
-			emitterSizeX: 1,
-			emitterSizeY: 1,
-			emitterSizeZ: 1,
-			directionX: 0,
-			directionY: 1,
-			directionZ: 0,
-			spreadAngle: 0,
-			gravityX: 0,
-			gravityY: -9.81,
-			gravityZ: 0
+			maxParticles: 1000,
+			emissionRate: 50,
+			lifetime: 2,
+			startSize: 0.1,
+			endSize: 0.05,
+			startColor: 0xffffff,
+			endColor: 0x888888,
+			velocity: [0, 1, 0],
+			gravity: [0, -9.8, 0],
+			spread: 0.5
 		};
 
 		editor.execute( new AddObjectCommand( editor, object ) );

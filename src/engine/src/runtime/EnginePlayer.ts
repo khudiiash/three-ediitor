@@ -33,7 +33,7 @@ export class EnginePlayer {
      */
     async load(json: any): Promise<void> {
         if (!this.app) {
-            pc.init(this.canvas, {
+            await pc.init(this.canvas, {
                 antialias: true,
                 alpha: false,
                 powerPreference: 'high-performance'

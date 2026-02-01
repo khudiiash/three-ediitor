@@ -6,7 +6,7 @@ import { AssetRegistry } from './AssetRegistry';
 import type { ScriptAttribute } from './Script';
 import { ScriptAsset } from '../assets/ScriptAsset';
 import { ParticleComponent } from '../components/ParticleComponent';
-import { ConstantValue, IntervalValue, ConstantColor, PointEmitter } from 'three.quarks';
+import type { WebGPURenderer } from 'three/webgpu';
 
 export class App {
     public engine: Engine;
@@ -36,7 +36,7 @@ export class App {
         this.startTime = performance.now() / 1000;
     }
 
-    get renderer(): THREE.WebGLRenderer | null {
+    get renderer(): WebGPURenderer | null {
         return this.engine.renderer;
     }
 
@@ -203,7 +203,7 @@ export class App {
                 }
             });
 
-            this.loadParticleSystems();
+            await this.loadParticleSystems();
             try {
                 await this.loadScriptsFromScene();
             } catch (error) {
@@ -228,7 +228,7 @@ export class App {
                 }
             });
 
-            this.loadParticleSystems();
+            await this.loadParticleSystems();
             try {
                 await this.loadScriptsFromScene();
             } catch (error) {
@@ -239,21 +239,35 @@ export class App {
         this.events?.emit('scene:loaded', this);
     }
 
-    private loadParticleSystems(): void {
+    private async loadParticleSystems(): Promise<void> {
+        const particlePromises: Promise<void>[] = [];
+        
         this.scene.traverse((object3D) => {
             if (object3D.userData && object3D.userData.isParticleSystem) {
                 const entity = (object3D as any).__entity as Entity | undefined;
                 if (entity) {
                     let particleComponent = entity.getComponent(ParticleComponent);
                     if (!particleComponent) {
-                        
                         particleComponent = entity.addComponent(ParticleComponent);
-                    } else if (!particleComponent.getParticleSystem()) {
-                        particleComponent.initialize();
+                        console.log('[App] Added ParticleComponent to entity:', entity.name);
+                    }
+                    // Initialize particle system asynchronously
+                    if (particleComponent && !particleComponent.getParticleSystem()) {
+                        const initPromise = (particleComponent as any).initialize();
+                        if (initPromise && typeof initPromise.then === 'function') {
+                            particlePromises.push(initPromise);
+                        }
                     }
                 }
             }
         });
+        
+        // Wait for all particle systems to initialize
+        if (particlePromises.length > 0) {
+            console.log('[App] Initializing', particlePromises.length, 'particle systems...');
+            await Promise.all(particlePromises);
+            console.log('[App] All particle systems initialized');
+        }
     }
 
 

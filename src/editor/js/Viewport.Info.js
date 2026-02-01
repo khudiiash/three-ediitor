@@ -26,17 +26,20 @@ function ViewportInfo( editor ) {
 	const trianglesText = new UIText( '0' ).addClass( 'stat-value' );
 	const frametimeText = new UIText( '0' ).addClass( 'stat-value' );
 	const samplesText = new UIText( '0' ).addClass( 'stat-value' ).setHidden( true );
+	const rendererText = new UIText( 'WebGPU' ).addClass( 'stat-value' );
 
 	const objectsUnitText = new UIText( strings.getKey( 'viewport/info/objects' ) ).addClass( 'stat-label' );
 	const verticesUnitText = new UIText( strings.getKey( 'viewport/info/vertices' ) ).addClass( 'stat-label' );
 	const trianglesUnitText = new UIText( strings.getKey( 'viewport/info/triangles' ) ).addClass( 'stat-label' );
 	const samplesUnitText = new UIText( strings.getKey( 'viewport/info/samples' ) ).addClass( 'stat-label' ).setHidden( true );
 	const frametimeLabelText = new UIText( strings.getKey( 'viewport/info/rendertime' ) ).addClass( 'stat-label' );
+	const rendererLabelText = new UIText( 'Renderer' ).addClass( 'stat-label' );
 
 	content.add( objectsUnitText,  objectsText );
 	content.add( verticesUnitText, verticesText );
 	content.add( trianglesUnitText, trianglesText );
 	content.add( frametimeLabelText, frametimeText );
+	content.add( rendererLabelText, rendererText );
 	content.add( samplesUnitText, samplesText );
 
 	container.add( content );

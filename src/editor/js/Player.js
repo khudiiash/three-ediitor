@@ -1,5 +1,6 @@
 
 import { pc, App, SceneLoader } from '../../engine/dist/three-engine.js';
+import { WebGPURenderer } from 'three/webgpu';
 
 function Player( editor ) {
 
@@ -29,9 +30,9 @@ function Player( editor ) {
 	let renderer = null; 
 	let isPlaying = false;
 	
-	function initEngine() {
+	async function initEngine() {
 		if ( !app ) {
-			pc.init( canvas, {
+			await pc.init( canvas, {
 				antialias: true,
 				alpha: false,
 				powerPreference: 'high-performance'
@@ -46,7 +47,10 @@ function Player( editor ) {
 		}
 	}
 	
-	initEngine();
+	// Initialize engine asynchronously but don't block constructor
+	initEngine().catch( err => {
+		console.error( '[Player] Failed to initialize engine:', err );
+	} );
 	
 	
 	window.pc = pc;
@@ -105,7 +109,7 @@ function Player( editor ) {
 
 		json.camera = sceneCamera.toJSON();
 
-		initEngine();
+		await initEngine();
 		
 		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
 		if ( projectPath && typeof window !== 'undefined' ) {
@@ -126,8 +130,45 @@ function Player( editor ) {
 		}
 		
 		if ( app && app.scene ) {
+			// Clean up particle sprites first (they have WebGPU buffers)
+			const particlesToRemove = [];
+			app.scene.traverse( ( object ) => {
+				if ( object.userData && object.userData.skipSerialization && 
+					 ( object.name && (object.name.includes('_Particles') || object.name.includes('ParticleSprite')) ) ) {
+					particlesToRemove.push( object );
+				}
+			} );
+			
+			console.log('[Player] Cleaning up', particlesToRemove.length, 'particle sprites before reload');
+			
+			particlesToRemove.forEach( ( sprite ) => {
+				if ( sprite.parent ) {
+					sprite.parent.remove( sprite );
+				}
+				if ( sprite.geometry ) {
+					try {
+						sprite.geometry.dispose();
+					} catch (e) {
+						console.warn('[Player] Error disposing geometry:', e);
+					}
+				}
+				if ( sprite.material ) {
+					try {
+						if ( Array.isArray( sprite.material ) ) {
+							sprite.material.forEach( m => m.dispose() );
+						} else {
+							sprite.material.dispose();
+						}
+					} catch (e) {
+						console.warn('[Player] Error disposing material:', e);
+					}
+				}
+			} );
+			
+			// Now destroy entities
 			if ( app.getEntities ) {
 				const entities = app.getEntities();
+				console.log('[Player] Destroying', entities?.length || 0, 'entities');
 				if ( entities && entities.length > 0 ) {
 					entities.forEach( entity => {
 						try {
@@ -153,6 +194,8 @@ function Player( editor ) {
 					}
 				}
 			}
+			
+			console.log('[Player] Scene cleared, children count:', app.scene.children.length);
 		}
 		
 		try {
@@ -280,6 +323,25 @@ function Player( editor ) {
 
 		if ( renderer ) {
 			renderer.setAnimationLoop( null );
+		}
+		
+		// Clean up particle system sprites to prevent buffer reuse errors
+		if ( scene ) {
+			const particlesToRemove = [];
+			scene.traverse( ( object ) => {
+				if ( object.userData && object.userData.skipSerialization && 
+					 ( object.name.includes('_Particles') || object.name.includes('ParticleSprite') ) ) {
+					particlesToRemove.push( object );
+				}
+			} );
+			
+			particlesToRemove.forEach( ( sprite ) => {
+				if ( sprite.parent ) {
+					sprite.parent.remove( sprite );
+				}
+				if ( sprite.geometry ) sprite.geometry.dispose();
+				if ( sprite.material ) sprite.material.dispose();
+			} );
 		}
 
 	};
@@ -411,6 +473,39 @@ function Player( editor ) {
 
 		
 		this.stop();
+		
+		// After stopping, clean up any particle sprites that might be lingering in the editor scene
+		if ( editor && editor.scene ) {
+			const particlesToRemove = [];
+			editor.scene.traverse( ( object ) => {
+				if ( object.userData && object.userData.skipSerialization && 
+					 ( object.name && (object.name.includes('_Particles') || object.name.includes('ParticleSprite') || object.name.includes('ParticlePreview')) ) ) {
+					particlesToRemove.push( object );
+				}
+			} );
+			
+			console.log('[Player] Cleaning up', particlesToRemove.length, 'particle sprites from editor scene after stop');
+			
+			particlesToRemove.forEach( ( sprite ) => {
+				if ( sprite.parent ) {
+					sprite.parent.remove( sprite );
+				}
+				if ( sprite.geometry ) {
+					try {
+						sprite.geometry.dispose();
+					} catch (e) {}
+				}
+				if ( sprite.material ) {
+					try {
+						if ( Array.isArray( sprite.material ) ) {
+							sprite.material.forEach( m => m.dispose() );
+						} else {
+							sprite.material.dispose();
+						}
+					} catch (e) {}
+				}
+			} );
+		}
 
 	}.bind( this ) );
 

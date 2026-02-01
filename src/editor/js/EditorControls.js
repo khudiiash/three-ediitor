@@ -40,10 +40,15 @@ class EditorControls extends THREE.EventDispatcher {
 
 		var changeEvent = { type: 'change' };
 
-		this.focus = function ( target ) {
+	this.focus = function ( target ) {
 
-			var distance;
+		var distance;
 
+		// Skip particle systems - use simple distance instead
+		if ( target.userData && target.userData.isParticleSystem ) {
+			center.setFromMatrixPosition( target.matrixWorld );
+			distance = 5; // Fixed distance for particle systems
+		} else {
 			box.setFromObject( target );
 
 			if ( box.isEmpty() === false ) {
@@ -59,16 +64,17 @@ class EditorControls extends THREE.EventDispatcher {
 				distance = 0.1;
 
 			}
+		}
 
-			delta.set( 0, 0, 1 );
-			delta.applyQuaternion( object.quaternion );
-			delta.multiplyScalar( distance * 4 );
+		delta.set( 0, 0, 1 );
+		delta.applyQuaternion( object.quaternion );
+		delta.multiplyScalar( distance * 4 );
 
-			object.position.copy( center ).add( delta );
+		object.position.copy( center ).add( delta );
 
-			scope.dispatchEvent( changeEvent );
+		scope.dispatchEvent( changeEvent );
 
-		};
+	};
 
 		this.pan = function ( delta ) {
 
