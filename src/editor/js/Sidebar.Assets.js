@@ -3,6 +3,7 @@ import { UIPanel, UIRow, UIButton, UIText, UIInput, UISelect, UIBreak } from './
 import { ScriptCompiler } from './ScriptCompiler.js';
 import { ModelParser } from './ModelParser.js';
 import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
+import { getMaterialPreviewImage, createLiveMaterialPreview } from './LiveMaterialPreview.js';
 import { assetManager } from '@engine/three-engine.js';
 
 import { Modal } from './Modal.js';
@@ -93,12 +94,22 @@ import { generateMaterialFromNodes } from './Editor.js';
 						const materialData = JSON.parse( file.content );
 						if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
 							
-							// Handle NodeMaterial - store as data, don't instantiate
-							if ( materialData.type === 'NodeMaterial' ) {
+							// Handle NodeMaterial / *NodeMaterial (e.g. MeshStandardNodeMaterial): store JSON in .data and set generated THREE.Material
+							const isNodeMaterial = materialData.type === 'NodeMaterial' ||
+								( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+								( materialData.nodes && materialData.connections );
+							if ( isNodeMaterial ) {
 
 								existingAsset.data = materialData;
 								existingAsset.data.assetPath = assetPath;
 								existingAsset.data.sourceFile = file.name;
+								const generated = editor.generateMaterialFromNodes && editor.generateMaterialFromNodes( materialData );
+								if ( generated ) {
+									generated.nodeMaterialData = materialData;
+									generated.assetPath = assetPath;
+									await existingAsset.setMaterial( generated );
+								}
+								editor.syncMaterialAssetToScene( existingAsset );
 								return;
 
 							}
@@ -142,11 +153,21 @@ import { generateMaterialFromNodes } from './Editor.js';
 						const materialData = JSON.parse( file.content );
 						if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
 							
-							if ( materialData.type === 'NodeMaterial' ) {
+							const isNodeMaterial = materialData.type === 'NodeMaterial' ||
+								( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+								( materialData.nodes && materialData.connections );
+							if ( isNodeMaterial ) {
 
 								asset.data = materialData;
 								asset.data.assetPath = assetPath;
 								asset.data.sourceFile = file.name;
+								const generated = editor.generateMaterialFromNodes && editor.generateMaterialFromNodes( materialData );
+								if ( generated ) {
+									generated.nodeMaterialData = materialData;
+									generated.assetPath = assetPath;
+									await asset.setMaterial( generated );
+								}
+								editor.syncMaterialAssetToScene( asset );
 								return;
 
 							}
@@ -736,6 +757,18 @@ function SidebarAssets( editor ) {
 		return 'file';
 
 	}
+
+	function getFileDisplayName( file ) {
+		const name = file && file.name ? file.name : '';
+		return name.replace( /\.[^/.]+$/, '' ) || name;
+	}
+
+	function getAssetTypeDisplayName( file ) {
+		if ( file && file.name && file.name.endsWith( '.nodemat' ) ) return 'Node Material';
+		if ( file && file.name && file.name.endsWith( '.mat' ) ) return 'Material';
+		const t = ( file && file.type ) || 'file';
+		return t.charAt( 0 ).toUpperCase() + t.slice( 1 ).toLowerCase();
+	}
 	const previewRenderer = getAssetPreviewRenderer();
 	
 	window.assetManager = assetManager;
@@ -747,57 +780,173 @@ function SidebarAssets( editor ) {
 		
 		console.log( '[Preview Cache] Generating preview for:', filePath, 'size:', size );
 		
-		// Generate THREE.Material from NodeMaterial if needed
-		let previewMaterial = material;
-		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+		let dataUrl = null;
+		// NodeMaterial: render once with WebGPU so thumbnail shows actual shader (e.g. time-based color)
+		const isNodeMat = material && (
+			material.type === 'NodeMaterial' ||
+			material.isNodeMaterial ||
+			( material.type && typeof material.type === 'string' && material.type.endsWith( 'NodeMaterial' ) ) ||
+			( material.nodes && material.connections )
+		);
+		if ( isNodeMat ) {
 
-			previewMaterial = generateMaterialFromNodes( material );
-			if ( ! previewMaterial ) {
-
-				console.warn( '[Preview Cache] Failed to generate material from nodes' );
-				return null;
-
-			}
+			dataUrl = await getMaterialPreviewImage( material, size, size, generateMaterialFromNodes );
 
 		}
-		
-		// Render preview at requested size (always 200px for quality)
-		const dataUrl = await previewRenderer.renderMaterialPreview( previewMaterial, size, size );
-		
-		if ( dataUrl ) {
+		if ( ! dataUrl ) {
 
-			// Cache the preview
-			previewCache.set( filePath, dataUrl );
-			console.log( '[Preview Cache] Cached preview for:', filePath, 'Length:', dataUrl.length );
-			
-			// Store in file object too for persistence
-			file.previewUrl = dataUrl;
-			file.previewTimestamp = Date.now();
-			
-			// Update all existing img elements that reference this preview
-			if ( previewImageRefs.has( filePath ) ) {
+			// Standard material or NodeMaterial fallback: use WebGL preview (WebGL cannot render WebGPU node materials)
+			let previewMaterial = material;
+			if ( isNodeMat ) {
 
-				const imgElements = previewImageRefs.get( filePath );
-				
-				imgElements.forEach( img => {
-
-					if ( img && img.parentNode ) {
-
-						// Only update if the element is still in the DOM
-						img.src = dataUrl;
-
-					}
-
+				previewMaterial = new THREE.MeshStandardMaterial( {
+					color: material.color !== undefined ? material.color : 0x888888,
+					roughness: material.roughness !== undefined ? material.roughness : 1,
+					metalness: material.metalness !== undefined ? material.metalness : 0
 				} );
 
 			}
+			dataUrl = await previewRenderer.renderMaterialPreview( previewMaterial, size, size );
+
+		}
+
+		if ( dataUrl ) {
+
+			// Cache under all path variants so lookups always find it
+			const pathNorm = ( filePath || '' ).replace( /^\/+/, '' );
+			[ filePath, pathNorm, '/' + pathNorm ].forEach( key => {
+				if ( key ) previewCache.set( key, dataUrl );
+			} );
+			console.log( '[Preview Cache] Cached preview for:', filePath, 'Length:', dataUrl.length );
+			
+			file.previewUrl = dataUrl;
+			file.previewTimestamp = Date.now();
+			
+			[ filePath, pathNorm, '/' + pathNorm ].forEach( key => {
+				if ( ! key || ! previewImageRefs.has( key ) ) return;
+				previewImageRefs.get( key ).forEach( img => {
+					if ( img && img.parentNode ) img.src = dataUrl;
+				} );
+			} );
 
 		}
 		
 		return dataUrl;
 
 	}
-	
+
+	/**
+	 * Single source of truth: regenerate material preview from the asset and update cache + all img refs.
+	 * Call when a material asset changes (node editor save, asset inspector edit) so every panel shows the same up-to-date preview.
+	 */
+	async function refreshMaterialPreviewForAsset( materialAsset ) {
+
+		if ( ! materialAsset ) return;
+		const path = ( materialAsset.url || materialAsset.path || '' ).replace( /^\/+/, '' );
+		if ( ! path ) return;
+
+		let material = materialAsset.getMaterial ? materialAsset.getMaterial() : null;
+		const nodeData = materialAsset.data && ( materialAsset.data.type === 'NodeMaterial' || materialAsset.data.isNodeMaterial || ( materialAsset.data.nodes && materialAsset.data.connections ) ) ? materialAsset.data : null;
+		if ( ! material && nodeData ) {
+
+			material = generateMaterialFromNodes( nodeData );
+
+		}
+		if ( ! material && ! nodeData ) return;
+
+		try {
+
+			let dataUrl = null;
+			if ( nodeData ) {
+
+				dataUrl = await getMaterialPreviewImage( nodeData, 200, 200, generateMaterialFromNodes );
+
+			}
+			if ( ! dataUrl ) dataUrl = await previewRenderer.renderMaterialPreview( material, 200, 200 );
+			if ( ! dataUrl ) return;
+
+			[ path, '/' + path ].forEach( key => {
+
+				if ( key ) previewCache.set( key, dataUrl );
+				if ( previewImageRefs.has( key ) ) {
+
+					previewImageRefs.get( key ).forEach( img => {
+
+						if ( img && img.parentNode ) img.src = dataUrl;
+
+					} );
+
+				}
+
+			} );
+
+		} catch ( err ) {
+
+			console.warn( '[Preview] refreshMaterialPreviewForAsset failed:', err );
+
+		}
+
+	}
+
+	window.refreshMaterialPreviewForAsset = refreshMaterialPreviewForAsset;
+
+	// When a material file changes (e.g. node editor save), refresh its thumbnail in assets panel and selector
+	if ( editor.signals && editor.signals.assetFileChanged ) {
+		editor.signals.assetFileChanged.add( async ( assetPath ) => {
+			const path = ( assetPath || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			if ( ! path || ! path.endsWith( '.nodemat' ) ) return;
+			const materialAsset = editor.assets.getByUrl( path ) || editor.assets.getByUrl( '/' + path );
+			if ( ! materialAsset || ! materialAsset.load ) return;
+			try {
+				await materialAsset.load();
+				// Viewport must use the same material instance: recompile from asset.data and assign to all meshes using this asset
+				if ( editor.syncMaterialAssetToScene ) editor.syncMaterialAssetToScene( materialAsset );
+				if ( typeof window.refreshMaterialPreviewForAsset === 'function' ) {
+					await window.refreshMaterialPreviewForAsset( materialAsset );
+				}
+			} catch ( err ) {
+				console.warn( '[Assets] Refresh preview on assetFileChanged failed:', err );
+			}
+		} );
+	}
+
+	/**
+	 * Update preview cache and all img refs by path (when no MaterialAsset instance, e.g. after node editor save).
+	 */
+	async function refreshMaterialPreviewByPath( path, threeMaterial ) {
+
+		if ( ! path || ! threeMaterial ) return;
+		const normalized = ( path || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+		if ( ! normalized ) return;
+		try {
+
+			const dataUrl = await previewRenderer.renderMaterialPreview( threeMaterial, 200, 200 );
+			if ( ! dataUrl ) return;
+			[ normalized, '/' + normalized ].forEach( key => {
+
+				if ( key ) previewCache.set( key, dataUrl );
+				if ( previewImageRefs.has( key ) ) {
+
+					previewImageRefs.get( key ).forEach( img => {
+
+						if ( img && img.parentNode ) img.src = dataUrl;
+
+					} );
+
+				}
+
+			} );
+
+		} catch ( err ) {
+
+			console.warn( '[Preview] refreshMaterialPreviewByPath failed:', err );
+
+		}
+
+	}
+
+	window.refreshMaterialPreviewByPath = refreshMaterialPreviewByPath;
+
 	// Export for use in other modules
 	window.generateAndCacheMaterialPreview = generateAndCacheMaterialPreview;
 	
@@ -1175,15 +1324,86 @@ function SidebarAssets( editor ) {
 					return thumbnail;
 
 				}
+
+				// NodeMaterial thumbnail: use file.content or load file so we always show real shader preview
+				if ( ! cachedPreview && file.name.endsWith( '.nodemat' ) ) {
+					let content = file.content;
+					if ( ! content && editor.storage && editor.storage.getProjectPath && invoke ) {
+						try {
+							const assetPath = ( file.path || '' ).replace( /^\/+/, '' );
+							const fileBytes = await invoke( 'read_asset_file', { projectPath: editor.storage.getProjectPath(), assetPath } );
+							content = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+							file.content = content;
+						} catch ( e ) {}
+					}
+					if ( content ) {
+					try {
+						const parsed = JSON.parse( content );
+						if ( parsed && parsed.nodes && parsed.connections ) {
+							const previewSize = Math.max( size, 48 );
+							try {
+								const { element, stop } = await createLiveMaterialPreview( parsed, previewSize, previewSize, generateMaterialFromNodes, { editor } );
+								element.style.maxWidth = '100%';
+								element.style.maxHeight = '100%';
+								element.style.objectFit = 'contain';
+								thumbnail.appendChild( element );
+								thumbnail._livePreviewStop = stop;
+								thumbnail.style.position = 'relative';
+								const badge = document.createElement( 'div' );
+								badge.style.cssText = 'position: absolute; bottom: 4px; right: 4px; background: rgba(139, 92, 246, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;';
+								badge.textContent = 'NODES';
+								thumbnail.appendChild( badge );
+								return thumbnail;
+							} catch ( liveErr ) {}
+							const dataUrl = await getMaterialPreviewImage( parsed, 200, 200, generateMaterialFromNodes );
+							if ( dataUrl ) {
+								const pathNorm = ( file.path || '' ).replace( /^\/+/, '' );
+								[ file.path, pathNorm, '/' + pathNorm ].forEach( key => { if ( key ) previewCache.set( key, dataUrl ); } );
+								file.previewUrl = dataUrl;
+								const img = document.createElement( 'img' );
+								img.src = dataUrl;
+								img.className = 'asset-thumbnail-img-contain';
+								thumbnail.appendChild( img );
+								if ( ! previewImageRefs.has( file.path ) ) previewImageRefs.set( file.path, new Set() );
+								previewImageRefs.get( file.path ).add( img );
+								const badge = document.createElement( 'div' );
+								badge.style.cssText = 'position: absolute; bottom: 4px; right: 4px; background: rgba(139, 92, 246, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;';
+								badge.textContent = 'NODES';
+								thumbnail.style.position = 'relative';
+								thumbnail.appendChild( badge );
+								return thumbnail;
+							}
+						}
+					} catch ( e ) {
+						// ignore parse error
+					}
+					}
+				}
 				
 				if ( materialAsset && materialAsset instanceof MaterialAsset ) {
 					let assetMaterial = materialAsset.getMaterial();
-					
+					// NodeMaterial graph: prefer materialAsset.data (set after load), else parse file.content
+					if ( file.name.endsWith( '.nodemat' ) && ! assetMaterial && materialAsset.data && ( materialAsset.data.nodes && materialAsset.data.connections ) ) {
+						assetMaterial = materialAsset.data;
+					}
+					if ( ! assetMaterial && file.name.endsWith( '.nodemat' ) && materialAsset.load ) {
+						try {
+							await materialAsset.load();
+							if ( materialAsset.data && ( materialAsset.data.nodes && materialAsset.data.connections ) ) {
+								assetMaterial = materialAsset.data;
+							}
+						} catch ( loadErr ) {
+							console.warn( '[createAssetPreview] Material load for preview failed:', loadErr );
+						}
+					}
 					if ( ! assetMaterial && file.content ) {
 						
 						try {
 							const materialData = JSON.parse( file.content );
-							if ( materialData.type === 'NodeMaterial' ) {
+							const isNodeMaterial = materialData.type === 'NodeMaterial' ||
+								( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+								( materialData.nodes && materialData.connections );
+						if ( isNodeMaterial ) {
 								materialAsset.data = materialData;
 								materialAsset.data.assetPath = assetPath;
 								assetMaterial = materialAsset.data;
@@ -1199,11 +1419,32 @@ function SidebarAssets( editor ) {
 
 					}
 					
-					if ( assetMaterial && ( assetMaterial.type === 'NodeMaterial' || assetMaterial.isNodeMaterial ) ) {
+					const isNodeMat = assetMaterial && (
+						assetMaterial.type === 'NodeMaterial' ||
+						assetMaterial.isNodeMaterial ||
+						( assetMaterial.type && typeof assetMaterial.type === 'string' && assetMaterial.type.endsWith( 'NodeMaterial' ) ) ||
+						( assetMaterial.nodes && assetMaterial.connections )
+					);
+					if ( isNodeMat ) {
 
-						console.log( '[createAssetPreview] NodeMaterial detected in assets panel' );
+						// Live WebGPU preview (synced time with viewport)
+						const previewSize = Math.max( size, 48 );
+						try {
+							const { element, stop } = await createLiveMaterialPreview( assetMaterial, previewSize, previewSize, generateMaterialFromNodes, { editor } );
+							element.style.maxWidth = '100%';
+							element.style.maxHeight = '100%';
+							element.style.objectFit = 'contain';
+							thumbnail.appendChild( element );
+							thumbnail._livePreviewStop = stop;
+							thumbnail.style.position = 'relative';
+							const badge = document.createElement( 'div' );
+							badge.style.cssText = 'position: absolute; bottom: 4px; right: 4px; background: rgba(139, 92, 246, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;';
+							badge.textContent = 'NODES';
+							thumbnail.appendChild( badge );
+							return thumbnail;
+						} catch ( liveErr ) {}
 
-						// Generate and cache preview (at 200px, scaled by CSS)
+						// Fallback: static cached preview
 						const dataUrl = await generateAndCacheMaterialPreview( file, assetMaterial, 200 );
 						
 						if ( dataUrl ) {
@@ -1213,33 +1454,14 @@ function SidebarAssets( editor ) {
 							img.className = 'asset-thumbnail-img-contain';
 							thumbnail.appendChild( img );
 							
-							// Register this img element for live updates
-							if ( ! previewImageRefs.has( file.path ) ) {
-
-								previewImageRefs.set( file.path, new Set() );
-
-							}
+							if ( ! previewImageRefs.has( file.path ) ) previewImageRefs.set( file.path, new Set() );
 							previewImageRefs.get( file.path ).add( img );
 							
-							// Add "NODES" badge overlay
 							const badge = document.createElement( 'div' );
-							badge.style.cssText = `
-								position: absolute;
-								bottom: 4px;
-								right: 4px;
-								background: rgba(139, 92, 246, 0.9);
-								color: white;
-								padding: 2px 6px;
-								border-radius: 4px;
-								font-size: 10px;
-								font-weight: 600;
-							`;
+							badge.style.cssText = 'position: absolute; bottom: 4px; right: 4px; background: rgba(139, 92, 246, 0.9); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;';
 							badge.textContent = 'NODES';
 							thumbnail.style.position = 'relative';
 							thumbnail.appendChild( badge );
-							
-							// Note: Live updates now handled by previewImageRefs system
-							// No need for materialAsset.on('changed') listener here
 							
 							return thumbnail;
 
@@ -1276,16 +1498,21 @@ function SidebarAssets( editor ) {
 						img.className = 'asset-thumbnail-img-contain';
 						thumbnail.appendChild( img );
 						
-						materialAsset.on( 'changed', async function onMaterialAssetChanged() {
-							try {
-								const updatedMaterial = materialAsset.getMaterial();
-								if ( updatedMaterial ) {
-									const newDataUrl = await previewRenderer.renderMaterialPreview( updatedMaterial, size, size );
-									img.src = newDataUrl;
+						let thumbnailUpdateTimeout = null;
+						materialAsset.on( 'changed', function onMaterialAssetChanged() {
+							if ( thumbnailUpdateTimeout ) clearTimeout( thumbnailUpdateTimeout );
+							thumbnailUpdateTimeout = setTimeout( async function () {
+								thumbnailUpdateTimeout = null;
+								try {
+									const updatedMaterial = materialAsset.getMaterial();
+									if ( updatedMaterial ) {
+										const newDataUrl = await previewRenderer.renderMaterialPreview( updatedMaterial, size, size );
+										img.src = newDataUrl;
+									}
+								} catch ( error ) {
+									console.warn( '[Preview] Failed to update material preview:', error );
 								}
-							} catch ( error ) {
-								console.warn( '[Preview] Failed to update material preview:', error );
-							}
+							}, 500 );
 						} );
 						
 						return thumbnail;
@@ -1351,8 +1578,13 @@ function SidebarAssets( editor ) {
 						assetPath: assetPath
 					} );
 					const materialContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
-					
-					const dataUrl = await previewRenderer.renderMaterialPreview( materialContent, size, size );
+					let dataUrl = null;
+					try {
+						const parsed = JSON.parse( materialContent );
+						const isNode = parsed && ( parsed.type === 'NodeMaterial' || ( parsed.type && parsed.type.endsWith( 'NodeMaterial' ) ) || ( parsed.nodes && parsed.connections ) );
+						if ( isNode ) dataUrl = await getMaterialPreviewImage( parsed, size, size, generateMaterialFromNodes );
+					} catch ( _ ) {}
+					if ( ! dataUrl ) dataUrl = await previewRenderer.renderMaterialPreview( materialContent, size, size );
 					const img = document.createElement( 'img' );
 					img.src = dataUrl;
 					img.className = 'asset-thumbnail-img-contain';
@@ -1473,7 +1705,7 @@ function SidebarAssets( editor ) {
 
 		const name = document.createElement( 'div' );
 		name.className = 'asset-grid-item-name';
-		name.textContent = file.name;
+		name.textContent = getFileDisplayName( file );
 		item.appendChild( name );
 
 		item.addEventListener( 'click', function ( e ) {
@@ -1527,6 +1759,18 @@ function SidebarAssets( editor ) {
 	}
 
 	
+	function stopAllLivePreviewThumbnails() {
+		[ filesTableBody, filesGrid, filesLargeGrid ].forEach( container => {
+			if ( ! container ) return;
+			container.querySelectorAll( '.asset-thumbnail-container' ).forEach( el => {
+				if ( el._livePreviewStop && typeof el._livePreviewStop === 'function' ) {
+					el._livePreviewStop();
+					el._livePreviewStop = null;
+				}
+			} );
+		} );
+	}
+
 	function refreshFiles() {
 		if ( ! filesTableBody ) {
 			return;
@@ -1535,6 +1779,8 @@ function SidebarAssets( editor ) {
 		if ( ! currentFolder ) {
 			return;
 		}
+
+		stopAllLivePreviewThumbnails();
 		
 		filesTableBody.innerHTML = '';
 		if ( filesGrid ) filesGrid.innerHTML = '';
@@ -1788,13 +2034,16 @@ function SidebarAssets( editor ) {
 						thumbnailContainer.innerHTML = '';
 						img.style.cssText = 'width: 24px; height: 24px; object-fit: cover; display: block;';
 						thumbnailContainer.appendChild( img );
-					} else {
-						if ( thumbnail.children.length > 0 ) {
-							thumbnailContainer.innerHTML = '';
-							Array.from( thumbnail.children ).forEach( child => {
-								thumbnailContainer.appendChild( child.cloneNode( true ) );
-							} );
-						}
+					} else if ( thumbnail._livePreviewStop ) {
+						thumbnailContainer.innerHTML = '';
+						thumbnail.style.width = '24px';
+						thumbnail.style.height = '24px';
+						thumbnailContainer.appendChild( thumbnail );
+					} else if ( thumbnail.children.length > 0 ) {
+						thumbnailContainer.innerHTML = '';
+						Array.from( thumbnail.children ).forEach( child => {
+							thumbnailContainer.appendChild( child.cloneNode( true ) );
+						} );
 					}
 				}
 			} catch ( error ) {
@@ -1804,13 +2053,13 @@ function SidebarAssets( editor ) {
 		
 		const nameSpan = document.createElement( 'span' );
 		nameSpan.className = 'assets-table-cell-name-text';
-		nameSpan.textContent = file.name;
+		nameSpan.textContent = getFileDisplayName( file );
 		nameCell.appendChild( thumbnailContainer );
 		nameCell.appendChild( nameSpan );
 
 		const typeCell = document.createElement( 'td' );
 		typeCell.className = 'assets-table-cell-type';
-		typeCell.textContent = file.type || 'File';
+		typeCell.textContent = getAssetTypeDisplayName( file );
 
 		const sizeCell = document.createElement( 'td' );
 		sizeCell.className = 'assets-table-cell-size';
@@ -2826,21 +3075,18 @@ function SidebarAssets( editor ) {
 
 	}
 
-	async function createMaterialOfType( materialType ) {
+	async function createMaterialOfType( materialType, options = {} ) {
 
 		if ( materialType === 'standard' ) {
 
-			// Default standard material
-			await createAssetFile( 'material', '', 'standard' );
+			await createAssetFile( 'material', '', 'standard', options );
 
 		} else if ( materialType === 'node' ) {
 
-			// Node material with TSL support
-			await createAssetFile( 'material', '', 'node' );
+			await createAssetFile( 'material', '', 'node', options );
 
 		} else {
 
-			// Check if it's a module-provided material type
 			const extensions = editor.modules.getMaterialTypeExtensions();
 			const extension = extensions.find( ext => ext.type === materialType );
 
@@ -2851,15 +3097,24 @@ function SidebarAssets( editor ) {
 			} else {
 
 				console.warn( `Unknown material type: ${materialType}` );
-				await createAssetFile( 'material', '', 'standard' );
+				await createAssetFile( 'material', '', 'standard', options );
 
 			}
 
 		}
 
 	}
+
+	if ( editor.signals && editor.signals.createMaterialAsset ) {
+		editor.signals.createMaterialAsset.add( function ( payload ) {
+			currentFolder = window.currentFolder || currentFolder || assetsRoot;
+			window.currentFolder = currentFolder;
+			const type = typeof payload === 'string' ? payload : ( payload && payload.type ) || 'standard';
+			createMaterialOfType( type === 'node' ? 'node' : 'standard', { fromMaterialPanel: true } );
+		} );
+	}
 	
-	async function createAssetFile( type, defaultContent, materialSubType = null ) {
+	async function createAssetFile( type, defaultContent, materialSubType = null, options = {} ) {
 
 		const extMap = {
 			'css': 'css',
@@ -2880,7 +3135,7 @@ function SidebarAssets( editor ) {
 
 		}
 
-		const defaultFileName = `new.${ext}`;
+		const defaultFileName = 'new';
 		const fileName = await Modal.showPrompt( `Enter ${type.toUpperCase()} File Name`, '', defaultFileName, defaultFileName );
 
 		if ( fileName && fileName.trim() !== '' ) {
@@ -2918,7 +3173,8 @@ function SidebarAssets( editor ) {
 						color: 16777215,
 						metalness: 0,
 						roughness: 1,
-						nodes: {}
+						nodes: {},
+						connections: []
 					};
 					content = JSON.stringify( nodeMaterial, null, '\t' );
 
@@ -2992,14 +3248,68 @@ void main() {
 			refreshFiles();
 			
 			if ( type === 'material' ) {
-				window.selectedAsset = {
-					type: 'file',
-					path: fileEntry.path,
-					name: fileEntry.name,
-					folder: currentFolder
-				};
-				if ( editor.signals && editor.signals.sceneGraphChanged ) {
-					editor.signals.sceneGraphChanged.dispatch();
+				// Only switch to asset inspector when creating from assets panel (not from material panel 3-button flow)
+				if ( ! options.fromMaterialPanel ) {
+					window.selectedAsset = {
+						type: 'file',
+						path: fileEntry.path,
+						name: fileEntry.name,
+						folder: currentFolder
+					};
+					if ( editor.signals && editor.signals.sceneGraphChanged ) {
+						editor.signals.sceneGraphChanged.dispatch();
+					}
+				}
+				// When creating from material panel: assign the new material to the selected mesh and keep entity inspector visible
+				if ( options.fromMaterialPanel && editor.selected && editor.selected.isMesh ) {
+					const assetPathForUrl = filePath.startsWith( '/' ) ? filePath.slice( 1 ) : filePath;
+					let materialAsset = editor.assets.getByUrl( assetPathForUrl );
+					let materialToAssign = null;
+					if ( materialAsset ) {
+						materialToAssign = materialAsset.getMaterial ? materialAsset.getMaterial() : null;
+						if ( ! materialToAssign && materialAsset.data && ( materialAsset.data.type === 'NodeMaterial' || materialAsset.data.isNodeMaterial ) ) {
+							materialToAssign = materialAsset.data;
+						}
+					}
+					// Fallback: if asset not found by URL (e.g. path format) or data not set yet, parse file content and assign node material data
+					if ( ! materialToAssign && content && ( type === 'material' && materialSubType === 'node' ) ) {
+						try {
+							const materialData = JSON.parse( content );
+							const isNodeMat = materialData && (
+								materialData.type === 'NodeMaterial' ||
+								materialData.isNodeMaterial ||
+								( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+								( materialData.nodes && materialData.connections )
+							);
+							if ( isNodeMat ) {
+								materialData.assetPath = assetPathForUrl;
+								materialData.isNodeMaterial = true;
+								materialToAssign = materialData;
+							}
+						} catch ( e ) {
+							// ignore parse error
+						}
+					}
+					if ( materialToAssign ) {
+						editor.setObjectMaterial( editor.selected, 0, materialToAssign );
+						// Sync node materials so the mesh gets the generated THREE.Material (and stays in sync on future edits)
+						const dataIsNodeMat = materialAsset && materialAsset.data && (
+							materialAsset.data.type === 'NodeMaterial' ||
+							materialAsset.data.isNodeMaterial ||
+							( materialAsset.data.type && materialAsset.data.type.endsWith( 'NodeMaterial' ) ) ||
+							( materialAsset.data.nodes && materialAsset.data.connections )
+						);
+						if ( dataIsNodeMat ) {
+							editor.syncMaterialAssetToScene( materialAsset );
+						}
+						if ( editor.signals && editor.signals.materialChanged ) {
+							editor.signals.materialChanged.dispatch( editor.selected, 0 );
+						}
+						// Force inspector to refresh so material panel shows the new material instead of 3 buttons
+						if ( editor.signals && editor.signals.objectSelected ) {
+							editor.signals.objectSelected.dispatch( editor.selected );
+						}
+					}
 				}
 			}
 
@@ -3174,28 +3484,33 @@ export default class ${validClassName} extends Script {
 	window.updateFileContent = function( filePath, newContent ) {
 
 		console.log( '[Assets] Updating file content in memory for:', filePath, 'Length:', newContent ? newContent.length : 0 );
-		
-		// Find and update the file in the folder structure
-		function findAndUpdateFile( folder, targetPath ) {
+		const normalizedTarget = ( filePath || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+		const targetBasename = normalizedTarget.split( '/' ).pop() || normalizedTarget;
+
+		// Find and update the file in the folder structure (match by full path or by filename)
+		function findAndUpdateFile( folder ) {
 
 			// Check files in current folder
 			if ( folder.files ) {
 
-				const file = folder.files.find( f => f.path === targetPath );
+				const file = folder.files.find( f => {
+					const p = ( f.path || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+					return f.path === filePath || p === normalizedTarget || f.name === targetBasename || f.name === normalizedTarget || p === normalizedTarget || p.endsWith( '/' + normalizedTarget ) || ( normalizedTarget && p.endsWith( '/' + targetBasename ) );
+				} );
 				if ( file ) {
 
 					console.log( '[Assets] Found file to update:', file.name, 'Old length:', file.content ? file.content.length : 0, 'New length:', newContent.length );
 					file.content = newContent;
 					file.size = newContent.length;
 					file.dateModified = Date.now();
-					
-					// Invalidate preview cache
-					if ( previewCache.has( targetPath ) ) {
-
-						console.log( '[Assets] Invalidating cached preview for:', targetPath );
-						previewCache.delete( targetPath );
-
-					}
+						
+					// Invalidate preview cache (by both search path and actual file path)
+					const pathForCache = ( file.path || '' ).replace( /^\/+/, '' );
+					[ filePath, pathForCache, normalizedTarget, '/' + pathForCache, file.path ].forEach( key => {
+						if ( key && previewCache.has( key ) ) {
+							previewCache.delete( key );
+						}
+					} );
 					
 					// Regenerate preview if it's a material
 					if ( file.type === 'material' && file.name.endsWith( '.nodemat' ) ) {
@@ -3209,7 +3524,7 @@ export default class ${validClassName} extends Script {
 							
 							// Generate preview at highest quality (200px) only
 							// Smaller sizes will scale down via CSS
-							generateAndCacheMaterialPreview( file, materialData, 200 ).then( dataUrl => {
+							generateAndCacheMaterialPreview( file, materialData, 200 ).then( ( dataUrl ) => {
 
 								if ( dataUrl ) {
 
@@ -3242,7 +3557,7 @@ export default class ${validClassName} extends Script {
 
 				for ( const child of folder.children ) {
 
-					if ( findAndUpdateFile( child, targetPath ) ) {
+					if ( findAndUpdateFile( child ) ) {
 
 						return true;
 
@@ -3256,8 +3571,9 @@ export default class ${validClassName} extends Script {
 
 		}
 
-		// Update the file content
-		const updated = findAndUpdateFile( window.assetsRoot, filePath );
+		// Update the file content (assetsRoot may be null if assets panel never loaded)
+		const root = window.assetsRoot;
+		const updated = root ? findAndUpdateFile( root ) : false;
 		
 		if ( updated ) {
 

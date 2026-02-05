@@ -62,15 +62,13 @@ const geometryNodes = [
 geometryNodes.forEach( node => {
 
 	const outputs = createVectorOutputs( node.outputType );
-	const socketCount = Math.max( outputs.length, 1 );
 
 	registerNode( node.type, {
 		name: node.name,
 		color: '#ff8787',
 		inputs: [],
 		outputs: outputs,
-		properties: {},
-		height: 32 + socketCount * 20 + 4
+		properties: {}
 	} );
 
 } );

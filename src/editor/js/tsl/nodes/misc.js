@@ -4,6 +4,16 @@
 
 import { registerNode, registerCategory } from '../NodeRegistry.js';
 
+// Engine/runtime node types that may appear in saved graphs (e.g. from scene serialization)
+// VarNode = pass-through variable reference; allow loading without breaking the editor
+registerNode( 'VarNode', {
+	name: 'Var',
+	color: '#94a3b8',
+	inputs: [ { name: 'In', type: 'float', label: '' } ],
+	outputs: [ { name: 'Out', type: 'float', label: '' } ],
+	properties: {}
+} );
+
 // === NOISE NODES ===
 const noiseNodes = [
 	{ type: 'cellNoiseFloat', name: 'Cell Noise (Float)', output: 'float' },
@@ -30,8 +40,7 @@ noiseNodes.forEach( node => {
 		color: '#10b981',
 		inputs: [ { name: 'UV', type: 'vec2', label: 'UV' } ],
 		outputs: [ { name: 'OUT', type: node.output, label: '' } ],
-		properties: {},
-		height: 32 + 20 + 4
+		properties: {}
 	} );
 
 } );
@@ -47,8 +56,7 @@ registerNode( 'texture', {
 	color: '#f783ac',
 	inputs: [ { name: 'UV', type: 'vec2', label: 'UV' } ],
 	outputs: [ { name: 'Color', type: 'vec4', label: '' } ],
-	properties: { texture: null },
-	height: 32 + 20 + 4
+	properties: { texture: null }
 } );
 
 registerNode( 'triplanarTexture', {
@@ -56,8 +64,7 @@ registerNode( 'triplanarTexture', {
 	color: '#f783ac',
 	inputs: [ { name: 'Position', type: 'vec3', label: 'Pos' } ],
 	outputs: [ { name: 'Color', type: 'vec4', label: '' } ],
-	properties: { texture: null },
-	height: 32 + 20 + 4
+	properties: { texture: null }
 } );
 
 registerNode( 'backdrop', {
@@ -65,8 +72,7 @@ registerNode( 'backdrop', {
 	color: '#f783ac',
 	inputs: [],
 	outputs: [ { name: 'Color', type: 'vec4', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'viewportDepth', {
@@ -74,8 +80,7 @@ registerNode( 'viewportDepth', {
 	color: '#f783ac',
 	inputs: [],
 	outputs: [ { name: 'Depth', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerCategory( {
@@ -112,8 +117,7 @@ utilNodes.forEach( node => {
 		color: '#a855f7',
 		inputs: [ { name: 'Value', type: 'vec3', label: '' } ],
 		outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-		properties: {},
-		height: 32 + 20 + 4
+		properties: {}
 	} );
 
 } );
@@ -141,8 +145,7 @@ modelNodes.forEach( node => {
 		color: '#06b6d4',
 		inputs: [],
 		outputs: [ { name: 'OUT', type: 'auto', label: '' } ],
-		properties: {},
-		height: 32 + 20 + 4
+		properties: {}
 	} );
 
 } );
@@ -170,8 +173,7 @@ advancedNodes.forEach( node => {
 		color: '#8b5cf6',
 		inputs: [],
 		outputs: [ { name: 'OUT', type: 'auto', label: '' } ],
-		properties: {},
-		height: 32 + 20 + 4
+		properties: {}
 	} );
 
 } );

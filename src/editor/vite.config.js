@@ -23,7 +23,7 @@ export default defineConfig({
     {
       name: 'resolve-importmap',
       resolveId(id) {
-        if (id === 'three') {
+        if (id === 'three' || id === 'three/webgpu') {
           // Use minified WebGPU build (standalone, no three.core.js dependency)
           return resolve(projectRoot, 'editor/build/three.webgpu.min.js');
         }

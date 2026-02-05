@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ModelParser } from './ModelParser.js';
 import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
+import { getMaterialPreviewImage, createLiveMaterialPreview } from './LiveMaterialPreview.js';
 import { assetManager } from '@engine/three-engine.js';
 
 class AssetSelector {
@@ -18,7 +19,7 @@ class AssetSelector {
 			audio: [ 'mp3', 'wav', 'ogg', 'm4a', 'aac' ],
 			model: [ 'glb', 'gltf', 'fbx', 'obj' ],
 			geometry: [ 'json', 'geo' ],
-			material: [ 'json', 'mat' ] 
+			material: [ 'json', 'mat', 'nodemat' ]
 		};
 
 		const overlay = document.createElement( 'div' );
@@ -128,6 +129,11 @@ class AssetSelector {
 
 		modal.appendChild( toolbar );
 
+		const livePreviewContainer = document.createElement( 'div' );
+		livePreviewContainer.className = 'asset-selector-live-preview';
+		livePreviewContainer.style.display = 'none';
+		modal.appendChild( livePreviewContainer );
+
 		const gridContainer = document.createElement( 'div' );
 		gridContainer.className = 'asset-selector-grid';
 		modal.appendChild( gridContainer );
@@ -135,6 +141,8 @@ class AssetSelector {
 		this.overlay = overlay;
 		this.modal = modal;
 		this.gridContainer = gridContainer;
+		this.livePreviewContainer = livePreviewContainer;
+		this.liveMaterialPreviewStop = null;
 		this.searchInput = searchInput;
 		this.title = title;
 		this.importBtn = importBtn;
@@ -195,6 +203,14 @@ class AssetSelector {
 
 	hide() {
 
+		if ( this.liveMaterialPreviewStop ) {
+			this.liveMaterialPreviewStop();
+			this.liveMaterialPreviewStop = null;
+		}
+		if ( this.livePreviewContainer ) {
+			this.livePreviewContainer.innerHTML = '';
+			this.livePreviewContainer.style.display = 'none';
+		}
 		this.overlay.style.display = 'none';
 		this.onSelectCallback = null;
 		this.currentAsset = null;
@@ -252,6 +268,56 @@ class AssetSelector {
 			} );
 		}
 
+		// When selecting materials, show one live NodeMaterial preview (synced time with viewport)
+		if ( this.assetType === 'material' && assets.length > 0 && this.editor && this.editor.generateMaterialFromNodes ) {
+			this.startLivePreviewForFirstNodeMaterial( assets );
+		}
+
+	}
+
+	async startLivePreviewForFirstNodeMaterial( assets ) {
+		if ( this.liveMaterialPreviewStop ) {
+			this.liveMaterialPreviewStop();
+			this.liveMaterialPreviewStop = null;
+		}
+		this.livePreviewContainer.innerHTML = '';
+		this.livePreviewContainer.style.display = 'none';
+
+		for ( const asset of assets ) {
+			let nodeData = null;
+			let material = asset.modelMaterial && asset.modelMaterial.material ? asset.modelMaterial.material : null;
+			if ( ! material && asset.modelPath ) {
+				const materialName = asset.name.replace( /\.(mat|nodemat)$/, '' );
+				material = assetManager.getMaterial( `${asset.modelPath}/${materialName}` );
+			}
+			if ( material ) {
+				nodeData = material.nodeMaterialData || ( ( material.type === 'NodeMaterial' || material.isNodeMaterial || ( material.nodes && material.connections ) ) ? material : null );
+			}
+			if ( ! nodeData && this.editor.storage && this.editor.storage.getProjectPath && window.__TAURI__ && window.__TAURI__.core && window.__TAURI__.core.invoke ) {
+				const projectPath = this.editor.storage.getProjectPath();
+				let assetPath = asset.path;
+				if ( assetPath.startsWith( '/' ) ) assetPath = assetPath.slice( 1 );
+				try {
+					const fileBytes = await window.__TAURI__.core.invoke( 'read_asset_file', { projectPath, assetPath } );
+					const materialContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
+					const parsed = JSON.parse( materialContent );
+					if ( parsed && ( parsed.type === 'NodeMaterial' || parsed.isNodeMaterial || ( parsed.nodes && parsed.connections ) ) ) {
+						nodeData = parsed;
+					}
+				} catch ( _ ) {}
+			}
+			if ( nodeData ) {
+				try {
+					const { element, stop } = await createLiveMaterialPreview( nodeData, 200, 200, this.editor.generateMaterialFromNodes, { editor: this.editor } );
+					this.liveMaterialPreviewStop = stop;
+					this.livePreviewContainer.appendChild( element );
+					this.livePreviewContainer.style.display = 'block';
+				} catch ( e ) {
+					console.warn( '[AssetSelector] Live preview failed:', e );
+				}
+				return;
+			}
+		}
 	}
 
 	getAllAssetsFromProject( assetType ) {
@@ -452,9 +518,10 @@ class AssetSelector {
 					}
 					
 					// Check if we have a cached preview first (for NodeMaterials especially)
-					if ( window.assetPreviewCache && window.assetPreviewCache.has( asset.path ) ) {
+					const cachePath = ( asset.path || '' ).replace( /^\/+/, '' );
+					const cachedDataUrl = window.assetPreviewCache && ( window.assetPreviewCache.get( asset.path ) || window.assetPreviewCache.get( cachePath ) || window.assetPreviewCache.get( '/' + cachePath ) );
+					if ( cachedDataUrl ) {
 
-						const cachedDataUrl = window.assetPreviewCache.get( asset.path );
 						const img = document.createElement( 'img' );
 						img.src = cachedDataUrl;
 						thumbnail.appendChild( img );
@@ -464,36 +531,31 @@ class AssetSelector {
 					
 					if ( material ) {
 
-						// Check if it's a NodeMaterial (plain data object)
-						if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
+						// NodeMaterial: need graph data for WebGPU preview
+						const isNode = material.type === 'NodeMaterial' || material.isNodeMaterial ||
+							( material.type && material.type.endsWith && material.type.endsWith( 'NodeMaterial' ) ) ||
+							( material.nodes && material.connections );
+						const nodeData = material.nodeMaterialData || ( material.userData && material.userData.nodes && material.userData.connections ? { type: 'NodeMaterial', nodes: material.userData.nodes, connections: material.userData.connections } : material );
+						if ( isNode && nodeData && this.editor && this.editor.generateMaterialFromNodes ) {
 
-							// Use the generateMaterialFromNodes function if available
-							if ( window.generateAndCacheMaterialPreview ) {
+							const dataUrl = await getMaterialPreviewImage( nodeData, 128, 128, this.editor.generateMaterialFromNodes );
+							if ( dataUrl ) {
 
-								// Find the file object to pass to the cache function
-								const file = { path: asset.path, name: asset.name };
-								const dataUrl = await window.generateAndCacheMaterialPreview( file, material, 200 );
-								if ( dataUrl ) {
-
-									const img = document.createElement( 'img' );
-									img.src = dataUrl;
-									thumbnail.appendChild( img );
-									return;
-
-								}
+								const img = document.createElement( 'img' );
+								img.src = dataUrl;
+								thumbnail.appendChild( img );
+								return;
 
 							}
 
-						} else {
-
-							// Standard THREE.Material
-							const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
-							const img = document.createElement( 'img' );
-							img.src = dataUrl;
-							thumbnail.appendChild( img );
-							return;
-
 						}
+
+						// Standard THREE.Material or fallback
+						const dataUrl = await previewRenderer.renderMaterialPreview( material, 128, 128 );
+						const img = document.createElement( 'img' );
+						img.src = dataUrl;
+						thumbnail.appendChild( img );
+						return;
 
 					}
 					
@@ -508,26 +570,22 @@ class AssetSelector {
 						} );
 						const materialContent = new TextDecoder().decode( new Uint8Array( fileBytes ) );
 						
-						// Try to parse as JSON to check if it's a NodeMaterial
+						// Try to parse as JSON and use WebGPU one-shot for NodeMaterials
 						try {
 
 							const materialData = JSON.parse( materialContent );
-							
-							if ( materialData.type === 'NodeMaterial' || materialData.isNodeMaterial ) {
+							const isNode = materialData.type === 'NodeMaterial' || materialData.isNodeMaterial ||
+								( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+								( materialData.nodes && materialData.connections );
+							if ( isNode && this.editor && this.editor.generateMaterialFromNodes ) {
 
-								// Use the cached preview generation for NodeMaterials
-								if ( window.generateAndCacheMaterialPreview ) {
+								const dataUrl = await getMaterialPreviewImage( materialData, 128, 128, this.editor.generateMaterialFromNodes );
+								if ( dataUrl ) {
 
-									const file = { path: asset.path, name: asset.name };
-									const dataUrl = await window.generateAndCacheMaterialPreview( file, materialData, 200 );
-									if ( dataUrl ) {
-
-										const img = document.createElement( 'img' );
-										img.src = dataUrl;
-										thumbnail.appendChild( img );
-										return;
-
-									}
+									const img = document.createElement( 'img' );
+									img.src = dataUrl;
+									thumbnail.appendChild( img );
+									return;
 
 								}
 
@@ -538,7 +596,7 @@ class AssetSelector {
 							// Not JSON or failed to parse, continue with standard rendering
 
 						}
-						
+
 						const dataUrl = await previewRenderer.renderMaterialPreview( materialContent, 128, 128 );
 						const img = document.createElement( 'img' );
 						img.src = dataUrl;
@@ -1360,16 +1418,32 @@ class AssetSelector {
 					previewImg.src = asset.url || asset.content;
 					previewImg.className = 'asset-preview-image';
 				} else if (asset.type === 'material') {
-					let material = asset.modelMaterial?.material;
-					if (!material && asset.modelPath) {
-						const materialName = asset.name.replace( /\.(mat|nodemat)$/, '' );
-						material = assetManager.getMaterial(`${asset.modelPath}/${materialName}`);
-					}
-					if (material) {
-						const dataUrl = await previewRenderer.renderMaterialPreview(material, 24, 24);
+					const cachePath = ( asset.path || '' ).replace( /^\/+/, '' );
+					const cachedDataUrl = window.assetPreviewCache && ( window.assetPreviewCache.get( asset.path ) || window.assetPreviewCache.get( cachePath ) || window.assetPreviewCache.get( '/' + cachePath ) );
+					if ( cachedDataUrl ) {
 						previewImg = document.createElement('img');
-						previewImg.src = dataUrl;
+						previewImg.src = cachedDataUrl;
 						previewImg.className = 'asset-preview-image-contain';
+					} else {
+						let material = asset.modelMaterial?.material;
+						if (!material && asset.modelPath) {
+							const materialName = asset.name.replace( /\.(mat|nodemat)$/, '' );
+							material = assetManager.getMaterial(`${asset.modelPath}/${materialName}`);
+						}
+						if (material) {
+							const isNode = material.type === 'NodeMaterial' || material.isNodeMaterial ||
+								( material.type && material.type.endsWith && material.type.endsWith( 'NodeMaterial' ) ) ||
+								( material.nodes && material.connections );
+							const nodeData = material.nodeMaterialData || ( material.userData && material.userData.nodes && material.userData.connections ? { type: 'NodeMaterial', nodes: material.userData.nodes, connections: material.userData.connections } : material );
+							let dataUrl = null;
+							if ( isNode && nodeData && this.editor && this.editor.generateMaterialFromNodes ) {
+								dataUrl = await getMaterialPreviewImage( nodeData, 24, 24, this.editor.generateMaterialFromNodes );
+							}
+							if ( ! dataUrl ) dataUrl = await previewRenderer.renderMaterialPreview( material, 24, 24 );
+							previewImg = document.createElement('img');
+							previewImg.src = dataUrl;
+							previewImg.className = 'asset-preview-image-contain';
+						}
 					}
 				} else if (asset.type === 'geometry') {
 					let geometry = asset.modelGeometry?.geometry;

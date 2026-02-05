@@ -10,4 +10,4 @@ import './nodes/math.js';
 import './nodes/logic.js';
 import './nodes/misc.js';
 
-export { registerNode, getNodeDefinition, registerCategory, getCategories, createNodeConfig } from './NodeRegistry.js';
+export { registerNode, getNodeDefinition, registerCategory, getCategories, createNodeConfig, HEADER_H, SOCKET_SPACING, BODY_PADDING } from './NodeRegistry.js';

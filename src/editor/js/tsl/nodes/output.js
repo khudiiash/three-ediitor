@@ -1,15 +1,14 @@
 /**
  * Material Output Nodes
+ * Width and height are calculated automatically by NodeRegistry layout.
  */
 
 import { registerNode, registerCategory } from '../NodeRegistry.js';
-const NODE_WIDTH = 140;
 
 // MeshStandardMaterial Output
 registerNode( 'outputStandard', {
 	name: 'MeshStandardMaterial',
 	color: '#ff6b6b',
-	width: NODE_WIDTH, // Wider for material outputs
 	inputs: [
 		{ name: 'Color', type: 'vec3', label: 'Color' },
 		{ name: 'Roughness', type: 'float', label: 'Roughness' },
@@ -19,15 +18,13 @@ registerNode( 'outputStandard', {
 		{ name: 'AO', type: 'float', label: 'AO' }
 	],
 	outputs: [],
-	properties: {},
-	height: 32 + 6 * 20 + 8 // More spacing: 32px header + 6 inputs * 20px + 8px padding
+	properties: {}
 } );
 
 // MeshPhysicalMaterial Output
 registerNode( 'outputPhysical', {
 	name: 'MeshPhysicalMaterial',
 	color: '#ff6b6b',
-	width: NODE_WIDTH,
 	inputs: [
 		{ name: 'Color', type: 'vec3', label: 'Color' },
 		{ name: 'Roughness', type: 'float', label: 'Roughness' },
@@ -42,29 +39,25 @@ registerNode( 'outputPhysical', {
 		{ name: 'IOR', type: 'float', label: 'IOR' }
 	],
 	outputs: [],
-	properties: {},
-	height: 32 + 11 * 20 + 8
+	properties: {}
 } );
 
 // MeshBasicMaterial Output
 registerNode( 'outputBasic', {
 	name: 'MeshBasicMaterial',
 	color: '#ff6b6b',
-	width: NODE_WIDTH,
 	inputs: [
 		{ name: 'Color', type: 'vec3', label: 'Color' },
 		{ name: 'Opacity', type: 'float', label: 'Opacity' }
 	],
 	outputs: [],
-	properties: {},
-	height: 32 + 2 * 20 + 8
+	properties: {}
 } );
 
 // MeshPhongMaterial Output
 registerNode( 'outputPhong', {
 	name: 'MeshPhongMaterial',
 	color: '#ff6b6b',
-	width: NODE_WIDTH,
 	inputs: [
 		{ name: 'Color', type: 'vec3', label: 'Color' },
 		{ name: 'Specular', type: 'vec3', label: 'Specular' },
@@ -73,15 +66,13 @@ registerNode( 'outputPhong', {
 		{ name: 'Emissive', type: 'vec3', label: 'Emissive' }
 	],
 	outputs: [],
-	properties: {},
-	height: 32 + 5 * 20 + 8
+	properties: {}
 } );
 
 // Legacy output (backwards compatibility)
 registerNode( 'output', {
 	name: 'Material Output',
 	color: '#ff6b6b',
-	width: NODE_WIDTH,
 	inputs: [
 		{ name: 'Color', type: 'vec3', label: 'Color' },
 		{ name: 'Roughness', type: 'float', label: 'Roughness' },
@@ -89,8 +80,7 @@ registerNode( 'output', {
 		{ name: 'Normal', type: 'vec3', label: 'Normal' }
 	],
 	outputs: [],
-	properties: {},
-	height: 32 + 4 * 20 + 8
+	properties: {}
 } );
 
 registerCategory( {

@@ -24,8 +24,7 @@ binaryLogicNodes.forEach( node => {
 			{ name: 'B', type: 'float', label: 'B' }
 		],
 		outputs: [ { name: 'OUT', type: 'bool', label: '' } ],
-		properties: {},
-		height: 32 + 2 * 20 + 4
+		properties: {}
 	} );
 
 } );
@@ -35,8 +34,7 @@ registerNode( 'not', {
 	color: '#f59e0b',
 	inputs: [ { name: 'Value', type: 'bool', label: '' } ],
 	outputs: [ { name: 'OUT', type: 'bool', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'select', {
@@ -48,8 +46,7 @@ registerNode( 'select', {
 		{ name: 'False', type: 'float', label: 'False' }
 	],
 	outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 3 * 20 + 4
+	properties: {}
 } );
 
 registerNode( 'discard', {
@@ -57,8 +54,7 @@ registerNode( 'discard', {
 	color: '#f59e0b',
 	inputs: [ { name: 'Condition', type: 'bool', label: '' } ],
 	outputs: [],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerCategory( {

@@ -127,6 +127,17 @@
 	color: #fff;
 }
 
+/* Live material preview (NodeMaterials) - synced time with viewport */
+.asset-selector-live-preview {
+	padding: 12px 20px;
+	border-bottom: 1px solid #2a2a2a;
+	background: #1a1a1a;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 0;
+}
+
 .asset-selector-btn.primary:hover {
 	background: #5aa8ff;
 	border-color: #5aa8ff;

@@ -21,8 +21,7 @@ binaryMathNodes.forEach( type => {
 			{ name: 'B', type: 'float', label: 'B' }
 		],
 		outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-		properties: {},
-		height: 28 + 2 * 16 + 4 // Compact
+		properties: {}
 	} );
 
 } );
@@ -49,8 +48,7 @@ unaryMathNodes.forEach( type => {
 		color: '#4dabf7',
 		inputs: [ { name: 'Value', type: 'float', label: '' } ],
 		outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-		properties: {},
-		height: 28 + 16 + 4 // Compact single output
+		properties: {}
 	} );
 
 } );
@@ -65,8 +63,7 @@ registerNode( 'mix', {
 		{ name: 'Factor', type: 'float', label: 'Fac' }
 	],
 	outputs: [ { name: 'OUT', type: 'vec3', label: '' } ],
-	properties: {},
-	height: 28 + 3 * 16 + 4 // Compact
+	properties: {}
 } );
 
 registerNode( 'clamp', {
@@ -78,8 +75,7 @@ registerNode( 'clamp', {
 		{ name: 'Max', type: 'float', label: 'Max' }
 	],
 	outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 3 * 20 + 4
+	properties: {}
 } );
 
 registerNode( 'smoothstep', {
@@ -91,8 +87,7 @@ registerNode( 'smoothstep', {
 		{ name: 'Value', type: 'float', label: 'Val' }
 	],
 	outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 3 * 20 + 4
+	properties: {}
 } );
 
 // Constants
@@ -101,8 +96,7 @@ registerNode( 'pi', {
 	color: '#4dabf7',
 	inputs: [],
 	outputs: [ { name: 'Value', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'halfPI', {
@@ -110,8 +104,7 @@ registerNode( 'halfPI', {
 	color: '#4dabf7',
 	inputs: [],
 	outputs: [ { name: 'Value', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'twoPI', {
@@ -119,8 +112,7 @@ registerNode( 'twoPI', {
 	color: '#4dabf7',
 	inputs: [],
 	outputs: [ { name: 'Value', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'epsilon', {
@@ -128,8 +120,7 @@ registerNode( 'epsilon', {
 	color: '#4dabf7',
 	inputs: [],
 	outputs: [ { name: 'Value', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 registerNode( 'infinity', {
@@ -137,8 +128,7 @@ registerNode( 'infinity', {
 	color: '#4dabf7',
 	inputs: [],
 	outputs: [ { name: 'Value', type: 'float', label: '' } ],
-	properties: {},
-	height: 32 + 20 + 4
+	properties: {}
 } );
 
 // Special math nodes
@@ -166,8 +156,7 @@ specialNodes.forEach( node => {
 			{ name: 'B', type: 'float', label: 'B' }
 		],
 		outputs: [ { name: 'OUT', type: 'float', label: '' } ],
-		properties: {},
-		height: 28 + 2 * 16 + 4 // Compact
+		properties: {}
 	} );
 
 } );

@@ -5,6 +5,9 @@ import { UIButton, UIDiv, UIInput, UIPanel, UIRow, UISelect, UIText, UITextArea 
 import { SetMaterialCommand } from './commands/SetMaterialCommand.js';
 import { SetMaterialValueCommand } from './commands/SetMaterialValueCommand.js';
 import { AssetSelector } from './AssetSelector.js';
+import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
+import { createLiveMaterialPreview } from './LiveMaterialPreview.js';
+import { generateMaterialFromNodes } from './Editor.js';
 
 import { SidebarMaterialBooleanProperty } from './Sidebar.Material.BooleanProperty.js';
 import { SidebarMaterialColorProperty } from './Sidebar.Material.ColorProperty.js';
@@ -18,8 +21,13 @@ function SidebarMaterial( editor ) {
 
 	const signals = editor.signals;
 	const strings = editor.strings;
+	const previewRenderer = getAssetPreviewRenderer();
 
 	let currentObject;
+	let materialPreviewRequestId = 0;
+	let previewUpdateTimeout = null;
+	let liveMaterialPreviewStop = null;
+	const PREVIEW_DEBOUNCE_MS = 400;
 
 	let currentMaterialSlot = 0;
 
@@ -56,72 +64,54 @@ function SidebarMaterial( editor ) {
 
 	container.add( materialSlotRow );
 
-	// Material Type Selector (Standard vs Node Material)
-	const materialTypeRow = new UIRow();
-	materialTypeRow.add( new UIText( 'Material Type' ).setClass( 'Label' ) );
-	
-	const materialTypeSelect = new UISelect().setWidth( '170px' ).setFontSize( '12px' );
-	materialTypeSelect.setOptions( {
-		'standard': 'Standard Material',
-		'node': 'Node Material'
-	} );
-	materialTypeSelect.onChange( async function () {
-
-		const newType = materialTypeSelect.getValue();
-		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
-		
-		if ( ! material ) return;
-
-		const isCurrentlyNode = material.type === 'NodeMaterial' || material.isNodeMaterial;
-		const switchingToNode = newType === 'node';
-
-		// Don't do anything if already the correct type
-		if ( ( isCurrentlyNode && switchingToNode ) || ( ! isCurrentlyNode && newType === 'standard' ) ) {
-
-			return;
-
-		}
-
-		if ( switchingToNode ) {
-
-			// Convert to node material
-			const nodeMaterial = {
-				type: 'NodeMaterial',
-				name: material.name || 'NodeMaterial',
-				color: material.color ? material.color.getHex() : 16777215,
-				metalness: material.metalness !== undefined ? material.metalness : 0,
-				roughness: material.roughness !== undefined ? material.roughness : 1,
-				nodes: {},
-				isNodeMaterial: true
-			};
-
-			// TODO: Set the node material on the object
-			console.log( 'Converting to node material:', nodeMaterial );
-			alert( 'Converting to Node Material - Coming soon!' );
-
-		} else {
-
-			// Convert to standard material
-			const standardMaterial = new THREE.MeshStandardMaterial();
-			standardMaterial.name = material.name || 'Material';
-			
-			// Copy properties if they exist
-			if ( material.color !== undefined ) standardMaterial.color.setHex( material.color );
-			if ( material.metalness !== undefined ) standardMaterial.metalness = material.metalness;
-			if ( material.roughness !== undefined ) standardMaterial.roughness = material.roughness;
-
-			editor.removeMaterial( material );
-			editor.execute( new SetMaterialCommand( editor, currentObject, standardMaterial, currentMaterialSlot ), 'Convert to Standard Material' );
-			editor.addMaterial( standardMaterial );
+	// Default material state: Select Material, Create new material, Create new node material (when mesh has no material or project default material)
+	const defaultMaterialContainer = new UIDiv();
+	defaultMaterialContainer.setDisplay( 'none' );
+	const selectMaterialInDefaultBtn = new UIButton( 'Select Material...' ).setWidth( '100%' );
+	selectMaterialInDefaultBtn.onClick( function () {
+		if ( ! currentObject ) return;
+		if ( ! editor.assetSelector ) editor.assetSelector = new AssetSelector( editor );
+		editor.assetSelector.show( async function ( material ) {
+			const isNodeMaterial = material && ( material.type === 'NodeMaterial' || material.isNodeMaterial );
+			const isStandardMaterial = material && material instanceof THREE.Material;
+			if ( ! material || ( ! isStandardMaterial && ! isNodeMaterial ) ) return;
+			const object = currentObject;
+			if ( ! object || ! object.material ) return;
+			const actualOld = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
+			if ( actualOld ) editor.removeMaterial( actualOld );
+			editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), 'Set Material' );
+			if ( isStandardMaterial ) editor.addMaterial( material );
 			refreshUI();
-
-		}
-
+		}, null, 'material' );
 	} );
-	materialTypeRow.add( materialTypeSelect );
-	container.add( materialTypeRow );
+	const createStandardMaterialBtn = new UIButton( 'Create new material' ).setWidth( '100%' );
+	createStandardMaterialBtn.onClick( function () {
+		if ( editor.signals && editor.signals.createMaterialAsset ) {
+			editor.signals.createMaterialAsset.dispatch( 'standard' );
+		}
+	} );
+	const createNodeMaterialBtn = new UIButton( 'Create new node material' ).setWidth( '100%' );
+	createNodeMaterialBtn.onClick( function () {
+		if ( editor.signals && editor.signals.createMaterialAsset ) {
+			editor.signals.createMaterialAsset.dispatch( 'node' );
+		}
+	} );
+	defaultMaterialContainer.add( selectMaterialInDefaultBtn );
+	defaultMaterialContainer.add( createStandardMaterialBtn );
+	defaultMaterialContainer.add( createNodeMaterialBtn );
+	container.add( defaultMaterialContainer );
 
-	
+	// Main material editor (hidden when in default material state)
+	const mainMaterialContainer = new UIDiv();
+	container.add( mainMaterialContainer );
+
+	// Material preview at top – full panel width, no label
+	const nodeMaterialPreviewDiv = new UIDiv();
+	nodeMaterialPreviewDiv.setWidth( '100%' );
+	nodeMaterialPreviewDiv.setHeight( '200px' );
+	nodeMaterialPreviewDiv.dom.style.overflow = 'hidden';
+	nodeMaterialPreviewDiv.dom.style.display = 'none';
+	mainMaterialContainer.add( nodeMaterialPreviewDiv );
 
 	const materialClassRow = new UIRow();
 	const materialClassSelect = new UISelect().setWidth( '170px' ).setFontSize( '12px' );
@@ -177,10 +167,11 @@ function SidebarMaterial( editor ) {
 	materialClassRow.add( new UIText( strings.getKey( 'sidebar/material/type' ) ).setClass( 'Label' ) );
 	materialClassRow.add( materialClassSelect );
 
-	container.add( materialClassRow );
+	mainMaterialContainer.add( materialClassRow );
 
 	const materialSelectorRow = new UIRow();
 	const materialSelectorButton = new UIButton( 'Select Material...' ).setWidth( '150px' );
+	materialSelectorRow.setDisplay( 'none' ); // Select Material is only in default state panel
 
 	materialSelectorButton.dom.addEventListener( 'dragover', function ( event ) {
 		event.preventDefault();
@@ -225,12 +216,10 @@ function SidebarMaterial( editor ) {
 							if ( material ) {
 								const object = currentObject;
 								if ( object ) {
-									const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
-									if ( oldMaterial ) {
-										editor.removeMaterial( oldMaterial );
-									}
-									editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + material.type );
-									editor.addMaterial( material );
+									const actualOld = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
+									if ( actualOld ) editor.removeMaterial( actualOld );
+									editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + ( material.type || 'Material' ) );
+									if ( material && material instanceof THREE.Material ) editor.addMaterial( material );
 									refreshUI();
 								}
 							}
@@ -246,10 +235,8 @@ function SidebarMaterial( editor ) {
 									newMaterial.map = texture;
 									newMaterial.name = object.material.name || 'Material';
 									
-									const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
-									if ( oldMaterial ) {
-										editor.removeMaterial( oldMaterial );
-									}
+									const actualOld = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
+									if ( actualOld ) editor.removeMaterial( actualOld );
 									editor.execute( new SetMaterialCommand( editor, object, newMaterial, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + newMaterial.type );
 									editor.addMaterial( newMaterial );
 									refreshUI();
@@ -288,13 +275,11 @@ function SidebarMaterial( editor ) {
 			const object = currentObject;
 			if ( ! object || ! object.material ) return;
 
-			const oldMaterial = editor.getObjectMaterial( object, currentMaterialSlot );
-			if ( oldMaterial ) {
-				editor.removeMaterial( oldMaterial );
-			}
-			editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + material.type );
+			const actualOld = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
+			if ( actualOld ) editor.removeMaterial( actualOld );
+			editor.execute( new SetMaterialCommand( editor, object, material, currentMaterialSlot ), strings.getKey( 'command/SetMaterial' ) + ': ' + ( material.type || 'Material' ) );
 			
-			// Only add to material manager if it's a standard THREE.Material
+			// Standard materials: add the passed material; node materials: setObjectMaterial already added the generated material
 			if ( isStandardMaterial ) {
 				editor.addMaterial( material );
 			}
@@ -305,7 +290,7 @@ function SidebarMaterial( editor ) {
 
 	materialSelectorRow.add( new UIText( 'Material' ).setClass( 'Label' ) );
 	materialSelectorRow.add( materialSelectorButton );
-	container.add( materialSelectorRow );
+	mainMaterialContainer.add( materialSelectorRow );
 
 	
 
@@ -319,12 +304,70 @@ function SidebarMaterial( editor ) {
 	materialNameRow.add( new UIText( strings.getKey( 'sidebar/material/name' ) ).setClass( 'Label' ) );
 	materialNameRow.add( materialName );
 
-	container.add( materialNameRow );
+	mainMaterialContainer.add( materialNameRow );
 
-	
+	async function updateMaterialPreviewInPanel( material, previewDiv ) {
+		const requestId = ++ materialPreviewRequestId;
+		if ( ! material ) return;
+		if ( liveMaterialPreviewStop ) {
+			liveMaterialPreviewStop();
+			liveMaterialPreviewStop = null;
+		}
+		try {
+			const nodeData = material.nodeMaterialData || ( ( material.type === 'NodeMaterial' || material.isNodeMaterial || ( material.type && typeof material.type === 'string' && material.type.endsWith( 'NodeMaterial' ) ) || ( material.nodes && material.connections ) ) ? material : null );
+			if ( nodeData ) {
+				const { element, stop } = await createLiveMaterialPreview( nodeData, 200, 200, generateMaterialFromNodes, { editor } );
+				if ( requestId !== materialPreviewRequestId ) {
+					stop();
+					return;
+				}
+				liveMaterialPreviewStop = stop;
+				previewDiv.dom.innerHTML = '';
+				previewDiv.dom.appendChild( element );
+				return;
+			}
+			const dataUrl = await previewRenderer.renderMaterialPreview( material, 200, 200 );
+			if ( requestId !== materialPreviewRequestId ) return;
+			previewDiv.dom.innerHTML = '';
+			if ( dataUrl ) {
+				const img = document.createElement( 'img' );
+				img.src = dataUrl;
+				img.style.width = '100%';
+				img.style.height = '100%';
+				img.style.objectFit = 'contain';
+				img.onerror = function () { previewDiv.dom.innerHTML = ''; };
+				previewDiv.dom.appendChild( img );
+			}
+		} catch ( e ) {
+			if ( requestId !== materialPreviewRequestId ) return;
+			previewDiv.dom.innerHTML = '';
+			console.warn( '[Sidebar.Material] Material preview failed:', e );
+		}
+	}
+
+	function updatePreviewOnly() {
+		if ( ! currentObject ) return;
+		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
+		if ( material ) updateMaterialPreviewInPanel( material, nodeMaterialPreviewDiv );
+	}
+
+	function onPointerUpForPreview() {
+		updatePreviewOnly();
+	}
+
+	function schedulePreviewUpdate() {
+		if ( previewUpdateTimeout ) clearTimeout( previewUpdateTimeout );
+		previewUpdateTimeout = setTimeout( function () {
+			previewUpdateTimeout = null;
+			updatePreviewOnly();
+		}, PREVIEW_DEBOUNCE_MS );
+	}
+
+	document.addEventListener( 'pointerup', onPointerUpForPreview );
+
 	// Container for all standard material properties (hidden for NodeMaterials)
 	const standardPropertiesContainer = new UIDiv();
-	container.add( standardPropertiesContainer );
+	mainMaterialContainer.add( standardPropertiesContainer );
 
 	const materialProgram = new SidebarMaterialProgram( editor, 'vertexShader' );
 	standardPropertiesContainer.add( materialProgram );
@@ -557,12 +600,12 @@ function SidebarMaterial( editor ) {
 	
 
 	const transmissionMap = new SidebarMaterialMapProperty( editor, 'transmissionMap', strings.getKey( 'sidebar/material/transmissionmap' ) );
-	container.add( transmissionMap );
+	standardPropertiesContainer.add( transmissionMap );
 
 	
 
 	const thicknessMap = new SidebarMaterialMapProperty( editor, 'thicknessMap', strings.getKey( 'sidebar/material/thicknessmap' ) );
-	container.add( thicknessMap );
+	standardPropertiesContainer.add( thicknessMap );
 
 	
 
@@ -664,7 +707,7 @@ function SidebarMaterial( editor ) {
 	materialUserDataRow.add( new UIText( strings.getKey( 'sidebar/material/userdata' ) ).setClass( 'Label' ) );
 	materialUserDataRow.add( materialUserData );
 
-	container.add( materialUserDataRow );
+	mainMaterialContainer.add( materialUserDataRow );
 
 	
 
@@ -672,49 +715,47 @@ function SidebarMaterial( editor ) {
 	exportJson.setMarginLeft( '120px' );
 	exportJson.onClick( function () {
 
-		const object = editor.selected;
-		const material = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
-
-		let output = material.toJSON();
-
-		try {
-
-			output = JSON.stringify( output, null, '\t' );
-			output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
-
-		} catch ( error ) {
-
-			output = JSON.stringify( output );
-
+		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
+		if ( ! material ) return;
+		let output;
+		let filename = materialName.getValue() || 'material';
+		if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
+			output = JSON.stringify( material, null, '\t' );
+			filename += '.nodemat';
+		} else if ( material.toJSON ) {
+			output = material.toJSON();
+			try {
+				output = JSON.stringify( output, null, '\t' );
+				output = output.replace( /[\n\t]+([\d\.e\-\[\]]+)/g, '$1' );
+			} catch ( err ) {
+				output = JSON.stringify( output );
+			}
+			filename += '.json';
+		} else {
+			output = JSON.stringify( material );
+			filename += '.json';
 		}
-
-		editor.utils.save( new Blob( [ output ] ), `${ materialName.getValue() || 'material' }.json` );
+		editor.utils.save( new Blob( [ output ] ), filename );
 
 	} );
-	container.add( exportJson );
+	mainMaterialContainer.add( exportJson );
 
 	// Edit Nodes button - opens TSL Editor (only for node materials)
 	const editNodesBtn = new UIButton( 'Edit Nodes' );
 	editNodesBtn.setMarginLeft( '4px' );
-	editNodesBtn.setDisplay( 'none' ); // Hidden by default
+	editNodesBtn.setDisplay( 'none' );
 	editNodesBtn.onClick( function () {
 
-		const object = editor.selected;
-		if ( ! object ) return;
-
-		const material = Array.isArray( object.material ) ? object.material[ currentMaterialSlot ] : object.material;
-		if ( material ) {
-
-			editor.tslEditor.open( material );
-
-		}
+		if ( ! currentObject ) return;
+		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
+		if ( material ) editor.tslEditor.open( material );
 
 	} );
-	container.add( editNodesBtn );
+	mainMaterialContainer.add( editNodesBtn );
 
 	const editorExtensionsContainer = new UIRow();
 	editorExtensionsContainer.dom.style.display = 'inline-block';
-	container.add( editorExtensionsContainer );
+	mainMaterialContainer.add( editorExtensionsContainer );
 
 	function refreshMaterialEditorButtons( material ) {
 
@@ -806,6 +847,25 @@ function SidebarMaterial( editor ) {
 
 		if ( ! currentObject ) return;
 
+		const actualMaterial = Array.isArray( currentObject.material ) ? currentObject.material[ currentMaterialSlot ] : currentObject.material;
+		const isAssetContext = currentObject.isMaterial === true;
+		// Three buttons (Select / Create material / Create node material) are always visible for meshes so we can change material later.
+		// Full material panel (Type, Name, Preview, Color, etc.) only when a material is created or selected. In asset context, no 3 buttons.
+		const hasAssetLink = actualMaterial && ( actualMaterial.assetPath || ( actualMaterial.nodeMaterialData && actualMaterial.nodeMaterialData.assetPath ) );
+		const hasMaterialToEdit = actualMaterial && hasAssetLink;
+
+		defaultMaterialContainer.setDisplay( isAssetContext ? 'none' : '' );
+		if ( ! hasMaterialToEdit ) {
+			if ( liveMaterialPreviewStop ) {
+				liveMaterialPreviewStop();
+				liveMaterialPreviewStop = null;
+			}
+			mainMaterialContainer.setDisplay( 'none' );
+			materialSlotRow.setDisplay( 'none' );
+			return;
+		}
+		mainMaterialContainer.setDisplay( '' );
+
 		let material = currentObject.material;
 
 		if ( Array.isArray( material ) ) {
@@ -838,38 +898,23 @@ function SidebarMaterial( editor ) {
 
 			const isNodeMaterial = material.type === 'NodeMaterial' || material.isNodeMaterial;
 
-			// Set material type selector
-			materialTypeSelect.setValue( isNodeMaterial ? 'node' : 'standard' );
-
-			// Set material class selector (only for standard materials)
-			if ( ! isNodeMaterial ) {
-
-				materialClassSelect.setValue( material.type );
-
-			}
-
-			// Show/hide UI based on material type
 			if ( isNodeMaterial ) {
-
-				// Hide standard material properties
 				materialClassRow.setDisplay( 'none' );
 				standardPropertiesContainer.setDisplay( 'none' );
-				
-				// Show Edit Nodes button for node materials
 				editNodesBtn.setDisplay( '' );
-
+				nodeMaterialPreviewDiv.dom.innerHTML = '';
+				nodeMaterialPreviewDiv.setDisplay( '' );
+				updateMaterialPreviewInPanel( material, nodeMaterialPreviewDiv );
 			} else {
-
-				// Show standard material properties
 				materialClassRow.setDisplay( '' );
 				standardPropertiesContainer.setDisplay( '' );
-				
-				// Hide Edit Nodes button for standard materials
+				nodeMaterialPreviewDiv.dom.innerHTML = '';
+				nodeMaterialPreviewDiv.setDisplay( '' );
 				editNodesBtn.setDisplay( 'none' );
-
+				if ( material.type ) materialClassSelect.setValue( material.type );
+				updateMaterialPreviewInPanel( material, nodeMaterialPreviewDiv );
 			}
 
-			// Refresh material editor buttons based on current material
 			refreshMaterialEditorButtons( material );
 
 		}
@@ -877,13 +922,9 @@ function SidebarMaterial( editor ) {
 		setRowVisibility();
 
 		try {
-
-			materialUserData.setValue( JSON.stringify( material.userData, null, '  ' ) );
-
+			materialUserData.setValue( JSON.stringify( material.userData != null ? material.userData : {}, null, '  ' ) );
 		} catch ( error ) {
-
-			console.log( error );
-
+			console.warn( error );
 		}
 
 		materialUserData.setBorderColor( 'transparent' );
@@ -895,37 +936,33 @@ function SidebarMaterial( editor ) {
 
 	signals.objectSelected.add( function ( object ) {
 
-		let hasMaterial = false;
+		const hasMaterial = object && ( object.material && ( ! Array.isArray( object.material ) || object.material.length > 0 ) || ( object.isMaterial && object.material instanceof THREE.Material ) );
+		const isMeshWithGeometry = object && object.isMesh && object.geometry;
 
-		if ( object && object.material ) {
-
-			hasMaterial = true;
-
-			if ( Array.isArray( object.material ) && object.material.length === 0 ) {
-
-				hasMaterial = false;
-
-			}
-
-		} else if ( object && object.isMaterial && object.material instanceof THREE.Material ) {
-
-			hasMaterial = true;
-
-		}
-
-		if ( hasMaterial ) {
-
+		if ( hasMaterial || isMeshWithGeometry ) {
 			currentObject = object;
 			currentMaterialSlot = 0;
 			materialSlotSelect.setValue( 0 );
 			refreshUI();
 			container.setDisplay( '' );
-			signals.materialChanged.dispatch( object, 0 );
-
+			if ( hasMaterial ) signals.materialChanged.dispatch( object, 0 );
 		} else {
-
 			currentObject = null;
+			if ( liveMaterialPreviewStop ) {
+				liveMaterialPreviewStop();
+				liveMaterialPreviewStop = null;
+			}
 			container.setDisplay( 'none' );
+		}
+
+	} );
+
+	signals.createMaterialAsset.add( function () {
+
+		if ( currentObject && editor.selected && currentObject === editor.selected ) {
+
+			refreshUI();
+			container.setDisplay( '' );
 
 		}
 
@@ -936,13 +973,14 @@ function SidebarMaterial( editor ) {
 		if ( object && object.isMaterial && object.material instanceof THREE.Material ) {
 
 			if ( currentObject !== object ) {
+				if ( previewUpdateTimeout ) { clearTimeout( previewUpdateTimeout ); previewUpdateTimeout = null; }
 				currentObject = object;
 				currentMaterialSlot = slot || 0;
 				materialSlotSelect.setValue( currentMaterialSlot );
 				refreshUI();
 				container.setDisplay( '' );
 			} else {
-				refreshUI();
+				schedulePreviewUpdate();
 			}
 
 		} else if ( object && object.material ) {
@@ -955,27 +993,40 @@ function SidebarMaterial( editor ) {
 				
 				// Handle NodeMaterial
 				if ( currentObject !== object ) {
+					if ( previewUpdateTimeout ) { clearTimeout( previewUpdateTimeout ); previewUpdateTimeout = null; }
 					currentObject = object;
 					currentMaterialSlot = slot || 0;
 					materialSlotSelect.setValue( currentMaterialSlot );
 					refreshUI();
 					container.setDisplay( '' );
 				} else {
-					refreshUI();
+					schedulePreviewUpdate();
 				}
 				
 			} else if ( material instanceof THREE.Material ) {
 				
 				// Handle standard THREE.Material
+				if ( currentObject !== object || currentMaterialSlot !== ( slot || 0 ) ) {
+					if ( previewUpdateTimeout ) { clearTimeout( previewUpdateTimeout ); previewUpdateTimeout = null; }
+					currentObject = object;
+					currentMaterialSlot = slot || 0;
+					materialSlotSelect.setValue( currentMaterialSlot );
+					refreshUI();
+					container.setDisplay( '' );
+				} else {
+					schedulePreviewUpdate();
+				}
 				if ( material.assetPath ) {
 					const assetPath = material.assetPath.startsWith( '/' ) ? material.assetPath.slice( 1 ) : material.assetPath;
 					const materialAsset = editor.assets.getByUrl( assetPath );
 					if ( materialAsset ) {
 						materialAsset.on( 'changed', function onMaterialAssetChanged() {
+							// Don't call refreshUI() here – it was causing preview to re-render every frame during color drag.
+							// Preview updates on pointerup only.
 							if ( currentObject && currentObject === object ) {
 								const currentMaterial = editor.getObjectMaterial( currentObject, currentMaterialSlot );
 								if ( currentMaterial && currentMaterial.assetPath === material.assetPath ) {
-									refreshUI();
+									// Optional: update other UI (name, etc.) without touching preview – leave as no-op for now
 								}
 							}
 						} );

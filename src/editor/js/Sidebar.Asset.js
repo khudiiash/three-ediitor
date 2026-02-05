@@ -2,10 +2,8 @@ import * as THREE from 'three';
 import { UIPanel, UIRow, UIInput, UIText, UINumber, UISelect, UICheckbox, UIDiv, UIButton } from './libs/ui.js';
 import { UICollapsiblePanel } from './libs/UICollapsiblePanel.js';
 import { SidebarMaterial } from './Sidebar.Material.js';
-import { getAssetPreviewRenderer } from './AssetPreviewRenderer.js';
 import { assetManager, TextureAsset, MaterialAsset } from '@engine/three-engine.js';
 import { ModelParser } from './ModelParser.js';
-import { generateMaterialFromNodes } from './Editor.js';
 
 function SidebarAsset( editor ) {
 
@@ -16,7 +14,6 @@ function SidebarAsset( editor ) {
 	container.setId( 'asset-inspector' );
 	container.setDisplay( 'none' );
 
-	const previewPanel = new UICollapsiblePanel( 'Preview' );
 	const assetPanel = new UICollapsiblePanel( 'Asset' );
 	const texturePanel = new UICollapsiblePanel( 'Texture' );
 	const materialPanel = new UICollapsiblePanel( 'Material' );
@@ -24,7 +21,6 @@ function SidebarAsset( editor ) {
 	texturePanel.setHidden( true );
 	materialPanel.setHidden( true );
 
-	container.add( previewPanel );
 	container.add( assetPanel );
 	container.add( texturePanel );
 	container.add( materialPanel );
@@ -35,7 +31,9 @@ function SidebarAsset( editor ) {
 	let currentMaterialAsset = null;
 	let currentTexture = null;
 	let currentMaterial = null;
-	const previewRenderer = getAssetPreviewRenderer();
+	let materialChangeSaveTimeout = null;
+	const MATERIAL_CHANGE_SAVE_DEBOUNCE_MS = 500;
+	let liveMaterialPreviewStop = null;
 
 	const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
 	const isInBrowser = typeof window !== 'undefined' && window.location && window.location.protocol === 'http:';
@@ -61,11 +59,6 @@ function SidebarAsset( editor ) {
 	}
 	
 	function restorePanelStates() {
-		if ( getPanelState( 'preview' ) ) {
-			previewPanel.expand();
-		} else {
-			previewPanel.collapse();
-		}
 		if ( getPanelState( 'asset' ) ) {
 			assetPanel.expand();
 		} else {
@@ -82,13 +75,6 @@ function SidebarAsset( editor ) {
 			materialPanel.collapse();
 		}
 	}
-	
-	previewPanel.dom.querySelector( '.CollapsiblePanelHeader' ).addEventListener( 'click', function() {
-		setTimeout( () => {
-			const isExpanded = previewPanel.dom.querySelector( '.CollapsiblePanelContent' ).style.display !== 'none';
-			setPanelState( 'preview', isExpanded );
-		}, 0 );
-	} );
 	
 	assetPanel.dom.querySelector( '.CollapsiblePanelHeader' ).addEventListener( 'click', function() {
 		setTimeout( () => {
@@ -143,20 +129,6 @@ function SidebarAsset( editor ) {
 	assetModifiedDateRow.add( new UIText( 'Modified' ).setClass( 'Label' ) );
 	assetModifiedDateRow.add( assetModifiedDate );
 	assetPanel.add( assetModifiedDateRow );
-
-	const previewContainer = new UIDiv();
-	previewContainer.setWidth( '100%' );
-	previewContainer.setHeight( '200px' );
-	previewContainer.dom.style.border = '1px solid var(--border-default)';
-	previewContainer.dom.style.borderRadius = 'var(--radius-base)';
-	previewContainer.dom.style.background = 'var(--bg-tertiary)';
-	previewContainer.dom.style.display = 'flex';
-	previewContainer.dom.style.alignItems = 'center';
-	previewContainer.dom.style.justifyContent = 'center';
-	previewContainer.dom.style.overflow = 'hidden';
-	previewContainer.dom.style.padding = 'var(--space-2)';
-	previewContainer.dom.style.margin = 'var(--space-2)';
-	previewPanel.add( previewContainer );
 
 	const textureWidthRow = new UIRow();
 	const textureWidth = new UIText();
@@ -357,24 +329,6 @@ function SidebarAsset( editor ) {
 	const materialContent = new SidebarMaterial( editor );
 	materialPanel.add( materialContent );
 
-	// Add Edit Nodes button for node materials in asset inspector
-	const editNodesRow = new UIRow();
-	editNodesRow.setDisplay( 'none' ); // Hidden by default
-	const editNodesButton = new UIButton( 'Edit Nodes' );
-	editNodesButton.onClick( function () {
-
-		if ( currentMaterial && ( currentMaterial.type === 'NodeMaterial' || currentMaterial.isNodeMaterial ) ) {
-
-			editor.tslEditor.open( currentMaterial );
-
-		}
-
-	} );
-	editNodesRow.add( new UIText( '' ).setClass( 'Label' ) );
-	editNodesRow.add( editNodesButton );
-	materialPanel.add( editNodesRow );
-
-
 	function getAssetUrl( file, assetPath ) {
 		if ( file.url ) {
 			return file.url;
@@ -397,249 +351,16 @@ function SidebarAsset( editor ) {
 	}
 
 	async function updatePreview( asset ) {
-		previewContainer.clear();
-		
-		if ( !asset ) return;
-
-		const ext = asset.name ? asset.name.split( '.' ).pop()?.toLowerCase() : '';
-		const imageExts = [ 'jpg', 'jpeg', 'png', 'gif', 'webp', 'hdr', 'exr', 'tga', 'ktx2' ];
-
-		if ( asset.folder && asset.folder.files ) {
-			const file = asset.folder.files.find( f => f.path === asset.path );
-			if ( file ) {
-				if ( imageExts.includes( ext ) || asset.type === 'texture' ) {
-					try {
-						let texture = null;
-						
-						if ( file.modelTexture && file.modelTexture.texture ) {
-							texture = file.modelTexture.texture;
-						} else {
-							const assetPath = file.path.startsWith( '/' ) ? file.path.slice( 1 ) : file.path;
-							const url = getAssetUrl( file, assetPath );
-							
-							if ( url && url !== 'null' && url !== 'undefined' ) {
-								try {
-									const textureAsset = new TextureAsset( file.name, url, {
-										name: file.name,
-										path: file.path,
-										dateCreated: file.dateCreated
-									} );
-									
-									await textureAsset.load();
-									texture = textureAsset.getTexture();
-								} catch ( loadError ) {
-									console.warn( '[Asset Inspector] Failed to load texture for preview:', loadError );
-									return;
-								}
-							} else {
-								console.warn( '[Asset Inspector] Invalid texture URL for preview:', url );
-								return;
-							}
-						}
-
-						if ( texture && texture.image ) {
-							const img = document.createElement( 'img' );
-							if ( texture.image instanceof HTMLImageElement ) {
-								img.src = texture.image.src;
-							} else if ( texture.image.src ) {
-								img.src = texture.image.src;
-							} else if ( texture.image instanceof HTMLCanvasElement ) {
-								img.src = texture.image.toDataURL();
-							} else if ( texture.image instanceof ImageData ) {
-								const canvas = document.createElement( 'canvas' );
-								canvas.width = texture.image.width;
-								canvas.height = texture.image.height;
-								const ctx = canvas.getContext( '2d' );
-								if ( ctx ) {
-									ctx.putImageData( texture.image, 0, 0 );
-									img.src = canvas.toDataURL();
-								}
-							} else if ( texture.image.width && texture.image.height ) {
-								const canvas = document.createElement( 'canvas' );
-								canvas.width = texture.image.width;
-								canvas.height = texture.image.height;
-								const ctx = canvas.getContext( '2d' );
-								if ( ctx ) {
-									try {
-										ctx.drawImage( texture.image, 0, 0 );
-										img.src = canvas.toDataURL();
-									} catch ( drawError ) {
-										console.warn( '[Asset Inspector] Failed to draw image to canvas:', drawError );
-									}
-								}
-							}
-							img.style.maxWidth = '100%';
-							img.style.maxHeight = '100%';
-							img.style.objectFit = 'contain';
-							const imgContainer = new UIDiv();
-							imgContainer.dom.appendChild( img );
-							previewContainer.add( imgContainer );
-						}
-					} catch ( error ) {
-						console.warn( '[Asset Inspector] Failed to load texture preview:', error );
-					}
-				} else if ( file.type === 'material' || ext === 'mat' ) {
-					try {
-						let material = file.modelMaterial && file.modelMaterial.material;
-						
-						if ( !material && file.modelPath ) {
-							const cachedModel = assetManager.getParsedModel( file.modelPath );
-							if ( cachedModel && cachedModel.materials ) {
-								const matName = file.name.replace( /\.(mat|nodemat)$/, '' );
-								const matEntry = cachedModel.materials.find( m => m.name === matName );
-								if ( matEntry && matEntry.material ) {
-									material = matEntry.material;
-								}
-							}
-						}
-
-						if ( material && material instanceof THREE.Material ) {
-							const dataUrl = await previewRenderer.renderMaterialPreview( material, 200, 200 );
-							const img = document.createElement( 'img' );
-							img.src = dataUrl;
-							img.style.maxWidth = '100%';
-							img.style.maxHeight = '100%';
-							img.style.objectFit = 'contain';
-							img.style.display = 'block';
-							img.style.margin = '0 auto';
-							const imgContainer = new UIDiv();
-							imgContainer.dom.style.width = '100%';
-							imgContainer.dom.style.height = '100%';
-							imgContainer.dom.style.display = 'flex';
-							imgContainer.dom.style.alignItems = 'center';
-							imgContainer.dom.style.justifyContent = 'center';
-							imgContainer.dom.appendChild( img );
-							previewContainer.add( imgContainer );
-						}
-					} catch ( error ) {
-						console.warn( '[Asset Inspector] Failed to load material preview:', error );
-					}
-				}
-			}
+		if ( liveMaterialPreviewStop ) {
+			liveMaterialPreviewStop();
+			liveMaterialPreviewStop = null;
 		}
 	}
 
 	async function updateMaterialPreview( material ) {
-		if ( !material ) {
-			console.warn( '[Asset Inspector] updateMaterialPreview called with no material' );
-			return;
-		}
-
-		console.log( '[Asset Inspector] updateMaterialPreview called with material:', material.type, material );
-
-		try {
-			// Check if we have a cached preview
-			const assetPath = material.assetPath || ( currentAsset ? currentAsset.path : null );
-			const cachedPreview = assetPath && window.assetPreviewCache ? window.assetPreviewCache.get( assetPath ) : null;
-			
-			if ( cachedPreview ) {
-
-				console.log( '[Asset Inspector] Using cached preview from assetPreviewCache:', assetPath );
-				
-				const img = document.createElement( 'img' );
-				img.src = cachedPreview;
-				img.style.maxWidth = '100%';
-				img.style.maxHeight = '100%';
-				img.style.objectFit = 'contain';
-				img.style.display = 'block';
-				img.style.margin = '0 auto';
-				
-				// Register this img element for live updates
-				if ( window.assetPreviewImageRefs ) {
-
-					if ( ! window.assetPreviewImageRefs.has( assetPath ) ) {
-
-						window.assetPreviewImageRefs.set( assetPath, new Set() );
-
-					}
-					window.assetPreviewImageRefs.get( assetPath ).add( img );
-					console.log( '[Asset Inspector] Registered img element for live updates:', assetPath );
-
-				}
-				
-				previewContainer.clear();
-				const imgContainer = new UIDiv();
-				imgContainer.dom.style.width = '100%';
-				imgContainer.dom.style.height = '100%';
-				imgContainer.dom.style.display = 'flex';
-				imgContainer.dom.style.alignItems = 'center';
-				imgContainer.dom.style.justifyContent = 'center';
-				imgContainer.dom.appendChild( img );
-				previewContainer.add( imgContainer );
-				console.log( '[Asset Inspector] Cached preview displayed' );
-				return;
-
-			}
-			
-			// If it's a NodeMaterial, generate a THREE.Material from it
-			let materialToRender = material;
-			
-			if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
-
-				console.log( '[Asset Inspector] NodeMaterial detected, generating THREE.Material...' );
-				materialToRender = generateMaterialFromNodes( material );
-				
-				if ( ! materialToRender ) {
-
-					console.warn( '[Asset Inspector] Failed to generate material from nodes, using default' );
-					materialToRender = new THREE.MeshStandardMaterial( { color: 0xcccccc } );
-
-				} else {
-
-					console.log( '[Asset Inspector] Generated material for preview:', materialToRender );
-
-				}
-
-			}
-
-			const dataUrl = await previewRenderer.renderMaterialPreview( materialToRender, 200, 200 );
-			console.log( '[Asset Inspector] Material preview rendered, dataUrl length:', dataUrl ? dataUrl.length : 0 );
-			if ( !dataUrl ) {
-				console.warn( '[Asset Inspector] Preview renderer returned empty dataUrl' );
-				return;
-			}
-			
-			// Cache the preview if we have an asset path
-			if ( assetPath && window.assetPreviewCache ) {
-
-				console.log( '[Asset Inspector] Caching preview in assetPreviewCache:', assetPath );
-				window.assetPreviewCache.set( assetPath, dataUrl );
-
-			}
-			
-			const img = document.createElement( 'img' );
-			img.src = dataUrl;
-			img.style.maxWidth = '100%';
-			img.style.maxHeight = '100%';
-			img.style.objectFit = 'contain';
-			img.style.display = 'block';
-			img.style.margin = '0 auto';
-			
-			// Register this img element for live updates
-			if ( assetPath && window.assetPreviewImageRefs ) {
-
-				if ( ! window.assetPreviewImageRefs.has( assetPath ) ) {
-
-					window.assetPreviewImageRefs.set( assetPath, new Set() );
-
-				}
-				window.assetPreviewImageRefs.get( assetPath ).add( img );
-				console.log( '[Asset Inspector] Registered img element for live updates:', assetPath );
-
-			}
-			
-			previewContainer.clear();
-			const imgContainer = new UIDiv();
-			imgContainer.dom.style.width = '100%';
-			imgContainer.dom.style.height = '100%';
-			imgContainer.dom.style.display = 'flex';
-			imgContainer.dom.style.alignItems = 'center';
-			imgContainer.dom.style.justifyContent = 'center';
-			imgContainer.dom.appendChild( img );
-			previewContainer.add( imgContainer );
-			console.log( '[Asset Inspector] Material preview image added to container' );
-		} catch ( error ) {
-			console.error( '[Asset Inspector] Failed to render material preview:', error );
+		if ( liveMaterialPreviewStop ) {
+			liveMaterialPreviewStop();
+			liveMaterialPreviewStop = null;
 		}
 	}
 
@@ -728,18 +449,11 @@ function SidebarAsset( editor ) {
 			texturePanel.setHidden( true );
 			materialPanel.setHidden( false );
 
-			previewPanel.expand();
 			assetPanel.expand();
 			materialPanel.expand();
 
 			await loadMaterial( asset );
-			if ( currentMaterial ) {
-				console.log( '[Asset Inspector] Material loaded, updating preview:', currentMaterial.type );
-				await updateMaterialPreview( currentMaterial );
-			} else {
-				console.warn( '[Asset Inspector] Material not loaded, trying updatePreview' );
-				await updatePreview( asset );
-			}
+			await updateMaterialPreview( currentMaterial );
 		} else {
 			texturePanel.setHidden( true );
 			materialPanel.setHidden( true );
@@ -926,42 +640,28 @@ function SidebarAsset( editor ) {
 					const materialObject = { material: material, isMaterial: true };
 					signals.materialChanged.dispatch( materialObject, 0 );
 					
-					materialAsset.on( 'changed', async function onMaterialAssetChanged() {
-						console.log( '[Asset Inspector] MaterialAsset changed event fired! Current asset:', currentMaterialAsset === materialAsset, 'isSavingMaterial:', isSavingMaterial );
-						
-						if ( currentMaterialAsset === materialAsset && !isSavingMaterial ) {
+					let assetChangedDebounceTimeout = null;
+					materialAsset.on( 'changed', function onMaterialAssetChanged() {
+						if ( currentMaterialAsset !== materialAsset || isSavingMaterial ) return;
+						if ( assetChangedDebounceTimeout ) clearTimeout( assetChangedDebounceTimeout );
+						assetChangedDebounceTimeout = setTimeout( async function () {
+							assetChangedDebounceTimeout = null;
 							const updatedMaterial = materialAsset.getMaterial();
-							
-							console.log( '[Asset Inspector] Got updated material:', updatedMaterial );
-							
-							// For NodeMaterial, always update (data object is same reference)
 							const isNodeMaterial = updatedMaterial && ( updatedMaterial.type === 'NodeMaterial' || updatedMaterial.isNodeMaterial );
-							
-							console.log( '[Asset Inspector] IsNodeMaterial:', isNodeMaterial, 'updatedMaterial !== currentMaterial:', updatedMaterial !== currentMaterial );
-							
 							if ( updatedMaterial && ( isNodeMaterial || updatedMaterial !== currentMaterial ) ) {
-
-								console.log( '[Asset Inspector] Material changed event, updating preview. IsNodeMaterial:', isNodeMaterial );
 								currentMaterial = updatedMaterial;
-								
 								editor.syncMaterialAssetToScene( materialAsset );
+								// Single source of truth: refresh global preview cache and all img refs (assets panel, mesh inspector, etc.)
+								if ( typeof window.refreshMaterialPreviewForAsset === 'function' ) {
+									await window.refreshMaterialPreviewForAsset( materialAsset ).catch( () => {} );
+								}
 								await updateMaterialPreview( currentMaterial ).catch( error => {
 									console.error( '[Asset Inspector] Failed to update material preview after asset change:', error );
 								} );
-								
 								const materialObject = { material: currentMaterial, isMaterial: true };
 								signals.materialChanged.dispatch( materialObject, 0 );
-
-							} else {
-
-								console.log( '[Asset Inspector] Skipped preview update - conditions not met' );
-
 							}
-						} else {
-
-							console.log( '[Asset Inspector] Skipped - not current asset or is saving' );
-
-						}
+						}, MATERIAL_CHANGE_SAVE_DEBOUNCE_MS );
 					} );
 					
 					try {
@@ -975,10 +675,32 @@ function SidebarAsset( editor ) {
 			
 			let material = null;
 
-			if ( asset.folder && asset.folder.files ) {
-				const file = asset.folder.files.find( f => f.path === asset.path );
-				console.log( '[Asset Inspector] Found file:', file ? { name: file.name, type: file.type, hasContent: !!file.content, path: file.path } : 'NOT FOUND' );
-				if ( file ) {
+			function findFileInFolder( folder, pathNorm, fileName ) {
+				const norm = ( p ) => ( p || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+				if ( folder.files ) {
+					const f = folder.files.find( file => norm( file.path ) === pathNorm || file.path === asset.path || file.name === fileName );
+					if ( f ) return f;
+				}
+				if ( folder.children ) {
+					for ( const child of folder.children ) {
+						const found = findFileInFolder( child, pathNorm, fileName );
+						if ( found ) return found;
+					}
+				}
+				return null;
+			}
+
+			const norm = ( p ) => ( p || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			const assetPathNorm = norm( asset.path );
+			const fileName = asset.name;
+			let file = asset.folder && asset.folder.files
+				? asset.folder.files.find( f => norm( f.path ) === assetPathNorm || f.path === asset.path || f.name === fileName )
+				: null;
+			if ( ! file && window.assetsRoot ) {
+				file = findFileInFolder( window.assetsRoot, assetPathNorm, fileName );
+			}
+			console.log( '[Asset Inspector] Found file:', file ? { name: file.name, type: file.type, hasContent: !!file.content, path: file.path } : 'NOT FOUND' );
+			if ( file ) {
 					if ( file.modelMaterial && file.modelMaterial.material ) {
 						material = file.modelMaterial.material;
 					} else if ( file.modelPath ) {
@@ -1036,12 +758,16 @@ function SidebarAsset( editor ) {
 								if ( materialData && materialData.type && materialData.type.includes( 'Material' ) ) {
 									console.log( '[Asset Inspector] Material data valid, parsing. Type:', materialData.type, 'Full data:', materialData );
 									
-									// Handle NodeMaterial - store as data object, don't instantiate with MaterialLoader
-									if ( materialData.type === 'NodeMaterial' ) {
+									// Handle NodeMaterial / *NodeMaterial (e.g. MeshStandardNodeMaterial) - preserve full graph
+									const isNodeMaterial = materialData.type === 'NodeMaterial' ||
+										( materialData.type && materialData.type.endsWith( 'NodeMaterial' ) ) ||
+										( materialData.nodes && materialData.connections );
+									if ( isNodeMaterial ) {
 
 										console.log( '[Asset Inspector] NodeMaterial detected, storing as data object' );
 										material = {
 											...materialData,
+											type: materialData.type || 'NodeMaterial',
 											isNodeMaterial: true,
 											assetPath: file.path,
 											sourceFile: file.name
@@ -1128,9 +854,7 @@ function SidebarAsset( editor ) {
 						}
 					}
 				}
-			}
-
-			if ( material && ( material instanceof THREE.Material || material.isNodeMaterial ) ) {
+			if ( material && ( material instanceof THREE.Material || material.isNodeMaterial || ( material.nodes && material.connections ) ) ) {
 				console.log( '[Asset Inspector] Material loaded successfully:', material.type, material.name );
 				currentMaterial = material;
 				editor.selected = null;
@@ -1138,24 +862,10 @@ function SidebarAsset( editor ) {
 				
 				// Only dispatch materialChanged for standard THREE.Material instances
 				// Node materials are plain data objects and don't work with SidebarMaterial UI
-				if ( material instanceof THREE.Material ) {
+				// Single material inspector: dispatch for both standard and node materials
+				const materialObject = { material: material, isMaterial: true };
+				signals.materialChanged.dispatch( materialObject, 0 );
 
-					const materialObject = { material: material, isMaterial: true };
-					signals.materialChanged.dispatch( materialObject, 0 );
-
-				}
-				
-				// Show/hide Edit Nodes button based on material type
-				if ( material.type === 'NodeMaterial' || material.isNodeMaterial ) {
-
-					editNodesRow.setDisplay( '' );
-
-				} else {
-
-					editNodesRow.setDisplay( 'none' );
-
-				}
-				
 				try {
 					await updateMaterialPreview( material );
 				} catch ( previewError ) {
@@ -1173,7 +883,8 @@ function SidebarAsset( editor ) {
 		if ( !currentAsset || !currentTextureAsset ) return;
 		
 		if ( currentAsset.folder && currentAsset.folder.files ) {
-			const file = currentAsset.folder.files.find( f => f.path === currentAsset.path );
+			const norm = ( p ) => ( p || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			const file = currentAsset.folder.files.find( f => norm( f.path ) === norm( currentAsset.path ) || f.name === currentAsset.name );
 			if ( file ) {
 				if ( !file.metadata ) {
 					file.metadata = {};
@@ -1209,10 +920,12 @@ function SidebarAsset( editor ) {
 		isSavingMaterial = true;
 		try {
 			if ( currentAsset.folder && currentAsset.folder.files ) {
-				const file = currentAsset.folder.files.find( f => f.path === currentAsset.path );
+				const norm = ( p ) => ( p || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+				const file = currentAsset.folder.files.find( f => norm( f.path ) === norm( currentAsset.path ) || f.name === currentAsset.name );
 				if ( file ) {
 					try {
-						const materialJson = currentMaterial.toJSON();
+						const isNodeMat = currentMaterial.type === 'NodeMaterial' || currentMaterial.isNodeMaterial || ( currentMaterial.nodes && currentMaterial.connections );
+						const materialJson = isNodeMat ? currentMaterial : currentMaterial.toJSON();
 						const materialContent = JSON.stringify( materialJson, null, '\t' );
 						file.content = materialContent;
 						file.size = materialContent.length;
@@ -1224,10 +937,15 @@ function SidebarAsset( editor ) {
 							} );
 						}
 						
-						const assetMaterial = currentMaterialAsset.getMaterial();
-						if ( assetMaterial !== currentMaterial ) {
-							await currentMaterialAsset.setMaterial( currentMaterial );
+						if ( isNodeMat ) {
+							currentMaterialAsset.data = currentMaterial;
 							editor.syncMaterialAssetToScene( currentMaterialAsset );
+						} else {
+							const assetMaterial = currentMaterialAsset.getMaterial();
+							if ( assetMaterial !== currentMaterial ) {
+								await currentMaterialAsset.setMaterial( currentMaterial );
+								editor.syncMaterialAssetToScene( currentMaterialAsset );
+							}
 						}
 						if ( currentMaterialAsset.metadata.materialType !== currentMaterial.type ) {
 							await currentMaterialAsset.updateMetadata( {
@@ -1254,7 +972,7 @@ function SidebarAsset( editor ) {
 
 	setInterval( checkAssetSelection, 100 );
 
-	signals.materialChanged.add( async function ( object, slot ) {
+	signals.materialChanged.add( function ( object, slot ) {
 		if ( !currentMaterial || !currentAsset || isSavingMaterial ) return;
 		
 		let materialToCheck = null;
@@ -1277,17 +995,24 @@ function SidebarAsset( editor ) {
 			if ( !isSameInstance && isSameAsset ) {
 				currentMaterial = materialToCheck;
 			}
-			
-			await updateMaterialPreview( currentMaterial ).catch( error => {
-				console.error( '[Asset Inspector] Failed to update material preview after change:', error );
-			} );
-			await saveMaterialContent();
+			if ( materialChangeSaveTimeout ) clearTimeout( materialChangeSaveTimeout );
+			materialChangeSaveTimeout = setTimeout( async function () {
+				materialChangeSaveTimeout = null;
+				await updateMaterialPreview( currentMaterial ).catch( error => {
+					console.error( '[Asset Inspector] Failed to update material preview after change:', error );
+				} );
+				await saveMaterialContent();
+			}, MATERIAL_CHANGE_SAVE_DEBOUNCE_MS );
 		} else if ( materialAssetPath && materialAssetPath === assetPath ) {
 			currentMaterial = materialToCheck;
-			await updateMaterialPreview( currentMaterial ).catch( error => {
-				console.error( '[Asset Inspector] Failed to update material preview after change:', error );
-			} );
-			await saveMaterialContent();
+			if ( materialChangeSaveTimeout ) clearTimeout( materialChangeSaveTimeout );
+			materialChangeSaveTimeout = setTimeout( async function () {
+				materialChangeSaveTimeout = null;
+				await updateMaterialPreview( currentMaterial ).catch( error => {
+					console.error( '[Asset Inspector] Failed to update material preview after change:', error );
+				} );
+				await saveMaterialContent();
+			}, MATERIAL_CHANGE_SAVE_DEBOUNCE_MS );
 		}
 	} );
 

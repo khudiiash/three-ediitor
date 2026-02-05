@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TSL, MeshStandardNodeMaterial, MeshPhysicalNodeMaterial, MeshBasicNodeMaterial, MeshPhongNodeMaterial } from 'three/webgpu';
 
 import { Config } from './Config.js';
 import { Loader } from './Loader.js';
@@ -12,279 +13,29 @@ import { CutObjectCommand } from './commands/CutObjectCommand.js';
 import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
 import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
 import { AssetObjectLoader } from './AssetObjectLoader.js';
-import { AssetRegistry } from '../../engine/dist/three-engine.js';
+import { AssetRegistry, MaterialAsset, createMaterialFromGraph, setNodeMaterialBackend } from '../../engine/dist/three-engine.js';
 import { ModuleSystem } from './ModuleSystem.js';
 import { TSLEditor } from './TSLEditor.js';
-import { MaterialAsset } from '../../engine/dist/three-engine.js';
 
-// Helper function to generate a THREE.Material from NodeMaterial data
+// Provide WebGPU/TSL backend to the engine so createMaterialFromGraph returns NodeMaterials in the editor
+setNodeMaterialBackend( {
+	TSL,
+	MeshStandardNodeMaterial,
+	MeshPhysicalNodeMaterial,
+	MeshBasicNodeMaterial,
+	MeshPhongNodeMaterial
+} );
+
+// Helper: generate a THREE.Material from NodeMaterial graph JSON (uses engine compiler; no duplication)
 function generateMaterialFromNodes( nodeMaterial ) {
 
-	if ( ! nodeMaterial || ! nodeMaterial.nodes ) {
-
-		return null;
-
-	}
-
-	// Find the output node
-	let outputNode = null;
-	let outputType = 'MeshStandardMaterial';
-	
-	for ( const nodeId in nodeMaterial.nodes ) {
-
-		const node = nodeMaterial.nodes[ nodeId ];
-		if ( node.type && node.type.startsWith( 'output' ) ) {
-
-			outputNode = node;
-			
-			// Determine material type from node type
-			if ( node.type === 'outputStandard' ) outputType = 'MeshStandardMaterial';
-			else if ( node.type === 'outputPhysical' ) outputType = 'MeshPhysicalMaterial';
-			else if ( node.type === 'outputBasic' ) outputType = 'MeshBasicMaterial';
-			else if ( node.type === 'outputPhong' ) outputType = 'MeshPhongMaterial';
-			
-			break;
-
-		}
-
-	}
-
-	if ( ! outputNode ) {
-
-		// No output node, use default material
-		return new THREE.MeshStandardMaterial( { color: 0xcccccc } );
-
-	}
-
-	// Create the material based on output type
-	let material;
-	if ( outputType === 'MeshStandardMaterial' ) {
-
-		material = new THREE.MeshStandardMaterial();
-
-	} else if ( outputType === 'MeshPhysicalMaterial' ) {
-
-		material = new THREE.MeshPhysicalMaterial();
-
-	} else if ( outputType === 'MeshBasicMaterial' ) {
-
-		material = new THREE.MeshBasicMaterial();
-
-	} else if ( outputType === 'MeshPhongMaterial' ) {
-
-		material = new THREE.MeshPhongMaterial();
-
-	} else {
-
-		material = new THREE.MeshStandardMaterial();
-
-	}
-
-	// Traverse connections to evaluate material properties
-	const connections = nodeMaterial.connections || [];
-	
-	// Helper function to evaluate a node output value
-	function evaluateNodeOutput( nodeId, outputIndex ) {
-
-		const node = nodeMaterial.nodes[ nodeId ];
-		if ( ! node ) return null;
-
-		// Handle constant value nodes
-		if ( node.type === 'color' ) {
-
-			if ( node.properties && node.properties.color ) {
-
-				const color = new THREE.Color( node.properties.color );
-				
-				// Return specific component if requested (R, G, B outputs)
-				if ( outputIndex === 0 ) return color.r; // R
-				if ( outputIndex === 1 ) return color.g; // G
-				if ( outputIndex === 2 ) return color.b; // B
-				if ( outputIndex === 3 ) return color; // RGB
-				
-				return color; // Default to full color
-
-			}
-
-		} else if ( node.type === 'float' ) {
-
-			return node.properties ? node.properties.value : 1.0;
-
-		} else if ( node.type === 'int' ) {
-
-			return node.properties ? node.properties.value : 0;
-
-		} else if ( node.type === 'vec2' ) {
-
-			if ( node.properties ) {
-
-				const x = node.properties.x || 0;
-				const y = node.properties.y || 0;
-				
-				if ( outputIndex === 0 ) return x; // X
-				if ( outputIndex === 1 ) return y; // Y
-				if ( outputIndex === 2 ) return new THREE.Vector2( x, y ); // XY
-				
-				return new THREE.Vector2( x, y );
-
-			}
-
-		} else if ( node.type === 'vec3' ) {
-
-			if ( node.properties ) {
-
-				const x = node.properties.x || 0;
-				const y = node.properties.y || 0;
-				const z = node.properties.z || 0;
-				
-				if ( outputIndex === 0 ) return x; // X
-				if ( outputIndex === 1 ) return y; // Y
-				if ( outputIndex === 2 ) return z; // Z
-				if ( outputIndex === 3 ) return new THREE.Vector3( x, y, z ); // XYZ
-				
-				return new THREE.Vector3( x, y, z );
-
-			}
-
-		} else if ( node.type === 'vec4' ) {
-
-			if ( node.properties ) {
-
-				const x = node.properties.x || 0;
-				const y = node.properties.y || 0;
-				const z = node.properties.z || 0;
-				const w = node.properties.w || 0;
-				
-				if ( outputIndex === 0 ) return x; // X
-				if ( outputIndex === 1 ) return y; // Y
-				if ( outputIndex === 2 ) return z; // Z
-				if ( outputIndex === 3 ) return w; // W
-				if ( outputIndex === 4 ) return new THREE.Vector4( x, y, z, w ); // XYZW
-				
-				return new THREE.Vector4( x, y, z, w );
-
-			}
-
-		} else if ( node.type === 'uv' ) {
-
-			// UV node: For now, return a default value
-			// In a real shader system, this would be handled by the GPU
-			// We'll return a mid-gray color as a placeholder
-			if ( outputIndex === 0 ) return 0.5; // X
-			if ( outputIndex === 1 ) return 0.5; // Y
-			if ( outputIndex === 2 ) return new THREE.Vector2( 0.5, 0.5 ); // XY
-			
-			return new THREE.Vector2( 0.5, 0.5 );
-
-		}
-
-		// For other geometry/texture nodes, return sensible defaults
-		// These would normally be computed per-pixel by the shader
-		if ( node.type && ( 
-			node.type.startsWith( 'normal' ) || 
-			node.type.startsWith( 'position' ) || 
-			node.type.startsWith( 'tangent' ) 
-		) ) {
-
-			// Return default values for geometry attributes
-			if ( outputIndex === 0 ) return 0.5; // X
-			if ( outputIndex === 1 ) return 0.5; // Y
-			if ( outputIndex === 2 ) return 0.5; // Z
-			if ( outputIndex === 3 ) return new THREE.Vector3( 0.5, 0.5, 0.5 ); // XYZ
-			
-			return new THREE.Vector3( 0.5, 0.5, 0.5 );
-
-		}
-
-		return null;
-
-	}	
-	// Helper function to find connected node for an input
-	function getConnectedValue( nodeId, inputIndex ) {
-
-		const connection = connections.find( c => c.toNode === parseInt( nodeId ) && c.toInput === inputIndex );
-		if ( ! connection ) return null;
-
-		// Evaluate the source node's output
-		return evaluateNodeOutput( connection.fromNode, connection.fromOutput );
-
-	}
-
-	// Find the output node ID
-	let outputNodeId = null;
-	for ( const nodeId in nodeMaterial.nodes ) {
-
-		if ( nodeMaterial.nodes[ nodeId ] === outputNode ) {
-
-			outputNodeId = nodeId;
-			break;
-
-		}
-
-	}
-
-	// Map input connections to material properties
-	if ( outputNodeId ) {
-
-		// Color (input 0)
-		const colorValue = getConnectedValue( outputNodeId, 0 );
-		if ( colorValue ) {
-
-			if ( colorValue instanceof THREE.Color ) {
-
-				material.color = colorValue;
-
-			} else if ( colorValue instanceof THREE.Vector2 ) {
-
-				// Vec2: use X, Y as R, G (useful for UV visualization)
-				material.color = new THREE.Color( colorValue.x, colorValue.y, 0 );
-
-			} else if ( colorValue instanceof THREE.Vector3 ) {
-
-				// Vec3: use X, Y, Z as R, G, B
-				material.color = new THREE.Color( colorValue.x, colorValue.y, colorValue.z );
-
-			} else if ( colorValue instanceof THREE.Vector4 ) {
-
-				// Vec4: use X, Y, Z as R, G, B (ignore W)
-				material.color = new THREE.Color( colorValue.x, colorValue.y, colorValue.z );
-
-			} else if ( typeof colorValue === 'number' ) {
-
-				// Single value, use as grayscale
-				material.color = new THREE.Color( colorValue, colorValue, colorValue );
-
-			}
-
-		}
-
-		// Roughness (input 1)
-		const roughnessValue = getConnectedValue( outputNodeId, 1 );
-		if ( roughnessValue !== null && material.roughness !== undefined ) {
-
-			if ( typeof roughnessValue === 'number' ) {
-
-				material.roughness = roughnessValue;
-
-			}
-
-		}
-
-		// Metalness (input 2)
-		const metalnessValue = getConnectedValue( outputNodeId, 2 );
-		if ( metalnessValue !== null && material.metalness !== undefined ) {
-
-			if ( typeof metalnessValue === 'number' ) {
-
-				material.metalness = metalnessValue;
-
-			}
-
-		}
-
-	}
-
-	return material;
+	if ( ! nodeMaterial ) return null;
+	const isNode = nodeMaterial.type === 'NodeMaterial' || nodeMaterial.isNodeMaterial ||
+		( nodeMaterial.type && typeof nodeMaterial.type === 'string' && nodeMaterial.type.endsWith( 'NodeMaterial' ) ) ||
+		( nodeMaterial.nodes && nodeMaterial.connections );
+	if ( ! isNode ) return null;
+
+	return createMaterialFromGraph( nodeMaterial );
 
 }
 
@@ -366,6 +117,7 @@ function Editor() {
 		materialAdded: new Signal(),
 		materialChanged: new Signal(),
 		materialRemoved: new Signal(),
+		createMaterialAsset: new Signal(),
 
 		scriptAdded: new Signal(),
 		scriptChanged: new Signal(),
@@ -380,10 +132,17 @@ function Editor() {
 
 		viewportCameraChanged: new Signal(),
 		viewportShadingChanged: new Signal(),
+		viewportRenderModeChanged: new Signal(),
 
 		intersectionsDetected: new Signal(),
 
 		pathTracerUpdated: new Signal(),
+
+		/** Dispatched each viewport animation frame with { time, deltaTime } (from viewport renderer nodeFrame). Use for synced time in live previews. */
+		animationFrame: new Signal(),
+
+		/** Dispatched when a project asset file content changes (e.g. node editor save). Payload: normalized asset path. */
+		assetFileChanged: new Signal(),
 	};
 
 	this.storage = new _Storage();
@@ -431,6 +190,8 @@ function Editor() {
 	this.viewportShading = 'default';
 
 	this.addCamera( this.camera );
+
+	this.generateMaterialFromNodes = generateMaterialFromNodes;
 
 }
 
@@ -939,13 +700,20 @@ Editor.prototype = {
 
 				// Store the original NodeMaterial data on the generated material
 				generatedMaterial.nodeMaterialData = newMaterial;
-				generatedMaterial.assetPath = newMaterial.assetPath;
+				generatedMaterial.assetPath = newMaterial.assetPath || ( newMaterial.assetPath && newMaterial.assetPath.replace( /^\/+/, '' ) );
+				// Store graph in userData so scene.toJSON() includes it for play mode
+				if ( newMaterial.nodes && newMaterial.connections ) {
+					generatedMaterial.userData.nodes = newMaterial.nodes;
+					generatedMaterial.userData.connections = newMaterial.connections;
+				}
 				newMaterial = generatedMaterial;
+				this.addMaterial( newMaterial );
 
 			} else {
 
 				console.warn( '[Editor] Failed to generate material from NodeMaterial, using default' );
-				newMaterial = new THREE.MeshStandardMaterial( { color: 0xff0000 } );
+				newMaterial = new MeshStandardNodeMaterial( { color: 0xff0000 } );
+				this.addMaterial( newMaterial );
 
 			}
 
@@ -965,22 +733,33 @@ Editor.prototype = {
 
 	syncMaterialAssetToScene: function ( materialAsset ) {
 
-		const assetMaterial = materialAsset.getMaterial && materialAsset.getMaterial();
-		if ( !assetMaterial ) return;
-
 		const assetUrl = ( materialAsset.url || '' ).replace( /^\/+/, '' );
+		let assetMaterial = materialAsset.getMaterial && materialAsset.getMaterial();
+
+		// Node materials: generate THREE.Material from asset.data (getMaterial() is null for node materials)
+		if ( ! assetMaterial && materialAsset.data && ( materialAsset.data.type === 'NodeMaterial' || materialAsset.data.isNodeMaterial ) ) {
+			assetMaterial = generateMaterialFromNodes( materialAsset.data );
+			if ( assetMaterial ) {
+				assetMaterial.nodeMaterialData = materialAsset.data;
+				assetMaterial.assetPath = materialAsset.data.assetPath || assetUrl;
+				if ( materialAsset.data.nodes && materialAsset.data.connections ) {
+					assetMaterial.userData.nodes = materialAsset.data.nodes;
+					assetMaterial.userData.connections = materialAsset.data.connections;
+				}
+			}
+		}
+		if ( ! assetMaterial ) return;
 
 		this.scene.traverse( function ( object ) {
 
-			if ( !object.material ) return;
+			if ( ! object.material ) return;
 
 			const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
 
 			materials.forEach( function ( current, index ) {
 
-				if ( !current || !current.assetPath ) return;
-
-				const matPath = ( current.assetPath || '' ).replace( /^\/+/, '' );
+				if ( ! current ) return;
+				const matPath = ( current.assetPath || ( current.nodeMaterialData && current.nodeMaterialData.assetPath ) || '' ).replace( /^\/+/, '' );
 				if ( matPath !== assetUrl ) return;
 				if ( current === assetMaterial ) return;
 
@@ -1423,6 +1202,26 @@ Editor.prototype = {
 
 		};
 
+		// Ensure node materials in scene JSON have nodes/connections for play mode
+		if ( result.scene && result.scene.materials && Array.isArray( result.scene.materials ) ) {
+			const materialGraphByUuid = {};
+			this.scene.traverse( function ( object ) {
+				const mats = object.material ? ( Array.isArray( object.material ) ? object.material : [ object.material ] ) : [];
+				mats.forEach( function ( m ) {
+					if ( ! m || materialGraphByUuid[ m.uuid ] ) return;
+					const data = m.nodeMaterialData || ( m.userData && m.userData.nodes ? { nodes: m.userData.nodes, connections: m.userData.connections } : null );
+					if ( data && data.nodes && data.connections ) materialGraphByUuid[ m.uuid ] = { nodes: data.nodes, connections: data.connections };
+				} );
+			} );
+			result.scene.materials.forEach( function ( mat ) {
+				if ( mat.type && String( mat.type ).endsWith( 'NodeMaterial' ) && ( ! mat.nodes || ! mat.connections ) && materialGraphByUuid[ mat.uuid ] ) {
+					const g = materialGraphByUuid[ mat.uuid ];
+					mat.nodes = g.nodes;
+					mat.connections = g.connections;
+				}
+			} );
+		}
+
 		for ( let i = 0; i < objectsToRestore.length; i++ ) {
 			const item = objectsToRestore[ i ];
 			item.parent.add( item.object );
@@ -1769,12 +1568,44 @@ Editor.prototype = {
 					}
 				}
 
+				// Before unregistering material assets: replace any mesh materials that reference them, then destroy asset
+				for ( const p of pathsToDelete ) {
+					const asset = scope.assets.getByUrl( p );
+					if ( asset && asset instanceof MaterialAsset ) {
+						const normPath = p.replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+						const defaultMat = new THREE.MeshStandardMaterial( { color: 0x888888, name: 'Default Material' } );
+						scope.addMaterial( defaultMat );
+						scope.scene.traverse( function ( object ) {
+							if ( ! object.material ) return;
+							const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+							materials.forEach( function ( current, index ) {
+								if ( ! current ) return;
+								const matPath = ( current.assetPath || ( current.nodeMaterialData && current.nodeMaterialData.assetPath ) || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+								if ( matPath !== normPath ) return;
+								if ( Array.isArray( object.material ) ) {
+									scope.removeMaterial( object.material[ index ] );
+									object.material[ index ] = defaultMat;
+									scope.signals.materialChanged.dispatch( object, index );
+								} else {
+									scope.removeMaterial( object.material );
+									object.material = defaultMat;
+									scope.signals.materialChanged.dispatch( object, 0 );
+								}
+							} );
+						} );
+					}
+				}
+
 				for ( const p of pathsToDelete ) {
 					scope.assets.unregisterByUrl( p );
 				}
 
 				window.selectedAsset = null;
 				scope.signals.sceneGraphChanged.dispatch();
+				// Refresh inspector so entity/mesh/material panel updates (no longer shows deleted asset)
+				if ( scope.selected ) {
+					scope.signals.objectSelected.dispatch( scope.selected );
+				}
 
 				if ( window.refreshAssets ) {
 					await window.refreshAssets();

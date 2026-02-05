@@ -27,7 +27,9 @@ function SidebarMaterialColorProperty( editor, property, name ) {
 
 	function onChange() {
 
-		if ( material[ property ].getHex() !== color.getHexValue() ) {
+		const value = material && material[ property ];
+		if ( ! value || typeof value.getHex !== 'function' ) return;
+		if ( value.getHex() !== color.getHexValue() ) {
 
 			editor.execute( new SetMaterialColorCommand( editor, object, property, color.getHexValue(), materialSlot ) );
 
@@ -55,17 +57,19 @@ function SidebarMaterialColorProperty( editor, property, name ) {
 
 		material = editor.getObjectMaterial( object, materialSlot );
 
-		// Don't update for NodeMaterials (they don't have THREE.Color properties)
-		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial ) ) {
+		// Don't update for NodeMaterials / graph data (they don't have THREE.Color properties)
+		if ( material && ( material.type === 'NodeMaterial' || material.isNodeMaterial || ( material.nodes && material.connections ) ) ) {
 
 			container.setDisplay( 'none' );
 			return;
 
 		}
 
-		if ( property in material ) {
+		const value = material[ property ];
+		const hasColor = value && typeof value.getHexString === 'function';
+		if ( property in material && hasColor ) {
 
-			color.setHexValue( material[ property ].getHexString() );
+			color.setHexValue( value.getHexString() );
 
 			if ( intensity !== undefined ) {
 

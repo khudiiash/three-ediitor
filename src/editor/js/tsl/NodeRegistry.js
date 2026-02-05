@@ -53,6 +53,41 @@ function getCategories() {
  * @param {string} type - Node type
  * @returns {Object} Node configuration (inputs, outputs, properties, height, width, color)
  */
+// Universal layout: compact (second-screenshot style). One row per socket: label + value inline.
+const HEADER_H = 22;
+const SOCKET_SPACING = 14;
+const BODY_PADDING = 0;
+const MIN_NODE_WIDTH = 68;
+
+function computeNodeWidth( definition, type ) {
+
+	if ( definition.width != null ) return definition.width;
+	const inputs = definition.inputs || [];
+	const outputs = definition.outputs || [];
+	const labels = [ ...inputs, ...outputs ].map( i => ( i.label || i.name || '' ).length );
+	const maxLabelLen = Math.max( 0, ...labels );
+	// Output-only nodes (e.g. MeshStandardMaterial): no right sockets, keep width tight
+	const outputOnly = ! outputs || outputs.length === 0;
+	const fromLabels = outputOnly
+		? Math.max( MIN_NODE_WIDTH, 24 + maxLabelLen * 5 )
+		: Math.min( 140, MIN_NODE_WIDTH + maxLabelLen * 4 );
+	// Color node: swatch + hex need room so hex doesn't overlap R output label
+	const fromContent = definition.hasInlineContent
+		? ( type === 'color' ? 110 : type === 'vec3' || type === 'vec4' ? 76 : 72 )
+		: MIN_NODE_WIDTH;
+	return Math.max( fromLabels, fromContent, MIN_NODE_WIDTH );
+
+}
+
+function computeNodeHeight( definition ) {
+
+	if ( definition.height != null ) return definition.height;
+	const socketCount = Math.max( ( definition.inputs || [] ).length, ( definition.outputs || [] ).length, 1 );
+	// Rows centered with 0.5 offset so first row clears header; height fits all rows
+	return HEADER_H + socketCount * SOCKET_SPACING + BODY_PADDING;
+
+}
+
 function createNodeConfig( type ) {
 
 	const definition = getNodeDefinition( type );
@@ -64,7 +99,7 @@ function createNodeConfig( type ) {
 			inputs: [ { name: 'Input', type: 'float', label: '' } ],
 			outputs: [ { name: 'OUT', type: 'float', label: '' } ],
 			properties: {},
-			height: 56,
+			height: HEADER_H + SOCKET_SPACING + BODY_PADDING,
 			width: 120,
 			color: '#4dabf7'
 		};
@@ -75,28 +110,13 @@ function createNodeConfig( type ) {
 		inputs: definition.inputs ? [ ...definition.inputs ] : [],
 		outputs: definition.outputs ? [ ...definition.outputs ] : [],
 		properties: definition.properties ? { ...definition.properties } : {},
-		height: definition.height || 56,
-		width: definition.width || 120,
+		height: computeNodeHeight( definition ),
+		width: computeNodeWidth( definition, type ),
 		color: definition.color || '#4dabf7'
 	};
-
-	// Calculate height if not specified
-	if ( ! definition.height ) {
-
-		const socketCount = Math.max( config.inputs.length, config.outputs.length, 1 );
-		config.height = 36 + socketCount * 20 + 4; // 32px header + sockets * 20px + 4px padding
-		
-		// Add extra space for inline content
-		if ( definition.hasInlineContent ) {
-
-			config.height += 8; // Extra space for inline displays
-
-		}
-
-	}
 
 	return config;
 
 }
 
-export { registerNode, getNodeDefinition, registerCategory, getCategories, createNodeConfig };
+export { registerNode, getNodeDefinition, registerCategory, getCategories, createNodeConfig, HEADER_H, SOCKET_SPACING, BODY_PADDING };

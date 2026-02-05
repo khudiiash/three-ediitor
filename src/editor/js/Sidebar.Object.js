@@ -1801,7 +1801,8 @@ function SidebarObject( editor ) {
 			particlePanel.setHidden( true );
 			scenePanel.setHidden( true );
 			panelsContainer.setDisplay( 'block' );
-		} else if ( editor.selected === null ) {
+		} else {
+			// No asset selected: show entity panel (mesh/light/camera visibility is set in updateRows when object is selected)
 			entityPanel.setHidden( false );
 		}
 	}

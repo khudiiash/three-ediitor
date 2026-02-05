@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Asset, AssetState, AssetType } from '../core/Asset';
+import { createMaterialFromGraph } from '../material/createMaterialFromGraph';
 
 export interface MaterialAssetMetadata {
 	name: string;
@@ -79,8 +80,21 @@ export class MaterialAsset extends Asset {
 			}
 			
 			let material: THREE.Material | null = null;
-			
-			if (materialData && materialData.type && materialData.type.includes('Material')) {
+
+			// Node materials (graph JSON): use engine compiler so runtime and editor share one path
+			const isNodeMaterial =
+				materialData?.type === 'NodeMaterial' ||
+				(materialData?.type && String(materialData.type).endsWith('NodeMaterial')) ||
+				(materialData?.nodes && materialData?.connections);
+			if (materialData && isNodeMaterial) {
+				try {
+					material = createMaterialFromGraph(materialData as any);
+				} catch (e) {
+					console.warn('[MaterialAsset] createMaterialFromGraph failed:', e);
+				}
+			}
+
+			if (!material && materialData && materialData.type && materialData.type.includes('Material')) {
 				try {
 					const loader = new THREE.MaterialLoader();
 					loader.setTextures({});
@@ -146,7 +160,8 @@ export class MaterialAsset extends Asset {
 			}
 
 			this.material = material;
-			this.data = material;
+			// Node materials: keep graph JSON in .data for editor/recompile; otherwise .data is the material
+			this.data = material && isNodeMaterial && materialData ? materialData : (material ?? this.data);
 			this.state = AssetState.LOADED;
 			this.emit('loaded', this.material);
 		} catch (error: any) {
@@ -165,7 +180,13 @@ export class MaterialAsset extends Asset {
 			this.material.dispose();
 		}
 		this.material = material;
-		this.data = material;
+		// For node materials: keep .data as the node JSON (for TSL editor); .material is the generated THREE.Material (for getMaterial() / mesh assignment)
+		const mat = material as THREE.Material & { nodeMaterialData?: any };
+		if (mat.nodeMaterialData) {
+			this.data = mat.nodeMaterialData;
+		} else {
+			this.data = material;
+		}
 		this.state = AssetState.LOADED;
 		if (this.metadata.materialType === undefined) {
 			this.metadata.materialType = material.type;

@@ -1,6 +1,7 @@
 import { UIPanel, UIRow, UIText, UIButton, UIInput, UISelect, UIColor } from './libs/ui.js';
 import * as THREE from 'three';
-import { getCategories, createNodeConfig } from './tsl/nodes.js';
+import { WebGPURenderer } from 'three/webgpu';
+import { getCategories, createNodeConfig, HEADER_H, SOCKET_SPACING } from './tsl/nodes.js';
 import { generateMaterialFromNodes } from './Editor.js';
 
 /**
@@ -14,6 +15,8 @@ function TSLEditor( editor ) {
 	let currentMaterial = null;
 	let editorWindow = null;
 	let nodeCanvas = null;
+	let nodeCanvasContainer = null;
+	let nodeOverlaysContainer = null;
 	let selectedNode = null;
 	let propertiesPanel = null;
 	
@@ -35,11 +38,16 @@ function TSLEditor( editor ) {
 	// Canvas context
 	let ctx = null;
 	
-	// Preview references
+	// Preview references (WebGPU for live TSL / NodeMaterial)
 	let previewRenderer = null;
 	let previewScene = null;
 	let previewMaterial = null;
 	let previewMesh = null;
+	let previewNodeMaterial = null;
+	let previewReady = false;
+	let unregisterPreviewAnimationFrame = null;
+	let sharedFrameTime = undefined;
+	let sharedFrameDeltaTime = undefined;
 
 	// History for undo/redo
 	const history = [];
@@ -129,165 +137,77 @@ function TSLEditor( editor ) {
 
 	}
 
-	function closeEditor() {
+	async function closeEditor() {
 
-		if ( editorWindow ) {
+		if ( ! editorWindow ) return;
 
-			// Save before closing
-			saveMaterial();
-			
-			// Force reload of the material asset
-			if ( currentMaterial && currentMaterial.assetPath ) {
+		// Save and sync immediately so meshes and all previews update before the window closes
+		await saveMaterial();
 
-				const assetPath = currentMaterial.assetPath.startsWith( '/' ) 
-					? currentMaterial.assetPath.slice( 1 ) 
-					: currentMaterial.assetPath;
-				
-				// Wait for file to be written, then force asset reload
-				setTimeout( async () => {
+		if ( currentMaterial && currentMaterial.assetPath ) {
 
-					// Get the material asset
-					const materialAsset = editor.assets.getByUrl( assetPath );
-					
-					if ( materialAsset ) {
+			const assetPath = currentMaterial.assetPath.replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			if ( editor.signals && editor.signals.assetFileChanged ) {
 
-						console.log( '[TSLEditor] Reloading material asset:', assetPath );
+				editor.signals.assetFileChanged.dispatch( assetPath );
 
-						// Force the asset to reload from file by clearing cached data
-						materialAsset.state = 'not_loaded';
-						
-						if ( materialAsset.data ) {
+			}
+			// If Asset Inspector is showing this material, force it to refresh
+			if ( window.selectedAsset && window.selectedAsset.path ) {
 
-							delete materialAsset.data;
+				const selectedPath = ( window.selectedAsset.path || '' ).replace( /^\/+/, '' );
+				if ( selectedPath === assetPath ) {
 
-						}
-						
-						// Read the file content from disk
-						const isTauri = typeof window.__TAURI__ !== 'undefined';
-						const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
-						
-						if ( isTauri && projectPath ) {
+					const currentSelection = window.selectedAsset;
+					window.selectedAsset = null;
+					setTimeout( () => { window.selectedAsset = currentSelection; }, 0 );
+					if ( editor.signals && editor.signals.sceneGraphChanged ) {
 
-							try {
-
-								const invoke = window.__TAURI__.core.invoke;
-								const fileBytes = await invoke( 'read_asset_file', {
-									projectPath: projectPath,
-									assetPath: assetPath
-								} );
-								
-								// Convert bytes to string
-								const decoder = new TextDecoder();
-								const fileContent = decoder.decode( new Uint8Array( fileBytes ) );
-								
-								// Parse and update the material data
-								const materialData = JSON.parse( fileContent );
-								materialAsset.data = materialData;
-								materialAsset.data.assetPath = assetPath;
-								
-								console.log( '[TSLEditor] Material reloaded from file:', materialData );
-								
-								// Trigger change event (use emitAsync for async listeners)
-								console.log( '[TSLEditor] Emitting changed event on materialAsset...' );
-								materialAsset.emitAsync( 'changed' ).then( () => {
-
-									console.log( '[TSLEditor] Changed event emitted successfully' );
-
-								} ).catch( err => {
-
-									console.error( '[TSLEditor] Error emitting changed event:', err );
-
-								} );
-								
-								// Force Asset Inspector to refresh by temporarily clearing selection
-								if ( window.selectedAsset && window.selectedAsset.path ) {
-
-									const selectedPath = window.selectedAsset.path.startsWith( '/' )
-										? window.selectedAsset.path.slice( 1 )
-										: window.selectedAsset.path;
-									
-									if ( selectedPath === assetPath ) {
-
-										console.log( '[TSLEditor] Material is selected in Asset Inspector, forcing refresh...' );
-										
-										// Save the current selection
-										const currentSelection = window.selectedAsset;
-										
-										// Clear selection to force update detection
-										window.selectedAsset = null;
-										
-										// Restore selection after a short delay
-										setTimeout( () => {
-
-											window.selectedAsset = currentSelection;
-											console.log( '[TSLEditor] Selection restored, Asset Inspector should update' );
-
-										}, 50 );
-
-									}
-
-								}
-
-							} catch ( err ) {
-
-								console.error( '[TSLEditor] Failed to reload material:', err );
-
-							}
-
-						}
-						
-						// Trigger signals
-						if ( editor.signals && editor.signals.assetFileChanged ) {
-
-							editor.signals.assetFileChanged.dispatch( assetPath );
-
-						}
-						
-						// Refresh the assets panel to update preview
-						if ( window.selectedAsset && window.selectedAsset.path ) {
-
-							const selectedPath = window.selectedAsset.path.startsWith( '/' )
-								? window.selectedAsset.path.slice( 1 )
-								: window.selectedAsset.path;
-							
-							if ( selectedPath === assetPath ) {
-
-								// Re-select the asset to trigger preview update
-								editor.signals.sceneGraphChanged.dispatch();
-
-							}
-
-						}
+						editor.signals.sceneGraphChanged.dispatch();
 
 					}
 
-				}, 150 ); // Increased delay to ensure file is written
+				}
 
 			}
 
-			// Remove keyboard listener
-			document.removeEventListener( 'keydown', handleKeyDown );
+		}
 
-			document.body.removeChild( editorWindow );
-			editorWindow = null;
-			nodeCanvas = null;
-			selectedNode = null;
-			currentMaterial = null;
-			nodes.length = 0;
-			connections = [];
-			ctx = null;
+		// Remove keyboard and window listeners
+		document.removeEventListener( 'keydown', handleKeyDown );
+		window.removeEventListener( 'mouseup', onMouseUp );
 
-			// Clear history
-			history.length = 0;
-			historyIndex = -1;
+		if ( previewNodeMaterial ) {
 
-			// Clear autosave timeout
-			if ( autosaveTimeout ) {
+			previewNodeMaterial.dispose();
+			previewNodeMaterial = null;
 
-				clearTimeout( autosaveTimeout );
-				autosaveTimeout = null;
+		}
+		if ( unregisterPreviewAnimationFrame ) {
+			if ( typeof unregisterPreviewAnimationFrame.detach === 'function' ) unregisterPreviewAnimationFrame.detach();
+			unregisterPreviewAnimationFrame = null;
+		}
+		sharedFrameTime = undefined;
+		sharedFrameDeltaTime = undefined;
+		previewReady = false;
+		document.body.removeChild( editorWindow );
+		editorWindow = null;
+		nodeCanvas = null;
+		selectedNode = null;
+		currentMaterial = null;
+		nodes.length = 0;
+		connections = [];
+		ctx = null;
 
-			}
+		// Clear history
+		history.length = 0;
+		historyIndex = -1;
+
+		// Clear autosave timeout
+		if ( autosaveTimeout ) {
+
+			clearTimeout( autosaveTimeout );
+			autosaveTimeout = null;
 
 		}
 
@@ -378,7 +298,7 @@ function TSLEditor( editor ) {
 			selectedNode = null;
 			updatePropertiesPanel( null );
 			updatePreviewMaterial();
-			
+			buildNodeOverlays();
 			saveHistoryState();
 			triggerAutosave();
 
@@ -591,6 +511,7 @@ function TSLEditor( editor ) {
 		container.style.flex = '1';
 		container.style.position = 'relative';
 		container.style.backgroundColor = '#0a0a0a';
+		nodeCanvasContainer = container;
 
 		const canvas = document.createElement( 'canvas' );
 		canvas.style.width = '100%';
@@ -599,6 +520,19 @@ function TSLEditor( editor ) {
 		container.appendChild( canvas );
 
 		nodeCanvas = canvas;
+
+		// Overlay for in-node value editing (Unity/Blender style)
+		const overlay = document.createElement( 'div' );
+		overlay.style.position = 'absolute';
+		overlay.style.left = '0';
+		overlay.style.top = '0';
+		overlay.style.width = '100%';
+		overlay.style.height = '100%';
+		overlay.style.pointerEvents = 'none';
+		overlay.style.overflow = 'hidden';
+		overlay.id = 'tsl-node-overlays';
+		container.appendChild( overlay );
+		nodeOverlaysContainer = overlay;
 
 		return container;
 
@@ -638,15 +572,17 @@ function TSLEditor( editor ) {
 		previewContainer.style.justifyContent = 'center';
 		previewContainer.style.border = '1px solid #2a2a2a';
 
-		// Create Three.js preview renderer
-		previewRenderer = new THREE.WebGLRenderer( { antialias: true, alpha: true } );
-		previewRenderer.setSize( 268, 200 );
+		// WebGPU preview renderer for live TSL / NodeMaterial (time, animations)
+		const previewWidth = 268;
+		const previewHeight = 200;
+		previewRenderer = new WebGPURenderer( { antialias: true, alpha: true } );
+		previewRenderer.setSize( previewWidth, previewHeight );
 		previewRenderer.setClearColor( 0x1a1a1a, 1 );
 		previewContainer.appendChild( previewRenderer.domElement );
 
 		// Setup preview scene
 		previewScene = new THREE.Scene();
-		const previewCamera = new THREE.PerspectiveCamera( 45, 268 / 200, 0.1, 1000 );
+		const previewCamera = new THREE.PerspectiveCamera( 45, previewWidth / previewHeight, 0.1, 1000 );
 		previewCamera.position.set( 0, 0, 3 );
 
 		const ambientLight = new THREE.AmbientLight( 0xffffff, 0.5 );
@@ -656,7 +592,7 @@ function TSLEditor( editor ) {
 		directionalLight.position.set( 1, 1, 1 );
 		previewScene.add( directionalLight );
 
-		// Preview sphere
+		// Preview sphere; fallback material until NodeMaterial is assigned
 		const previewGeometry = new THREE.SphereGeometry( 1, 64, 64 );
 		previewMaterial = new THREE.MeshStandardMaterial( {
 			color: currentMaterial && currentMaterial.color !== undefined ? currentMaterial.color : 0xffffff,
@@ -666,17 +602,56 @@ function TSLEditor( editor ) {
 		previewMesh = new THREE.Mesh( previewGeometry, previewMaterial );
 		previewScene.add( previewMesh );
 
-		// Animate preview
-		function animatePreview() {
+		// WebGPU init is async; then run live preview loop
+		( async () => {
 
-			if ( ! editorWindow ) return;
-			
-			previewMesh.rotation.y += 0.005;
-			previewRenderer.render( previewScene, previewCamera );
-			requestAnimationFrame( animatePreview );
+			if ( ! previewRenderer || ! editorWindow ) return;
+			try {
 
-		}
-		animatePreview();
+				await previewRenderer.init();
+				previewReady = true;
+				updatePreviewMaterial();
+				// Sync preview time with viewport so NodeMaterial `time` matches main viewport / other previews
+				if ( signals.animationFrame ) {
+					unregisterPreviewAnimationFrame = signals.animationFrame.add( ( { time, deltaTime } ) => {
+						sharedFrameTime = time;
+						sharedFrameDeltaTime = deltaTime;
+					} );
+				}
+
+			} catch ( err ) {
+
+				console.warn( '[TSLEditor] WebGPU preview init failed:', err );
+
+			}
+			function animatePreview() {
+
+				if ( ! editorWindow ) return;
+				if ( previewReady && previewRenderer ) {
+
+					if ( previewRenderer.nodes && previewRenderer.nodes.nodeFrame ) {
+						const nf = previewRenderer.nodes.nodeFrame;
+						if ( sharedFrameTime !== undefined && sharedFrameDeltaTime !== undefined ) {
+							nf.time = sharedFrameTime;
+							nf.deltaTime = sharedFrameDeltaTime;
+						} else {
+							// Fallback when viewport hasn't ticked yet or isn't running (e.g. only node editor open)
+							const t = performance.now() / 1000;
+							nf.deltaTime = nf.lastTime !== undefined ? t - nf.lastTime : 1 / 60;
+							nf.time = nf.time !== undefined ? nf.time + nf.deltaTime : t;
+							nf.lastTime = t;
+						}
+					}
+					previewMesh.rotation.y += 0.005;
+					previewRenderer.render( previewScene, previewCamera );
+
+				}
+				requestAnimationFrame( animatePreview );
+
+			}
+			animatePreview();
+
+		} )();
 
 		previewSection.appendChild( previewContainer );
 		panel.appendChild( previewSection );
@@ -728,10 +703,11 @@ function TSLEditor( editor ) {
 		// Scale context to match DPI
 		ctx.scale( dpr, dpr );
 
-		// Event listeners
+		// Event listeners (mouseup on window so drag/pan/connection end when pointer released anywhere)
 		nodeCanvas.addEventListener( 'mousedown', onMouseDown );
 		nodeCanvas.addEventListener( 'mousemove', onMouseMove );
 		nodeCanvas.addEventListener( 'mouseup', onMouseUp );
+		window.addEventListener( 'mouseup', onMouseUp );
 		nodeCanvas.addEventListener( 'wheel', onWheel );
 		nodeCanvas.addEventListener( 'dblclick', onDoubleClick );
 
@@ -790,6 +766,7 @@ function TSLEditor( editor ) {
 		// Save to history and trigger autosave
 		saveHistoryState();
 		triggerAutosave();
+		buildNodeOverlays();
 
 	}
 
@@ -816,18 +793,21 @@ function TSLEditor( editor ) {
 
 				const savedNode = material.nodes[ nodeId ];
 				const id = parseInt( nodeId );
-				
+				const pos = savedNode.position;
+				const px = ( pos && typeof pos.x === 'number' ) ? pos.x : 0;
+				const py = ( pos && typeof pos.y === 'number' ) ? pos.y : 0;
+
 				// Get node configuration from registry
 				const nodeConfig = createNodeConfig( savedNode.type );
-				
+
 				const node = {
 					id: id,
 					type: savedNode.type,
 					name: savedNode.name,
 					color: savedNode.color || nodeConfig.color || '#4dabf7',
-					x: savedNode.position.x,
-					y: savedNode.position.y,
-					width: savedNode.width || nodeConfig.width, // Use saved width or config width
+					x: px,
+					y: py,
+					width: savedNode.width || nodeConfig.width,
 					height: nodeConfig.height,
 					inputs: nodeConfig.inputs,
 					outputs: nodeConfig.outputs,
@@ -867,6 +847,7 @@ function TSLEditor( editor ) {
 			
 			// Update preview after loading nodes
 			updatePreviewMaterial();
+			buildNodeOverlays();
 
 		}
 
@@ -882,9 +863,13 @@ function TSLEditor( editor ) {
 
 	}
 
+	/**
+	 * Updates currentMaterial from graph, optionally writes to file, and syncs scene + previews.
+	 * @returns {Promise<void>} Resolves when save and sync are complete (so callers can await before closing).
+	 */
 	function saveMaterial() {
 
-		if ( ! currentMaterial ) return;
+		if ( ! currentMaterial ) return Promise.resolve();
 
 		// Convert nodes to material data structure
 		const materialNodes = {};
@@ -910,72 +895,132 @@ function TSLEditor( editor ) {
 			toInput: conn.toInput
 		} ) );
 
-		// Update material
+		// Update material in memory (so sync uses latest graph even before file write)
 		currentMaterial.nodes = materialNodes;
 		currentMaterial.connections = materialConnections;
 
 		console.log( '[TSLEditor] Material data updated with nodes:', Object.keys( materialNodes ).length, 'connections:', materialConnections.length );
-		console.log( '[TSLEditor] Material saved:', currentMaterial );
 
-		// Save to file using assetPath or uuid
 		const assetPath = currentMaterial.assetPath || currentMaterial.sourceFile;
-		
-		console.log( '[TSLEditor] Attempting to save to path:', assetPath );
-		
-		if ( assetPath ) {
+		const materialJSON = JSON.stringify( currentMaterial, null, '\t' );
 
-			// Save directly to file
-			const materialJSON = JSON.stringify( currentMaterial, null, '\t' );
-			
-			console.log( '[TSLEditor] Saving JSON, length:', materialJSON.length );
-			
-			// Use Tauri invoke to write the file
-			const isTauri = typeof window.__TAURI__ !== 'undefined';
-			const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
-			
-			if ( isTauri && projectPath ) {
+		function syncAssetAndScene() {
 
-				const invoke = window.__TAURI__.core.invoke;
-				
-				// Clean up the asset path
-				let cleanPath = assetPath.startsWith( '/' ) ? assetPath.slice( 1 ) : assetPath;
-				cleanPath = cleanPath.replace( /\/+/g, '/' );
-				
-				invoke( 'write_asset_file', {
-					projectPath: projectPath,
-					assetPath: cleanPath,
-					content: Array.from( new TextEncoder().encode( materialJSON ) )
-				} ).then( () => {
+			const cleanPath = ( assetPath || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			if ( ! cleanPath ) return Promise.resolve();
 
-					console.log( '[TSLEditor] Material saved to file:', cleanPath );
-					showAutosaveStatus( 'Saved' );
-					
-					// Update the file content in the asset system so it reloads correctly
-					if ( window.updateFileContent ) {
+			// Always sync scene from in-memory graph (does not depend on asset being in registry)
+			const graphData = JSON.parse( materialJSON );
+			const newMaterial = generateMaterialFromNodes( graphData );
+			if ( ! newMaterial ) return Promise.resolve();
+			newMaterial.nodeMaterialData = graphData;
+			newMaterial.assetPath = cleanPath;
+			editor.addMaterial( newMaterial );
 
-						window.updateFileContent( assetPath, materialJSON );
+			const normalized = ( p ) => ( p || '' ).replace( /^\/+/, '' ).replace( /\/+/g, '/' );
+			editor.scene.traverse( ( object ) => {
+
+				if ( ! object.material ) return;
+				const materials = Array.isArray( object.material ) ? object.material : [ object.material ];
+				materials.forEach( ( current, index ) => {
+
+					if ( ! current ) return;
+					const matPath = normalized( current.assetPath || ( current.nodeMaterialData && current.nodeMaterialData.assetPath ) );
+					if ( matPath !== cleanPath ) return;
+					if ( current === newMaterial ) return;
+					editor.removeMaterial( current );
+					if ( Array.isArray( object.material ) ) {
+
+						object.material[ index ] = newMaterial;
+
+					} else {
+
+						object.material = newMaterial;
 
 					}
-
-				} ).catch( err => {
-
-					console.error( '[TSLEditor] Failed to save material:', err );
-					showAutosaveStatus( 'Error saving', true );
+					editor.signals.materialChanged.dispatch( object, index );
 
 				} );
 
-			} else {
+			} );
 
-				console.warn( '[TSLEditor] Tauri not available or no project path, cannot save material' );
-				showAutosaveStatus( 'Error: No project', true );
+			// Update asset in registry if present so inspector and future loads stay in sync
+			const materialAsset = editor.assets.getByUrl( cleanPath ) || editor.assets.getByUrl( '/' + cleanPath );
+			if ( materialAsset ) {
+
+				try {
+
+					materialAsset.data = graphData;
+					materialAsset.data.assetPath = cleanPath;
+					if ( typeof materialAsset.setMaterial === 'function' ) {
+
+						materialAsset.setMaterial( newMaterial ).catch( () => {} );
+
+					}
+
+				} catch ( e ) {
+
+					console.warn( '[TSLEditor] Failed to update material asset:', e );
+
+				}
 
 			}
 
-		} else {
+			// Refresh all preview thumbnails (use same newMaterial so preview matches scene)
+			const refreshPromise = typeof window.refreshMaterialPreviewByPath === 'function'
+				? window.refreshMaterialPreviewByPath( cleanPath, newMaterial )
+				: ( materialAsset && typeof window.refreshMaterialPreviewForAsset === 'function'
+					? window.refreshMaterialPreviewForAsset( materialAsset )
+					: Promise.resolve() );
+			return refreshPromise.then( () => {
 
-			console.warn( '[TSLEditor] No asset path found, cannot save material' );
+				editor.signals.materialChanged.dispatch( editor.selected, 0 );
+
+			} );
 
 		}
+
+		if ( ! assetPath ) {
+
+			console.warn( '[TSLEditor] No asset path found, cannot save material' );
+			return Promise.resolve();
+
+		}
+
+		const isTauri = typeof window.__TAURI__ !== 'undefined';
+		const projectPath = editor.storage && editor.storage.getProjectPath ? editor.storage.getProjectPath() : null;
+
+		if ( isTauri && projectPath ) {
+
+			const invoke = window.__TAURI__.core.invoke;
+			let cleanPath = assetPath.startsWith( '/' ) ? assetPath.slice( 1 ) : assetPath;
+			cleanPath = cleanPath.replace( /\/+/g, '/' );
+
+			return invoke( 'write_asset_file', {
+				projectPath: projectPath,
+				assetPath: cleanPath,
+				content: Array.from( new TextEncoder().encode( materialJSON ) )
+			} ).then( () => {
+
+				console.log( '[TSLEditor] Material saved to file:', cleanPath );
+				showAutosaveStatus( 'Saved' );
+				if ( window.updateFileContent ) window.updateFileContent( assetPath, materialJSON );
+				return syncAssetAndScene();
+
+			} ).catch( err => {
+
+				console.error( '[TSLEditor] Failed to save material:', err );
+				showAutosaveStatus( 'Error saving', true );
+				// Still sync from in-memory data so scene updates even if file write failed
+				return syncAssetAndScene();
+
+			} );
+
+		}
+
+		// No Tauri: sync from memory only so scene and previews update immediately
+		console.warn( '[TSLEditor] Tauri not available or no project path' );
+		return syncAssetAndScene();
 
 	}
 
@@ -1097,8 +1142,9 @@ function TSLEditor( editor ) {
 		selectedNode = null;
 		updatePropertiesPanel( null );
 
-		// Update preview
+		// Update preview and in-node overlays
 		updatePreviewMaterial();
+		buildNodeOverlays();
 
 		// Trigger autosave
 		triggerAutosave();
@@ -1142,7 +1188,7 @@ function TSLEditor( editor ) {
 			selectedNode = null;
 			updatePropertiesPanel( null );
 			updatePreviewMaterial();
-			
+			buildNodeOverlays();
 			saveHistoryState();
 			triggerAutosave();
 
@@ -1170,6 +1216,7 @@ function TSLEditor( editor ) {
 		// Select the new node
 		selectedNode = newNode;
 		updatePropertiesPanel( newNode );
+		buildNodeOverlays();
 
 		console.log( '[TSLEditor] Node pasted:', newNode );
 
@@ -1236,13 +1283,16 @@ function TSLEditor( editor ) {
 		// Draw nodes
 		nodes.forEach( node => drawNode( node ) );
 
+		// Keep overlay in sync with pan/zoom
+		updateNodeOverlayTransform();
+
 		// Restore context state
 		ctx.restore();
 
 	}
 
-	// Helper function to get socket color based on type
-	function getSocketColor( type ) {
+	// Helper: get socket color by type; when dimmed (unconnected) use same hue but dimmed
+	function getSocketColor( type, dimmed = false ) {
 
 		const colors = {
 			'float': { main: '#74c0fc', border: '#1e40af', glow: 'rgba(116, 192, 252, 0.3)' },
@@ -1254,10 +1304,17 @@ function TSLEditor( editor ) {
 			'bool': { main: '#ff6b6b', border: '#c92a2a', glow: 'rgba(255, 107, 107, 0.3)' },
 			'texture': { main: '#ff8787', border: '#e03131', glow: 'rgba(255, 135, 135, 0.3)' }
 		};
-
-		// Default to purple if type not found
-		return colors[ type ] || { main: '#8b5cf6', border: '#5b21b6', glow: 'rgba(139, 92, 246, 0.3)' };
-
+		const c = colors[ type ] || { main: '#8b5cf6', border: '#5b21b6', glow: 'rgba(139, 92, 246, 0.3)' };
+		if ( ! dimmed ) return c;
+		// Dimmed: still clearly show type (blue/green/etc.) – use 0.65 so sockets stay recognizable
+		return {
+			main: c.main.replace( /^#(.{2})(.{2})(.{2})$/, ( _, r, g, b ) => {
+				const dim = ( n ) => Math.round( parseInt( n, 16 ) * 0.65 ).toString( 16 ).padStart( 2, '0' );
+				return '#' + dim( r ) + dim( g ) + dim( b );
+			} ),
+			border: '#333',
+			glow: 'rgba(80, 80, 80, 0.25)'
+		};
 	}
 
 	function drawGrid() {
@@ -1295,67 +1352,184 @@ function TSLEditor( editor ) {
 
 	}
 
-	function drawNodeContent( node, x, y, bodyStart ) {
+	const bodyStart = HEADER_H;
+	const socketSpacing = SOCKET_SPACING;
+	const valueInputLeft = 18;
+	const valueInputWidth = 28;
+	const valueInputHeight = 10;
+	// Row center Y: first row offset by half spacing so it clears the header
+	const rowCenterY = ( index ) => bodyStart + ( index + 0.5 ) * socketSpacing;
+	const valueInputTop = ( index ) => rowCenterY( index ) - valueInputHeight / 2;
 
-		// Draw node-specific inline content
-		if ( node.type === 'color' && node.properties.color ) {
+	function buildNodeOverlays() {
 
-			// Color preview box - positioned below the input socket
-			const contentY = y + bodyStart + 24; // Below first socket
-			ctx.fillStyle = node.properties.color;
-			ctx.fillRect( x + 8, contentY, 20, 16 );
-			ctx.strokeStyle = '#444';
-			ctx.lineWidth = 1 / zoom;
-			ctx.strokeRect( x + 8, contentY, 20, 16 );
+		if ( ! nodeOverlaysContainer ) return;
+		nodeOverlaysContainer.innerHTML = '';
+		const editableTypes = [ 'color', 'float', 'int', 'vec2', 'vec3', 'vec4' ];
 
-			// Color label
-			ctx.fillStyle = '#bbb';
-			ctx.font = `${9}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-			ctx.textAlign = 'left';
-			ctx.fillText( 'COLOR', x + 32, contentY + 11 );
+		const baseInputStyle = {
+			padding: '1px 3px',
+			fontSize: '9px',
+			backgroundColor: '#1a1a1a',
+			border: '1px solid #2a2a2a',
+			borderRadius: '3px',
+			color: '#e0e0e0',
+			boxSizing: 'border-box',
+			outline: 'none',
+			width: valueInputWidth + 'px',
+			height: valueInputHeight + 'px',
+			display: 'block'
+		};
 
-		} else if ( node.type === 'float' && node.properties.value !== undefined ) {
+		const applyChange = () => {
+			updatePreviewMaterial();
+			saveHistoryState();
+			triggerAutosave();
+		};
 
-			// Value display - positioned below the input socket
-			const contentY = y + bodyStart + 24;
-			ctx.fillStyle = '#bbb';
-			ctx.font = `${10}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-			ctx.textAlign = 'left';
-			ctx.fillText( `VALUE (${node.properties.value.toFixed( 2 )})`, x + 8, contentY );
+		nodes.forEach( node => {
 
-		} else if ( node.type === 'int' && node.properties.value !== undefined ) {
+			if ( ! editableTypes.includes( node.type ) ) return;
 
-			// Integer value display - positioned below the input socket
-			const contentY = y + bodyStart + 24;
-			ctx.fillStyle = '#bbb';
-			ctx.font = `${10}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-			ctx.textAlign = 'left';
-			ctx.fillText( `INDEX (${Math.floor( node.properties.value )})`, x + 8, contentY );
+			const wrap = document.createElement( 'div' );
+			wrap.style.position = 'absolute';
+			wrap.style.left = '0';
+			wrap.style.top = '0';
+			wrap.style.width = '0';
+			wrap.style.height = '0';
+			wrap.style.pointerEvents = 'none';
+			wrap.dataset.nodeId = String( node.id );
 
-		} else if ( ( node.type === 'vec2' || node.type === 'vec3' || node.type === 'vec4' ) && node.properties ) {
+			if ( node.type === 'color' ) {
 
-			// Vector components display - positioned below input sockets
-			const numInputs = node.inputs.length;
-			const contentY = y + bodyStart + numInputs * 20 + 10; // Below all input sockets
-			
+				const locked = isInputConnected( node.id, 0 );
+				const row = document.createElement( 'div' );
+				row.style.position = 'absolute';
+				row.style.left = ( node.x + valueInputLeft ) + 'px';
+				row.style.top = ( node.y + valueInputTop( 0 ) ) + 'px';
+				row.style.pointerEvents = 'auto';
+				row.style.display = 'flex';
+				row.style.gap = '3px';
+				row.style.alignItems = 'center';
+				const colorIn = document.createElement( 'input' );
+				colorIn.type = 'color';
+				colorIn.value = node.properties.color || '#ffffff';
+				colorIn.disabled = locked;
+				Object.assign( colorIn.style, baseInputStyle, { width: '18px', height: '12px', padding: '0', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1, flexShrink: 0 } );
+				colorIn.title = locked ? 'Connected' : 'Color';
+				colorIn.onchange = () => { node.properties.color = colorIn.value; hexIn.value = colorIn.value; applyChange(); };
+				row.appendChild( colorIn );
+				const hexIn = document.createElement( 'input' );
+				hexIn.type = 'text';
+				hexIn.placeholder = '#hex';
+				hexIn.value = ( node.properties.color || '#ffffff' ).toLowerCase();
+				hexIn.disabled = locked;
+				Object.assign( hexIn.style, baseInputStyle, { width: '44px', opacity: locked ? 0.6 : 1 } );
+				hexIn.title = 'Paste hex (e.g. #ff5500)';
+				const commitHex = () => {
+					let hex = hexIn.value.trim().replace( /^#/, '' );
+					if ( /^[0-9a-fA-F]{3}$/.test( hex ) ) hex = hex[ 0 ] + hex[ 0 ] + hex[ 1 ] + hex[ 1 ] + hex[ 2 ] + hex[ 2 ];
+					if ( /^[0-9a-fA-F]{6}$/.test( hex ) ) {
+						const v = '#' + hex.toLowerCase();
+						node.properties.color = v;
+						colorIn.value = v;
+						hexIn.value = v;
+						applyChange();
+					} else hexIn.value = colorIn.value;
+				};
+				hexIn.onchange = commitHex;
+				hexIn.onblur = commitHex;
+				hexIn.onkeydown = ( e ) => { if ( e.key === 'Enter' ) commitHex(); };
+				row.appendChild( hexIn );
+				wrap.appendChild( row );
+
+			} else if ( node.type === 'float' || node.type === 'int' ) {
+
+				const locked = isInputConnected( node.id, 0 );
+				const row = document.createElement( 'div' );
+				row.style.position = 'absolute';
+				row.style.left = ( node.x + valueInputLeft ) + 'px';
+				row.style.top = ( node.y + valueInputTop( 0 ) ) + 'px';
+				row.style.pointerEvents = 'auto';
+				const val = document.createElement( 'input' );
+				val.type = 'number';
+				val.step = node.type === 'int' ? '1' : '0.01';
+				val.value = node.properties.value;
+				val.disabled = locked;
+				Object.assign( val.style, baseInputStyle, { opacity: locked ? 0.6 : 1 } );
+				val.onchange = () => {
+					node.properties.value = node.type === 'int' ? parseInt( val.value, 10 ) : parseFloat( val.value );
+					applyChange();
+				};
+				row.appendChild( val );
+				wrap.appendChild( row );
+
+			} else if ( node.type === 'vec2' || node.type === 'vec3' || node.type === 'vec4' ) {
+
+				const comps = node.type === 'vec2' ? [ { key: 'x', i: 0 }, { key: 'y', i: 1 } ]
+					: node.type === 'vec3' ? [ { key: 'x', i: 0 }, { key: 'y', i: 1 }, { key: 'z', i: 2 } ]
+					: [ { key: 'x', i: 0 }, { key: 'y', i: 1 }, { key: 'z', i: 2 }, { key: 'w', i: 3 } ];
+				comps.forEach( ( { key, i } ) => {
+					const locked = isInputConnected( node.id, i );
+					const row = document.createElement( 'div' );
+					row.style.position = 'absolute';
+					row.style.left = ( node.x + valueInputLeft ) + 'px';
+					row.style.top = ( node.y + valueInputTop( i ) ) + 'px';
+					row.style.pointerEvents = 'auto';
+					const el = document.createElement( 'input' );
+					el.type = 'number';
+					el.step = '0.01';
+					el.value = node.properties[ key ];
+					el.placeholder = key.toUpperCase();
+					el.disabled = locked;
+					Object.assign( el.style, baseInputStyle, { opacity: locked ? 0.6 : 1 } );
+					el.onchange = () => { node.properties[ key ] = parseFloat( el.value ); applyChange(); };
+					row.appendChild( el );
+					wrap.appendChild( row );
+				} );
+
+			}
+
+			nodeOverlaysContainer.appendChild( wrap );
+
+		} );
+
+	}
+
+	function updateNodeOverlayTransform() {
+
+		if ( ! nodeOverlaysContainer ) return;
+		nodeOverlaysContainer.style.transform = `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`;
+		nodeOverlaysContainer.style.transformOrigin = '0 0';
+
+	}
+
+	function updateNodeOverlayPosition( node ) {
+
+		const wrap = nodeOverlaysContainer && nodeOverlaysContainer.querySelector( `[data-node-id="${node.id}"]` );
+		if ( ! wrap || ! wrap.children.length ) return;
+		const editableTypes = [ 'color', 'float', 'int', 'vec2', 'vec3', 'vec4' ];
+		if ( ! editableTypes.includes( node.type ) ) return;
+		if ( node.type === 'color' || node.type === 'float' || node.type === 'int' ) {
+			wrap.children[ 0 ].style.left = ( node.x + valueInputLeft ) + 'px';
+			wrap.children[ 0 ].style.top = ( node.y + valueInputTop( 0 ) ) + 'px';
+		} else {
+			for ( let i = 0; i < wrap.children.length; i ++ ) {
+				wrap.children[ i ].style.left = ( node.x + valueInputLeft ) + 'px';
+				wrap.children[ i ].style.top = ( node.y + valueInputTop( i ) ) + 'px';
+			}
+		}
+
+	}
+
+	function drawNodeContent( node, x, y, bodyStart, rowCenterY ) {
+
+		if ( node.type === 'uv' ) {
+
 			ctx.fillStyle = '#888';
 			ctx.font = `${8}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
 			ctx.textAlign = 'left';
-			
-			let vecText = '';
-			if ( node.type === 'vec2' ) vecText = `(${node.properties.x?.toFixed( 2 ) || 0}, ${node.properties.y?.toFixed( 2 ) || 0})`;
-			else if ( node.type === 'vec3' ) vecText = `(${node.properties.x?.toFixed( 1 ) || 0}, ${node.properties.y?.toFixed( 1 ) || 0}, ${node.properties.z?.toFixed( 1 ) || 0})`;
-			else if ( node.type === 'vec4' ) vecText = `(${node.properties.x?.toFixed( 1 ) || 0}, ${node.properties.y?.toFixed( 1 ) || 0}, ${node.properties.z?.toFixed( 1 ) || 0}, ${node.properties.w?.toFixed( 1 ) || 0})`;
-			
-			ctx.fillText( vecText, x + 8, contentY );
-
-		} else if ( node.type === 'uv' ) {
-
-			// UV label display  
-			ctx.fillStyle = '#888';
-			ctx.font = `${9}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-			ctx.textAlign = 'left';
-			ctx.fillText( 'INDEX (0)', x + 8, y + 39 );
+			ctx.fillText( 'INDEX (0)', x + 8, rowCenterY( 0 ) + 3 );
 
 		}
 
@@ -1401,62 +1575,63 @@ function TSLEditor( editor ) {
 
 		}
 
-		// Darken by 40% for better readability
-		r = Math.floor( r * 0.6 );
-		g = Math.floor( g * 0.6 );
-		b = Math.floor( b * 0.6 );
+		// Header: much darker for contrast, so title stays readable
+		r = Math.floor( r * 0.4 );
+		g = Math.floor( g * 0.4 );
+		b = Math.floor( b * 0.4 );
 
 		ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
 		ctx.beginPath();
-		ctx.roundRect( x, y, node.width, 24, [ 6, 6, 0, 0 ] );
+		ctx.roundRect( x, y, node.width, HEADER_H, [ 6, 6, 0, 0 ] );
 		ctx.fill();
 
-		// Node border
-		ctx.strokeStyle = selectedNode === node ? '#6ba3ff' : '#2a2a2a';
-		ctx.lineWidth = ( selectedNode === node ? 2 : 1 ) / zoom; // Adjust line width for zoom
+		// Node border – light visible outline (reference: rounded, clear edge)
+		ctx.strokeStyle = selectedNode === node ? '#6ba3ff' : '#2d3a3a';
+		ctx.lineWidth = ( selectedNode === node ? 2 : 1 ) / zoom;
 		ctx.beginPath();
 		ctx.roundRect( x, y, node.width, node.height, 6 );
 		ctx.stroke();
 
-		// Node title - compact header
+		// Node title - smaller font so it fits; clipped so it never overlaps socket areas
+		const headerPad = 12;
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect( x + headerPad, y, node.width - headerPad * 2, HEADER_H );
+		ctx.clip();
 		ctx.fillStyle = '#ffffff';
-		ctx.font = `bold ${10}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+		ctx.font = `bold ${8}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
 		ctx.textAlign = 'center';
-		ctx.fillText( node.name, x + node.width / 2, y + 15 );
-
-		// Variable name subtitle below title (if any)
+		ctx.fillText( node.name, x + node.width / 2, y + Math.floor( HEADER_H / 2 ) + 3 );
 		if ( node.subtitle ) {
 
 			ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-			ctx.font = `${8}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-			ctx.fillText( node.subtitle, x + node.width / 2, y + 26 );
+			ctx.font = `${7}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+			ctx.fillText( node.subtitle, x + node.width / 2, y + HEADER_H - 4 );
 
 		}
+		ctx.restore();
 
-		const bodyStart = 32; // Header height with padding
-		const socketSize = 5; // Slightly larger sockets
-		const socketSpacing = 20; // More spacing for better readability
+		const bodyStart = HEADER_H;
+		const socketSize = 4;
+		const socketSpacing = SOCKET_SPACING;
+		// Row center Y: offset by half a row so first row clears the header (no overlap)
+		const rowCenterY = ( index ) => y + bodyStart + ( index + 0.5 ) * socketSpacing;
 
 		// Draw node-specific content (color preview, values, etc.)
-		drawNodeContent( node, x, y, bodyStart );
+		drawNodeContent( node, x, y, bodyStart, rowCenterY );
 
 		// Draw inputs on the left
 		node.inputs.forEach( ( input, index ) => {
 
-			const inputY = y + bodyStart + index * socketSpacing;
+			const inputY = rowCenterY( index );
 			const socketX = x + 1; // Inside the node edge
 			
 			// Check if this input is connected
 			const isConnected = connections.some( c => 
 				c.toNode === node.id && c.toInput === index
 			);
-			
-			// Get socket color based on type (grey if not connected)
-			const socketColor = isConnected ? getSocketColor( input.type ) : {
-				main: '#4a4a4a',
-				border: '#2a2a2a',
-				glow: 'rgba(74, 74, 74, 0.2)'
-			};
+			// Always show type color; dim when not connected
+			const socketColor = getSocketColor( input.type, ! isConnected );
 			
 			// Input socket outer glow
 			ctx.fillStyle = socketColor.glow;
@@ -1475,13 +1650,13 @@ function TSLEditor( editor ) {
 			ctx.lineWidth = 1.5 / zoom; // Adjust for zoom
 			ctx.stroke();
 
-			// Input label (if any)
+			// Input label (same row as value input; label between socket and value)
 			if ( node.showLabels && input.label ) {
 
-				ctx.fillStyle = '#9ca3af';
-				ctx.font = `${9}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+				ctx.fillStyle = '#b8b8b8';
+				ctx.font = `${8}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
 				ctx.textAlign = 'left';
-				ctx.fillText( input.label, x + 10, inputY + 3 );
+				ctx.fillText( input.label, x + 8, inputY + 3 );
 
 			}
 
@@ -1490,20 +1665,15 @@ function TSLEditor( editor ) {
 		// Draw outputs on the right
 		node.outputs.forEach( ( output, index ) => {
 
-			const outputY = y + bodyStart + index * socketSpacing;
+			const outputY = rowCenterY( index );
 			const socketX = x + node.width - 1; // Inside the node edge
 
 			// Check if this output is connected
 			const isConnected = connections.some( c => 
 				c.fromNode === node.id && c.fromOutput === index
 			);
-
-			// Get socket color based on type (grey if not connected)
-			const socketColor = isConnected ? getSocketColor( output.type ) : {
-				main: '#4a4a4a',
-				border: '#2a2a2a',
-				glow: 'rgba(74, 74, 74, 0.2)'
-			};
+			// Always show type color; dim when not connected
+			const socketColor = getSocketColor( output.type, ! isConnected );
 
 			// Output socket outer glow
 			ctx.fillStyle = socketColor.glow;
@@ -1522,13 +1692,13 @@ function TSLEditor( editor ) {
 			ctx.lineWidth = 1.5 / zoom; // Adjust for zoom
 			ctx.stroke();
 
-			// Output label (if any)
+			// Output label
 			if ( node.showLabels && output.label ) {
 
-				ctx.fillStyle = '#9ca3af';
-				ctx.font = `${9}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+				ctx.fillStyle = '#b8b8b8';
+				ctx.font = `${8}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
 				ctx.textAlign = 'right';
-				ctx.fillText( output.label, x + node.width - 10, outputY + 3 );
+				ctx.fillText( output.label, x + node.width - 8, outputY + 3 );
 
 			}
 
@@ -1543,11 +1713,12 @@ function TSLEditor( editor ) {
 
 		if ( ! fromNode || ! toNode ) return;
 
-		const bodyStart = 32;
-		const socketSpacing = 20;
+		const bodyStart = HEADER_H;
+		const socketSpacing = SOCKET_SPACING;
+		const rowCenterY = ( node, index ) => node.y + bodyStart + ( index + 0.5 ) * socketSpacing;
 
-		const fromY = fromNode.y + bodyStart + conn.fromOutput * socketSpacing;
-		const toY = toNode.y + bodyStart + conn.toInput * socketSpacing;
+		const fromY = rowCenterY( fromNode, conn.fromOutput );
+		const toY = rowCenterY( toNode, conn.toInput );
 
 		const x1 = fromNode.x + fromNode.width - 1; // Match new output socket position
 		const y1 = fromY;
@@ -1644,17 +1815,18 @@ function TSLEditor( editor ) {
 			const x = node.x;
 			const y = node.y;
 
-			const bodyStart = 32;
-			const socketSpacing = 20;
+			const bodyStart = HEADER_H;
+			const socketSpacing = SOCKET_SPACING;
+			const rowCenterY = ( index ) => y + bodyStart + ( index + 0.5 ) * socketSpacing;
 
 			// Check if clicking on output socket (now at node edge)
 			for ( let j = 0; j < node.outputs.length; j ++ ) {
 
-				const outputY = y + bodyStart + j * socketSpacing;
+				const outputY = rowCenterY( j );
 				const socketX = x + node.width - 1; // Updated position
 				const dist = Math.sqrt( ( worldPos.x - socketX ) ** 2 + ( worldPos.y - outputY ) ** 2 );
 
-				if ( dist < 12 / zoom ) {
+				if ( dist < 10 / zoom ) {
 
 					isDraggingConnection = true;
 					connectionStart = {
@@ -1674,11 +1846,11 @@ function TSLEditor( editor ) {
 			// Check if clicking on input socket (now at node edge)
 			for ( let j = 0; j < node.inputs.length; j ++ ) {
 
-				const inputY = y + bodyStart + j * socketSpacing;
+				const inputY = rowCenterY( j );
 				const socketX = x + 1; // Updated position
 				const dist = Math.sqrt( ( worldPos.x - socketX ) ** 2 + ( worldPos.y - inputY ) ** 2 );
 
-				if ( dist < 12 / zoom ) {
+				if ( dist < 10 / zoom ) {
 
 					// Remove existing connection to this input
 					connections = connections.filter( conn => 
@@ -1733,6 +1905,7 @@ function TSLEditor( editor ) {
 
 			draggedNode.x = worldPos.x - draggedNode.width / 2;
 			draggedNode.y = worldPos.y - draggedNode.height / 2;
+			updateNodeOverlayPosition( draggedNode );
 
 		} else if ( isPanning ) {
 
@@ -1759,8 +1932,9 @@ function TSLEditor( editor ) {
 
 		if ( isDraggingConnection && connectionStart ) {
 
-			const bodyStart = 32;
-			const socketSpacing = 20;
+			const bodyStart = HEADER_H;
+			const socketSpacing = SOCKET_SPACING;
+			const rowCenterY = ( n, index ) => n.y + bodyStart + ( index + 0.5 ) * socketSpacing;
 
 			// Check if dropped on an input socket
 			for ( let i = 0; i < nodes.length; i ++ ) {
@@ -1771,11 +1945,23 @@ function TSLEditor( editor ) {
 
 				for ( let j = 0; j < node.inputs.length; j ++ ) {
 
-					const inputY = y + bodyStart + j * socketSpacing;
+					const inputY = rowCenterY( node, j );
 					const socketX = x + 1; // Updated position
 					const dist = Math.sqrt( ( worldPos.x - socketX ) ** 2 + ( worldPos.y - inputY ) ** 2 );
 
-					if ( dist < 15 / zoom ) {
+					if ( dist < 12 / zoom ) {
+
+						const outSocket = connectionStart.node.outputs[ connectionStart.output ];
+						const inSocket = node.inputs[ j ];
+						const outType = outSocket ? outSocket.type : 'float';
+						const inType = inSocket ? inSocket.type : 'float';
+
+						if ( ! canConnectSocket( outType, inType ) ) {
+
+							// Incompatible (e.g. float -> texture); don't create connection
+							break;
+
+						}
 
 						// Remove any existing connection to this input socket
 						// (only one connection allowed per input)
@@ -1783,7 +1969,7 @@ function TSLEditor( editor ) {
 							! ( conn.toNode === node.id && conn.toInput === j )
 						);
 
-						// Create new connection
+						// Create new connection (types are compatible; coercion handled at compile time)
 						connections.push( {
 							fromNode: connectionStart.node.id,
 							fromOutput: connectionStart.output,
@@ -1793,6 +1979,8 @@ function TSLEditor( editor ) {
 						updatePreviewMaterial(); // Update preview when connection made
 						saveHistoryState();
 						triggerAutosave();
+						updatePropertiesPanel( selectedNode ); // Refresh so value inputs lock when connected
+						buildNodeOverlays(); // In-node inputs lock when connected
 						break;
 
 					}
@@ -1861,6 +2049,47 @@ function TSLEditor( editor ) {
 
 	}
 
+	/**
+	 * Whether an output socket type can be connected to an input socket type (with coercion).
+	 * e.g. vec2 -> vec3 (take xy, z=0), vec4 -> float (take x), float -> vec3 (x,0,0).
+	 * Incompatible: e.g. float/int/vec* <-> texture.
+	 */
+	function canConnectSocket( outputType, inputType ) {
+
+		if ( outputType === inputType ) return true;
+		// Texture only accepts texture
+		if ( inputType === 'texture' ) return outputType === 'texture';
+		if ( outputType === 'texture' ) return inputType === 'texture';
+
+		const numeric = [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color', 'bool' ];
+		if ( ! numeric.includes( outputType ) || ! numeric.includes( inputType ) ) return false;
+
+		// float input: accept float, int, vec2/3/4/color (take x)
+		if ( inputType === 'float' ) return [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color', 'bool' ].includes( outputType );
+		// int input: accept int, float, bool
+		if ( inputType === 'int' ) return [ 'int', 'float', 'bool' ].includes( outputType );
+		// bool input: accept bool, float
+		if ( inputType === 'bool' ) return [ 'bool', 'float', 'int' ].includes( outputType );
+
+		// vec2 input: vec2, float (x), vec3 (xy), vec4 (xy)
+		if ( inputType === 'vec2' ) return [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color' ].includes( outputType );
+		// vec3 input: vec3, vec2 (xy,z=0), vec4 (xyz), float (x,0,0), color
+		if ( inputType === 'vec3' ) return [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color' ].includes( outputType );
+		// vec4 input: vec4, vec3 (xyz,w=1), vec2 (xy,0,1), float (x,0,0,1), color (rgb,1)
+		if ( inputType === 'vec4' ) return [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color' ].includes( outputType );
+		// color input: same as vec3
+		if ( inputType === 'color' ) return [ 'float', 'int', 'vec2', 'vec3', 'vec4', 'color' ].includes( outputType );
+
+		return false;
+
+	}
+
+	function isInputConnected( nodeId, inputIndex ) {
+
+		return connections.some( c => c.toNode === nodeId && c.toInput === inputIndex );
+
+	}
+
 	function updatePropertiesPanel( node ) {
 
 		if ( ! propertiesPanel ) return;
@@ -1919,11 +2148,12 @@ function TSLEditor( editor ) {
 		nameInput.onchange = () => node.name = nameInput.value;
 		propertiesSection.appendChild( nameInput );
 
-		// Node-specific properties
+		// Node-specific properties (locked when corresponding input is connected)
 		if ( node.type === 'color' && node.properties.color !== undefined ) {
 
+			const colorLocked = isInputConnected( node.id, 0 );
 			const colorLabel = document.createElement( 'div' );
-			colorLabel.textContent = 'Color';
+			colorLabel.textContent = colorLocked ? 'Color (connected)' : 'Color';
 			colorLabel.style.fontSize = '11px';
 			colorLabel.style.color = '#888';
 			colorLabel.style.marginBottom = '4px';
@@ -1932,25 +2162,71 @@ function TSLEditor( editor ) {
 			const colorInput = document.createElement( 'input' );
 			colorInput.type = 'color';
 			colorInput.value = node.properties.color;
+			colorInput.disabled = colorLocked;
 			colorInput.style.width = '100%';
 			colorInput.style.height = '32px';
 			colorInput.style.border = '1px solid #2a2a2a';
 			colorInput.style.borderRadius = '4px';
-			colorInput.style.cursor = 'pointer';
-			colorInput.onchange = () => {
+			colorInput.style.cursor = colorLocked ? 'not-allowed' : 'pointer';
+			colorInput.style.opacity = colorLocked ? '0.6' : '1';
+			colorInput.style.marginBottom = '8px';
+			if ( ! colorLocked ) colorInput.onchange = () => {
 				node.properties.color = colorInput.value;
+				hexInput.value = colorInput.value.toLowerCase();
 				updatePreviewMaterial();
 				saveHistoryState();
 				triggerAutosave();
 			};
 			propertiesSection.appendChild( colorInput );
 
+			const hexLabel = document.createElement( 'div' );
+			hexLabel.textContent = 'Hex';
+			hexLabel.style.fontSize = '11px';
+			hexLabel.style.color = '#888';
+			hexLabel.style.marginBottom = '4px';
+			propertiesSection.appendChild( hexLabel );
+
+			const hexInput = document.createElement( 'input' );
+			hexInput.type = 'text';
+			hexInput.placeholder = '#rrggbb or rrggbb';
+			hexInput.value = ( node.properties.color || '#ffffff' ).toLowerCase();
+			hexInput.disabled = colorLocked;
+			hexInput.style.width = '100%';
+			hexInput.style.padding = '6px 8px';
+			hexInput.style.backgroundColor = '#1a1a1a';
+			hexInput.style.border = '1px solid #2a2a2a';
+			hexInput.style.borderRadius = '4px';
+			hexInput.style.color = '#ddd';
+			hexInput.style.fontSize = '12px';
+			hexInput.style.boxSizing = 'border-box';
+			hexInput.style.fontFamily = 'monospace';
+			hexInput.style.opacity = colorLocked ? '0.6' : '1';
+			hexInput.title = 'Paste hex (e.g. #ff5500 or ff5500)';
+			const commitHex = () => {
+				let hex = hexInput.value.trim().replace( /^#/, '' );
+				if ( /^[0-9a-fA-F]{3}$/.test( hex ) ) hex = hex[ 0 ] + hex[ 0 ] + hex[ 1 ] + hex[ 1 ] + hex[ 2 ] + hex[ 2 ];
+				if ( /^[0-9a-fA-F]{6}$/.test( hex ) ) {
+					const v = '#' + hex.toLowerCase();
+					node.properties.color = v;
+					colorInput.value = v;
+					hexInput.value = v;
+					updatePreviewMaterial();
+					saveHistoryState();
+					triggerAutosave();
+				} else hexInput.value = ( node.properties.color || '#ffffff' ).toLowerCase();
+			};
+			hexInput.onchange = commitHex;
+			hexInput.onblur = commitHex;
+			hexInput.onkeydown = ( e ) => { if ( e.key === 'Enter' ) commitHex(); };
+			propertiesSection.appendChild( hexInput );
+
 		}
 
 		if ( node.type === 'float' && node.properties.value !== undefined ) {
 
+			const valueLocked = isInputConnected( node.id, 0 );
 			const valueLabel = document.createElement( 'div' );
-			valueLabel.textContent = 'Value';
+			valueLabel.textContent = valueLocked ? 'Value (connected)' : 'Value';
 			valueLabel.style.fontSize = '11px';
 			valueLabel.style.color = '#888';
 			valueLabel.style.marginBottom = '4px';
@@ -1960,6 +2236,7 @@ function TSLEditor( editor ) {
 			valueInput.type = 'number';
 			valueInput.value = node.properties.value;
 			valueInput.step = '0.1';
+			valueInput.disabled = valueLocked;
 			valueInput.style.width = '100%';
 			valueInput.style.padding = '6px 8px';
 			valueInput.style.backgroundColor = '#1a1a1a';
@@ -1968,7 +2245,8 @@ function TSLEditor( editor ) {
 			valueInput.style.color = '#ddd';
 			valueInput.style.fontSize = '12px';
 			valueInput.style.boxSizing = 'border-box';
-			valueInput.onchange = () => {
+			valueInput.style.opacity = valueLocked ? '0.6' : '1';
+			if ( ! valueLocked ) valueInput.onchange = () => {
 				node.properties.value = parseFloat( valueInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -1980,8 +2258,9 @@ function TSLEditor( editor ) {
 
 		if ( node.type === 'int' && node.properties.value !== undefined ) {
 
+			const valueLocked = isInputConnected( node.id, 0 );
 			const valueLabel = document.createElement( 'div' );
-			valueLabel.textContent = 'Value';
+			valueLabel.textContent = valueLocked ? 'Value (connected)' : 'Value';
 			valueLabel.style.fontSize = '11px';
 			valueLabel.style.color = '#888';
 			valueLabel.style.marginBottom = '4px';
@@ -1991,6 +2270,7 @@ function TSLEditor( editor ) {
 			valueInput.type = 'number';
 			valueInput.value = node.properties.value;
 			valueInput.step = '1';
+			valueInput.disabled = valueLocked;
 			valueInput.style.width = '100%';
 			valueInput.style.padding = '6px 8px';
 			valueInput.style.backgroundColor = '#1a1a1a';
@@ -1999,7 +2279,8 @@ function TSLEditor( editor ) {
 			valueInput.style.color = '#ddd';
 			valueInput.style.fontSize = '12px';
 			valueInput.style.boxSizing = 'border-box';
-			valueInput.onchange = () => {
+			valueInput.style.opacity = valueLocked ? '0.6' : '1';
+			if ( ! valueLocked ) valueInput.onchange = () => {
 				node.properties.value = parseInt( valueInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2011,9 +2292,11 @@ function TSLEditor( editor ) {
 
 		if ( node.type === 'vec2' && node.properties.x !== undefined ) {
 
+			const xLocked = isInputConnected( node.id, 0 );
+			const yLocked = isInputConnected( node.id, 1 );
 			// X value
 			const xLabel = document.createElement( 'div' );
-			xLabel.textContent = 'X';
+			xLabel.textContent = xLocked ? 'X (connected)' : 'X';
 			xLabel.style.fontSize = '11px';
 			xLabel.style.color = '#888';
 			xLabel.style.marginBottom = '4px';
@@ -2023,6 +2306,7 @@ function TSLEditor( editor ) {
 			xInput.type = 'number';
 			xInput.value = node.properties.x;
 			xInput.step = '0.1';
+			xInput.disabled = xLocked;
 			xInput.style.width = '100%';
 			xInput.style.padding = '6px 8px';
 			xInput.style.backgroundColor = '#1a1a1a';
@@ -2032,7 +2316,8 @@ function TSLEditor( editor ) {
 			xInput.style.fontSize = '12px';
 			xInput.style.marginBottom = '12px';
 			xInput.style.boxSizing = 'border-box';
-			xInput.onchange = () => {
+			xInput.style.opacity = xLocked ? '0.6' : '1';
+			if ( ! xLocked ) xInput.onchange = () => {
 				node.properties.x = parseFloat( xInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2042,7 +2327,7 @@ function TSLEditor( editor ) {
 
 			// Y value
 			const yLabel = document.createElement( 'div' );
-			yLabel.textContent = 'Y';
+			yLabel.textContent = yLocked ? 'Y (connected)' : 'Y';
 			yLabel.style.fontSize = '11px';
 			yLabel.style.color = '#888';
 			yLabel.style.marginBottom = '4px';
@@ -2052,6 +2337,7 @@ function TSLEditor( editor ) {
 			yInput.type = 'number';
 			yInput.value = node.properties.y;
 			yInput.step = '0.1';
+			yInput.disabled = yLocked;
 			yInput.style.width = '100%';
 			yInput.style.padding = '6px 8px';
 			yInput.style.backgroundColor = '#1a1a1a';
@@ -2060,7 +2346,8 @@ function TSLEditor( editor ) {
 			yInput.style.color = '#ddd';
 			yInput.style.fontSize = '12px';
 			yInput.style.boxSizing = 'border-box';
-			yInput.onchange = () => {
+			yInput.style.opacity = yLocked ? '0.6' : '1';
+			if ( ! yLocked ) yInput.onchange = () => {
 				node.properties.y = parseFloat( yInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2072,9 +2359,12 @@ function TSLEditor( editor ) {
 
 		if ( node.type === 'vec3' && node.properties.x !== undefined ) {
 
+			const xLocked = isInputConnected( node.id, 0 );
+			const yLocked = isInputConnected( node.id, 1 );
+			const zLocked = isInputConnected( node.id, 2 );
 			// X value
 			const xLabel = document.createElement( 'div' );
-			xLabel.textContent = 'X';
+			xLabel.textContent = xLocked ? 'X (connected)' : 'X';
 			xLabel.style.fontSize = '11px';
 			xLabel.style.color = '#888';
 			xLabel.style.marginBottom = '4px';
@@ -2084,6 +2374,7 @@ function TSLEditor( editor ) {
 			xInput.type = 'number';
 			xInput.value = node.properties.x;
 			xInput.step = '0.1';
+			xInput.disabled = xLocked;
 			xInput.style.width = '100%';
 			xInput.style.padding = '6px 8px';
 			xInput.style.backgroundColor = '#1a1a1a';
@@ -2093,7 +2384,8 @@ function TSLEditor( editor ) {
 			xInput.style.fontSize = '12px';
 			xInput.style.marginBottom = '12px';
 			xInput.style.boxSizing = 'border-box';
-			xInput.onchange = () => {
+			xInput.style.opacity = xLocked ? '0.6' : '1';
+			if ( ! xLocked ) xInput.onchange = () => {
 				node.properties.x = parseFloat( xInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2103,7 +2395,7 @@ function TSLEditor( editor ) {
 
 			// Y value
 			const yLabel = document.createElement( 'div' );
-			yLabel.textContent = 'Y';
+			yLabel.textContent = yLocked ? 'Y (connected)' : 'Y';
 			yLabel.style.fontSize = '11px';
 			yLabel.style.color = '#888';
 			yLabel.style.marginBottom = '4px';
@@ -2113,6 +2405,7 @@ function TSLEditor( editor ) {
 			yInput.type = 'number';
 			yInput.value = node.properties.y;
 			yInput.step = '0.1';
+			yInput.disabled = yLocked;
 			yInput.style.width = '100%';
 			yInput.style.padding = '6px 8px';
 			yInput.style.backgroundColor = '#1a1a1a';
@@ -2122,7 +2415,8 @@ function TSLEditor( editor ) {
 			yInput.style.fontSize = '12px';
 			yInput.style.marginBottom = '12px';
 			yInput.style.boxSizing = 'border-box';
-			yInput.onchange = () => {
+			yInput.style.opacity = yLocked ? '0.6' : '1';
+			if ( ! yLocked ) yInput.onchange = () => {
 				node.properties.y = parseFloat( yInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2132,7 +2426,7 @@ function TSLEditor( editor ) {
 
 			// Z value
 			const zLabel = document.createElement( 'div' );
-			zLabel.textContent = 'Z';
+			zLabel.textContent = zLocked ? 'Z (connected)' : 'Z';
 			zLabel.style.fontSize = '11px';
 			zLabel.style.color = '#888';
 			zLabel.style.marginBottom = '4px';
@@ -2142,6 +2436,7 @@ function TSLEditor( editor ) {
 			zInput.type = 'number';
 			zInput.value = node.properties.z;
 			zInput.step = '0.1';
+			zInput.disabled = zLocked;
 			zInput.style.width = '100%';
 			zInput.style.padding = '6px 8px';
 			zInput.style.backgroundColor = '#1a1a1a';
@@ -2150,7 +2445,8 @@ function TSLEditor( editor ) {
 			zInput.style.color = '#ddd';
 			zInput.style.fontSize = '12px';
 			zInput.style.boxSizing = 'border-box';
-			zInput.onchange = () => {
+			zInput.style.opacity = zLocked ? '0.6' : '1';
+			if ( ! zLocked ) zInput.onchange = () => {
 				node.properties.z = parseFloat( zInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2162,9 +2458,13 @@ function TSLEditor( editor ) {
 
 		if ( node.type === 'vec4' && node.properties.x !== undefined ) {
 
+			const xLocked = isInputConnected( node.id, 0 );
+			const yLocked = isInputConnected( node.id, 1 );
+			const zLocked = isInputConnected( node.id, 2 );
+			const wLocked = isInputConnected( node.id, 3 );
 			// X value
 			const xLabel = document.createElement( 'div' );
-			xLabel.textContent = 'X';
+			xLabel.textContent = xLocked ? 'X (connected)' : 'X';
 			xLabel.style.fontSize = '11px';
 			xLabel.style.color = '#888';
 			xLabel.style.marginBottom = '4px';
@@ -2174,6 +2474,7 @@ function TSLEditor( editor ) {
 			xInput.type = 'number';
 			xInput.value = node.properties.x;
 			xInput.step = '0.1';
+			xInput.disabled = xLocked;
 			xInput.style.width = '100%';
 			xInput.style.padding = '6px 8px';
 			xInput.style.backgroundColor = '#1a1a1a';
@@ -2183,7 +2484,8 @@ function TSLEditor( editor ) {
 			xInput.style.fontSize = '12px';
 			xInput.style.marginBottom = '12px';
 			xInput.style.boxSizing = 'border-box';
-			xInput.onchange = () => {
+			xInput.style.opacity = xLocked ? '0.6' : '1';
+			if ( ! xLocked ) xInput.onchange = () => {
 				node.properties.x = parseFloat( xInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2193,7 +2495,7 @@ function TSLEditor( editor ) {
 
 			// Y value
 			const yLabel = document.createElement( 'div' );
-			yLabel.textContent = 'Y';
+			yLabel.textContent = yLocked ? 'Y (connected)' : 'Y';
 			yLabel.style.fontSize = '11px';
 			yLabel.style.color = '#888';
 			yLabel.style.marginBottom = '4px';
@@ -2203,6 +2505,7 @@ function TSLEditor( editor ) {
 			yInput.type = 'number';
 			yInput.value = node.properties.y;
 			yInput.step = '0.1';
+			yInput.disabled = yLocked;
 			yInput.style.width = '100%';
 			yInput.style.padding = '6px 8px';
 			yInput.style.backgroundColor = '#1a1a1a';
@@ -2212,7 +2515,8 @@ function TSLEditor( editor ) {
 			yInput.style.fontSize = '12px';
 			yInput.style.marginBottom = '12px';
 			yInput.style.boxSizing = 'border-box';
-			yInput.onchange = () => {
+			yInput.style.opacity = yLocked ? '0.6' : '1';
+			if ( ! yLocked ) yInput.onchange = () => {
 				node.properties.y = parseFloat( yInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2222,7 +2526,7 @@ function TSLEditor( editor ) {
 
 			// Z value
 			const zLabel = document.createElement( 'div' );
-			zLabel.textContent = 'Z';
+			zLabel.textContent = zLocked ? 'Z (connected)' : 'Z';
 			zLabel.style.fontSize = '11px';
 			zLabel.style.color = '#888';
 			zLabel.style.marginBottom = '4px';
@@ -2232,6 +2536,7 @@ function TSLEditor( editor ) {
 			zInput.type = 'number';
 			zInput.value = node.properties.z;
 			zInput.step = '0.1';
+			zInput.disabled = zLocked;
 			zInput.style.width = '100%';
 			zInput.style.padding = '6px 8px';
 			zInput.style.backgroundColor = '#1a1a1a';
@@ -2241,7 +2546,8 @@ function TSLEditor( editor ) {
 			zInput.style.fontSize = '12px';
 			zInput.style.marginBottom = '12px';
 			zInput.style.boxSizing = 'border-box';
-			zInput.onchange = () => {
+			zInput.style.opacity = zLocked ? '0.6' : '1';
+			if ( ! zLocked ) zInput.onchange = () => {
 				node.properties.z = parseFloat( zInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2251,7 +2557,7 @@ function TSLEditor( editor ) {
 
 			// W value
 			const wLabel = document.createElement( 'div' );
-			wLabel.textContent = 'W';
+			wLabel.textContent = wLocked ? 'W (connected)' : 'W';
 			wLabel.style.fontSize = '11px';
 			wLabel.style.color = '#888';
 			wLabel.style.marginBottom = '4px';
@@ -2261,6 +2567,7 @@ function TSLEditor( editor ) {
 			wInput.type = 'number';
 			wInput.value = node.properties.w;
 			wInput.step = '0.1';
+			wInput.disabled = wLocked;
 			wInput.style.width = '100%';
 			wInput.style.padding = '6px 8px';
 			wInput.style.backgroundColor = '#1a1a1a';
@@ -2269,7 +2576,8 @@ function TSLEditor( editor ) {
 			wInput.style.color = '#ddd';
 			wInput.style.fontSize = '12px';
 			wInput.style.boxSizing = 'border-box';
-			wInput.onchange = () => {
+			wInput.style.opacity = wLocked ? '0.6' : '1';
+			if ( ! wLocked ) wInput.onchange = () => {
 				node.properties.w = parseFloat( wInput.value );
 				updatePreviewMaterial();
 				saveHistoryState();
@@ -2302,47 +2610,30 @@ function TSLEditor( editor ) {
 
 	function updatePreviewMaterial() {
 
-		if ( ! previewMaterial || ! currentMaterial ) {
+		if ( ! previewMesh || ! currentMaterial ) return;
 
-			console.log( '[TSLEditor] updatePreviewMaterial: missing previewMaterial or currentMaterial' );
-			return;
-
-		}
-
-		// Create a temporary NodeMaterial data structure from current editor state
 		const nodeMaterialData = {
 			type: 'NodeMaterial',
 			nodes: {},
 			connections: connections
 		};
+		nodes.forEach( node => { nodeMaterialData.nodes[ node.id ] = node; } );
 
-		// Convert nodes array to nodes object (with numeric keys)
-		nodes.forEach( node => {
-
-			nodeMaterialData.nodes[ node.id ] = node;
-
-		} );
-
-		console.log( '[TSLEditor] updatePreviewMaterial: nodes:', Object.keys( nodeMaterialData.nodes ).length, 'connections:', connections.length );
-		console.log( '[TSLEditor] connections:', connections );
-
-		// Use the same material generation logic as the main editor
 		const generatedMaterial = generateMaterialFromNodes( nodeMaterialData );
-		
-		console.log( '[TSLEditor] generatedMaterial:', generatedMaterial );
-		
+
 		if ( generatedMaterial ) {
 
-			// Copy properties to preview material
-			previewMaterial.color.copy( generatedMaterial.color );
-			previewMaterial.roughness = generatedMaterial.roughness;
-			previewMaterial.metalness = generatedMaterial.metalness;
-			previewMaterial.needsUpdate = true;
+			if ( previewNodeMaterial && previewNodeMaterial !== generatedMaterial ) {
 
-			console.log( '[TSLEditor] Preview material updated. Color:', previewMaterial.color );
+				previewNodeMaterial.dispose();
 
-			// Clean up temporary material
-			generatedMaterial.dispose();
+			}
+			previewMesh.material = generatedMaterial;
+			previewNodeMaterial = generatedMaterial;
+
+		} else {
+
+			previewMesh.material = previewMaterial;
 
 		}
 

@@ -18,21 +18,21 @@
 			"name": "Camera",
 			"layers": 1,
 			"matrix": [
-				1,
+				0.44689937155683956,
 				0,
+				-0.8945842339892319,
 				0,
+				-0.5059672384420386,
+				0.824687082781112,
+				-0.2527614866179481,
 				0,
+				0.7377520622305562,
+				0.5655892639486523,
+				0.3685521390259226,
 				0,
-				0.8944271909999153,
-				-0.4472135954999578,
-				0,
-				0,
-				0.4472135954999578,
-				0.8944271909999153,
-				0,
-				0,
-				5.000000000000002,
-				10,
+				4.359324457865765,
+				3.3420267291196413,
+				2.177748373616007,
 				1
 			],
 			"up": [
@@ -65,21 +65,21 @@
 		},
 		"geometries": [
 			{
-				"uuid": "7ebb0ec2-50ab-46b6-a26a-1a05db382adf",
-				"type": "TorusKnotGeometry",
+				"uuid": "8578a915-50a4-461e-886f-3c30b2afea38",
+				"type": "CapsuleGeometry",
 				"radius": 1,
-				"tube": 0.4,
-				"tubularSegments": 64,
+				"height": 1,
+				"capSegments": 4,
 				"radialSegments": 8,
-				"p": 2,
-				"q": 3
+				"heightSegments": 1
 			}
 		],
 		"materials": [
 			{
-				"uuid": "0ea65fe9-3cd4-4d70-9589-cabcc05e26b3",
+				"uuid": "276dc446-ec6a-4a94-8430-ec0fd8f977ae",
 				"type": "MeshStandardMaterial",
-				"color": 3046092,
+				"name": "Default Material",
+				"color": 8947848,
 				"roughness": 1,
 				"metalness": 0,
 				"emissive": 0,
@@ -90,14 +90,11 @@
 					"XYZ"
 				],
 				"envMapIntensity": 1,
-				"blendColor": 0,
-				"userData": {
-					"assetPath": "Monster.nodemat"
-				}
+				"blendColor": 0
 			}
 		],
 		"object": {
-			"uuid": "b18f7cb5-8884-4f2b-b7d0-52f2a3f32218",
+			"uuid": "",
 			"type": "Scene",
 			"name": "Main",
 			"layers": 1,
@@ -126,38 +123,7 @@
 			],
 			"children": [
 				{
-					"uuid": "8aec102b-4bd4-4626-a2d1-38cafafeaa2e",
-					"type": "Mesh",
-					"name": "TorusKnot",
-					"layers": 1,
-					"matrix": [
-						1,
-						0,
-						0,
-						0,
-						0,
-						1,
-						0,
-						0,
-						0,
-						0,
-						1,
-						0,
-						0,
-						0,
-						0,
-						1
-					],
-					"up": [
-						0,
-						1,
-						0
-					],
-					"geometry": "7ebb0ec2-50ab-46b6-a26a-1a05db382adf",
-					"material": "0ea65fe9-3cd4-4d70-9589-cabcc05e26b3"
-				},
-				{
-					"uuid": "f170b147-8db4-4ef3-8b4d-fccd8bd24498",
+					"uuid": "7f1aa023-34bb-4f30-8016-b50ea7e3b1a9",
 					"type": "DirectionalLight",
 					"name": "DirectionalLight",
 					"layers": 1,
@@ -188,7 +154,7 @@
 					"intensity": 1,
 					"shadow": {
 						"camera": {
-							"uuid": "3415a4b6-2675-4de9-95c4-5d2eecb046ac",
+							"uuid": "9b78dc52-c15b-4189-90aa-d7e1563b5b2c",
 							"type": "OrthographicCamera",
 							"layers": 1,
 							"up": [
@@ -205,7 +171,38 @@
 							"far": 500
 						}
 					},
-					"target": "2487cc36-f5e8-4815-befe-f653fa7f1239"
+					"target": "e547fa44-f87c-437b-ba21-7d9823d1e53a"
+				},
+				{
+					"uuid": "37b233ef-b402-4c47-9d38-835a54ce752d",
+					"type": "Mesh",
+					"name": "Capsule",
+					"layers": 1,
+					"matrix": [
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1,
+						0,
+						0,
+						0,
+						0,
+						1
+					],
+					"up": [
+						0,
+						1,
+						0
+					],
+					"geometry": "8578a915-50a4-461e-886f-3c30b2afea38",
+					"material": "276dc446-ec6a-4a94-8430-ec0fd8f977ae"
 				}
 			],
 			"backgroundRotation": [

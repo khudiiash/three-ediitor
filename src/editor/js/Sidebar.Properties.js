@@ -40,13 +40,13 @@ function SidebarProperties( editor ) {
 
 	function togglePanels( object ) {
 
+		// Always show inspector content so asset inspector can show when an asset is selected,
+		// and entity/mesh inspector shows when an object is selected (see Sidebar.Object checkAssetSelection).
+		objectPanels.setDisplay( 'block' );
 		if ( object === null ) {
-			objectPanels.setDisplay( 'none' );
 			scriptPanel.setHidden( true );
 			return;
 		}
-
-		objectPanels.setDisplay( 'block' );
 		scriptPanel.setHidden( object === editor.camera );
 
 	}

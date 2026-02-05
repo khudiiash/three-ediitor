@@ -128,6 +128,22 @@ function SidebarSettings( editor ) {
 	toneMappingRow.add( toneMappingInputsContainer );
 	renderingPanel.add( toneMappingRow );
 
+	const viewportRenderRow = new UIRow();
+	const viewportRenderSelect = new UISelect().setOptions( {
+		continuous: 'Continuous',
+		onChange: 'On Change'
+	} ).setWidth( '120px' ).onChange( function () {
+
+		config.setKey( 'project/viewport/renderMode', this.getValue() );
+		signals.viewportRenderModeChanged.dispatch();
+
+	} );
+	const viewportRenderValue = config.getKey( 'project/viewport/renderMode' );
+	viewportRenderSelect.setValue( viewportRenderValue === 'onChange' ? 'onChange' : 'continuous' );
+	viewportRenderRow.add( new UIText( 'Viewport Render' ).setClass( 'Label' ) );
+	viewportRenderRow.add( viewportRenderSelect );
+	renderingPanel.add( viewportRenderRow );
+
 	
 	const shadowPanel = new UICollapsiblePanel( 'Shadow' );
 	shadowPanel.collapse();

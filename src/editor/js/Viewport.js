@@ -18,6 +18,7 @@ import { SetScaleCommand } from './commands/SetScaleCommand.js';
 
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { ViewportPathtracer } from './Viewport.Pathtracer.js';
+import { setSharedAnimationTime } from './LiveMaterialPreview.js';
 
 let ParticleSystem = null;
 (async () => {
@@ -970,10 +971,16 @@ const camera = editor.camera;
 
 	} );
 
+	let materialChangedRenderScheduled = false;
 	signals.materialChanged.add( function () {
 
-		updatePTMaterials();
-		render();
+		if ( materialChangedRenderScheduled ) return;
+		materialChangedRenderScheduled = true;
+		requestAnimationFrame( function () {
+			materialChangedRenderScheduled = false;
+			updatePTMaterials();
+			render();
+		} );
 
 	} );
 
@@ -1264,10 +1271,22 @@ const camera = editor.camera;
 
 	function animate() {
 
-		const mixer = editor.mixer;
 		const delta = clock.getDelta();
+		// Sync TSL time for live previews (Inspector, node editor, asset selector): always dispatch so time is synced
+		let time = clock.getElapsedTime();
+		let deltaTime = delta;
+		if ( renderer && renderer.nodes && renderer.nodes.nodeFrame ) {
+			const nf = renderer.nodes.nodeFrame;
+			time = nf.time;
+			deltaTime = nf.deltaTime;
+		}
+		if ( editor.signals.animationFrame ) editor.signals.animationFrame.dispatch( { time, deltaTime } );
+		setSharedAnimationTime( time, deltaTime );
 
-		let needsUpdate = false;
+		const mixer = editor.mixer;
+
+		const renderMode = editor.config.getKey( 'project/viewport/renderMode' ) || 'continuous';
+		let needsUpdate = ( renderMode === 'continuous' );
 
 		// Update WebGPU particle system if active
 		if ( currentParticleSystem ) {

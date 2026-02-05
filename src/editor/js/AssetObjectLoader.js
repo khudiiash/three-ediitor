@@ -1,17 +1,51 @@
 import * as THREE from 'three';
+import {
+	NodeObjectLoader,
+	MeshStandardNodeMaterial,
+	MeshPhysicalNodeMaterial,
+	MeshBasicNodeMaterial,
+	MeshPhongNodeMaterial
+} from 'three/webgpu';
 import { MaterialAsset } from '@engine/three-engine.js';
 
-class AssetObjectLoader extends THREE.ObjectLoader {
+class AssetObjectLoader extends NodeObjectLoader {
 
 	constructor( manager, projectPath, editor = null ) {
 
 		super( manager );
 		this.projectPath = projectPath;
 		this.editor = editor;
+		// Register node material types so NodeMaterialLoader can instantiate them when loading scene JSON
+		this.nodeMaterials = {
+			MeshStandardNodeMaterial,
+			MeshPhysicalNodeMaterial,
+			MeshBasicNodeMaterial,
+			MeshPhongNodeMaterial
+		};
+
+	}
+
+	/**
+	 * Override so we never call NodeLoader.parseNodes with null/non-array (avoids "json is not iterable").
+	 * We don't register TSL node types (VarNode, ConstNode, etc.), so we skip node graph parsing;
+	 * node graphs come from generateMaterialFromNodes when loading .nodemat assets.
+	 */
+	parseNodes( json, textures ) {
+
+		if ( json != null && Array.isArray( json ) ) {
+
+			return super.parseNodes( json, textures );
+
+		}
+
+		return {};
 
 	}
 
 	async parseAsync( json ) {
+
+		// Skip parsing json.nodes so parseNodes() is never given null (NodeLoader expects iterable).
+		this._nodesJSON = null;
 
 		if ( json.textures ) {
 			const isTauri = typeof window !== 'undefined' && window.__TAURI__ && window.__TAURI__.core.invoke;
@@ -312,7 +346,8 @@ class AssetObjectLoader extends THREE.ObjectLoader {
 		}
 		
 		const result = await super.parseAsync( json );
-		
+		this._nodesJSON = null;
+
 		if ( json.textures && result ) {
 			result.traverse( function( object ) {
 				if ( object.material ) {

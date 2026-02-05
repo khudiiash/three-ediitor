@@ -34,8 +34,8 @@ registerNode( 'nodeType', {
     properties: { 
         propertyName: defaultValue 
     },
-    hasInlineContent: true|false,  // Shows inline preview (color, value, etc.)
-    height: 56  // Optional, auto-calculated if not provided
+    hasInlineContent: true|false   // Optional: shows inline value inputs (color, float, vec2/3/4)
+    // width and height are calculated automatically by the layout from inputs/outputs
 } );
 ```
 
@@ -106,6 +106,16 @@ The `createNodeConfig()` function automatically generates node configurations fr
 - Deep clones properties to avoid reference issues
 - Adds extra space for inline content
 - Provides fallback for unknown node types
+
+## Runtime TSL (Real Shaders)
+
+The editor graph is compiled into **real Three.js TSL nodes** by the **engine** (`createMaterialFromGraph` in `src/engine/src/material/createMaterialFromGraph.ts`). The editor calls this at runtime and passes the WebGPU/TSL backend via `setNodeMaterialBackend()`. The same compiler is used when loading scenes/materials from JSON in the built game (no editor). The following nodes are compiled and **do affect the shader**:
+
+- **Constants**: Color, Float, Int, Vec2, Vec3, Vec4
+- **Geometry**: UV, Normal (Local/View/World), Position (Local/View/World), Position View Direction, Tangent Local, Screen UV, Time, Instance Index
+- **Math**: Add, Subtract, Multiply, Divide, Power, Mix, Clamp, Min, Max, Sin, Cos, Dot, Normalize, Length, Fract, Floor, Abs, Saturate
+
+Material output slots (Color, Roughness, Metalness, Normal, Emissive, AO) are wired to `material.colorNode`, `material.roughnessNode`, etc. Nodes not yet in the engine compiler (e.g. Texture, Noise, some Logic nodes) still appear in the editor but only constant values are applied as fallbacks; add them in `createMaterialFromGraph.ts` to support them in the shader.
 
 ## Benefits
 

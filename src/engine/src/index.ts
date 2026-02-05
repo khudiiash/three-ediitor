@@ -29,6 +29,12 @@ export { MaterialAsset } from './assets/MaterialAsset';
 export type { TextureAssetMetadata } from './assets/TextureAsset';
 export type { MaterialAssetMetadata } from './assets/MaterialAsset';
 
+export {
+	createMaterialFromGraph,
+	setNodeMaterialBackend,
+} from './material/createMaterialFromGraph';
+export type { NodeMaterialGraph } from './material/createMaterialFromGraph';
+
 export { ParticleSystem } from './utils/ParticleSystem';
 export type { ParticleSystemConfig } from './utils/ParticleSystem';
 
