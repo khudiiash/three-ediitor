@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nodes</title>
+  <style>
+    body { margin: 0; height: 100vh; }
+    #root { width: 100%; height: 100%; }
+    #modal-root { position: fixed; inset: 0; z-index: 99999; pointer-events: none; }
+    #modal-root > * { pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <div id="modal-root"></div>
+  <script type="module">
+    import { mountNodes } from './js/nodes/main.jsx';
+    mountNodes( document.getElementById( 'root' ) );
+  </script>
+</body>
+</html>

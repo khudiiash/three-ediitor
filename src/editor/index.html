@@ -355,7 +355,37 @@
 
 			const resizer = new Resizer( editor );
 			document.body.appendChild( resizer.dom );
-			
+
+			// Nodes overlay (React Flow) on top of editor – no header; nodes-root fills overlay
+			const nodesOverlay = document.createElement( 'div' );
+			nodesOverlay.id = 'nodes-overlay';
+			nodesOverlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;display:none;background:#1a1a1a;';
+			nodesOverlay.style.display = 'none';
+			const nodesRoot = document.createElement( 'div' );
+			nodesRoot.id = 'nodes-root';
+			nodesRoot.style.cssText = 'width:100%;height:100%;';
+			nodesOverlay.appendChild( nodesRoot );
+			document.body.appendChild( nodesOverlay );
+			window.showNodesOverlay = function () {
+				if ( nodesOverlay.style.display !== 'block' ) {
+					nodesOverlay.style.display = 'block';
+					import( './js/nodes/main.jsx' ).then( function ( m ) {
+						m.mountNodes( nodesRoot );
+					} ).catch( function ( err ) { console.error( '[Nodes]', err ); } );
+				}
+			};
+			window.toggleNodesOverlay = function () {
+				const visible = nodesOverlay.style.display === 'block';
+				nodesOverlay.style.display = visible ? 'none' : 'block';
+				if ( !visible ) {
+					import( './js/nodes/main.jsx' ).then( function ( m ) {
+						m.mountNodes( nodesRoot );
+					} ).catch( function ( err ) { console.error( '[Nodes]', err ); } );
+				}
+			};
+			// Debug: show nodes overlay at start so it's visible and JSX is in the watch graph (HMR)
+			setTimeout( function () { window.showNodesOverlay(); }, 100 );
+
 			let isLoadingFromHash = false;
 			
 			let timeout;

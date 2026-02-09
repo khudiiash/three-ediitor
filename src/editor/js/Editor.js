@@ -1,5 +1,34 @@
 import * as THREE from 'three';
-import { TSL, MeshStandardNodeMaterial, MeshPhysicalNodeMaterial, MeshBasicNodeMaterial, MeshPhongNodeMaterial } from 'three/webgpu';
+import {
+	TSL,
+	MeshStandardNodeMaterial,
+	MeshPhysicalNodeMaterial,
+	MeshBasicNodeMaterial,
+	MeshPhongNodeMaterial,
+	MeshSSSNodeMaterial,
+	MeshToonNodeMaterial,
+	MeshLambertNodeMaterial,
+	MeshNormalNodeMaterial,
+	PointsNodeMaterial,
+} from 'three/webgpu';
+// Geometry/attribute nodes and vec/color from three/tsl (Vite alias → editor/build/three.tsl.min.js)
+import {
+	positionWorld,
+	positionLocal,
+	positionView,
+	positionViewDirection,
+	normalLocal,
+	normalView,
+	normalWorld,
+	uv,
+	screenUV,
+	tangentLocal,
+	vec2,
+	vec3,
+	vec4,
+	color,
+	time,
+} from 'three/tsl';
 
 import { Config } from './Config.js';
 import { Loader } from './Loader.js';
@@ -13,30 +42,131 @@ import { CutObjectCommand } from './commands/CutObjectCommand.js';
 import { PasteObjectCommand } from './commands/PasteObjectCommand.js';
 import { RemoveObjectCommand } from './commands/RemoveObjectCommand.js';
 import { AssetObjectLoader } from './AssetObjectLoader.js';
-import { AssetRegistry, MaterialAsset, createMaterialFromGraph, setNodeMaterialBackend } from '../../engine/dist/three-engine.js';
+import { AssetRegistry, MaterialAsset, createMaterialFromGraph, setNodeMaterialBackend } from '../../engine/dist/three-engine.js?v=3';
 import { ModuleSystem } from './ModuleSystem.js';
 import { TSLEditor } from './TSLEditor.js';
+import { graphToNodeMaterial } from './nodes/graphSerialization.js';
+import { generateTSLCode, runGeneratedTSLCode } from './nodes/tslCodeGenerator.js';
 
-// Provide WebGPU/TSL backend to the engine so createMaterialFromGraph returns NodeMaterials in the editor
+// Provide WebGPU/TSL backend so createMaterialFromGraph returns NodeMaterials. Geometry nodes from three/tsl.
 setNodeMaterialBackend( {
 	TSL,
+	time: typeof time === 'function' ? time : undefined,
 	MeshStandardNodeMaterial,
 	MeshPhysicalNodeMaterial,
 	MeshBasicNodeMaterial,
-	MeshPhongNodeMaterial
+	MeshPhongNodeMaterial,
+	MeshSSSNodeMaterial,
+	MeshToonNodeMaterial,
+	MeshLambertNodeMaterial,
+	MeshNormalNodeMaterial,
+	PointsNodeMaterial,
+	positionWorld,
+	positionLocal,
+	positionView,
+	positionViewDirection,
+	normalLocal,
+	normalView,
+	normalWorld,
+	uv,
+	screenUV,
+	tangentLocal,
+	vec2,
+	vec3,
+	vec4,
+	color,
 } );
 
-// Helper: generate a THREE.Material from NodeMaterial graph JSON (uses engine compiler; no duplication)
+// One namespace for running generated TSL code (import symbols + material classes). Prefer explicit imports, fallback to TSL.* so "time" etc. are always provided.
+const tslModuleForGeneratedCode = Object.assign( {}, TSL, {
+	MeshStandardNodeMaterial,
+	MeshPhysicalNodeMaterial,
+	MeshBasicNodeMaterial,
+	MeshPhongNodeMaterial,
+	MeshSSSNodeMaterial,
+	MeshToonNodeMaterial,
+	MeshLambertNodeMaterial,
+	MeshNormalNodeMaterial,
+	PointsNodeMaterial,
+	time: typeof time !== 'undefined' ? time : ( TSL && TSL.time ),
+	positionWorld,
+	positionLocal,
+	positionView,
+	positionViewDirection,
+	normalLocal,
+	normalView,
+	normalWorld,
+	uv,
+	screenUV,
+	tangentLocal,
+	vec2,
+	vec3,
+	vec4,
+	color,
+} );
+
+// Helper: generate a THREE.Material from NodeMaterial graph. Single pipeline: nodes/edges → engine graph → createMaterialFromGraph (real TSL nodes).
 function generateMaterialFromNodes( nodeMaterial ) {
 
 	if ( ! nodeMaterial ) return null;
+
+	// Node editor: build material by running the generated TSL code so live preview matches the displayed code (custom Fn, imports, etc.).
+	if ( nodeMaterial.editorGraph && Array.isArray( nodeMaterial.nodes ) && Array.isArray( nodeMaterial.edges ) ) {
+		const nodes = nodeMaterial.nodes;
+		const edges = nodeMaterial.edges;
+		const code = generateTSLCode( nodes, edges );
+		const mat = runGeneratedTSLCode( code, tslModuleForGeneratedCode );
+		if ( mat ) return mat;
+		// Fallback to engine graph if generated code fails (e.g. unsupported node in generator)
+		const engineGraph = graphToNodeMaterial( nodes, edges );
+		return createMaterialFromGraph( engineGraph );
+	}
+
 	const isNode = nodeMaterial.type === 'NodeMaterial' || nodeMaterial.isNodeMaterial ||
 		( nodeMaterial.type && typeof nodeMaterial.type === 'string' && nodeMaterial.type.endsWith( 'NodeMaterial' ) ) ||
 		( nodeMaterial.nodes && nodeMaterial.connections );
 	if ( ! isNode ) return null;
 
-	return createMaterialFromGraph( nodeMaterial );
+	const material = createMaterialFromGraph( nodeMaterial );
+	if ( ! material ) return null;
 
+	// Apply output node props (from node params panel) so preview and material reflect color, roughness, etc.
+	// Do not override .color when material has colorNode (graph drives color).
+	const nodes = nodeMaterial.nodes || {};
+	const outputNode = Object.values( nodes ).find( ( n ) => n && n.type === 'output' );
+	if ( outputNode ) {
+		const mat = material;
+		const hasColorNode = mat.colorNode != null;
+		if ( outputNode.color !== undefined && mat.color && ! hasColorNode ) mat.color.setHex( outputNode.color );
+		if ( outputNode.roughness !== undefined && mat.roughness !== undefined ) mat.roughness = outputNode.roughness;
+		if ( outputNode.metalness !== undefined && mat.metalness !== undefined ) mat.metalness = outputNode.metalness;
+		if ( outputNode.opacity !== undefined ) mat.opacity = outputNode.opacity;
+		if ( outputNode.transparent !== undefined ) mat.transparent = outputNode.transparent;
+		if ( outputNode.depthWrite !== undefined ) mat.depthWrite = outputNode.depthWrite;
+		if ( outputNode.side !== undefined ) mat.side = [ THREE.FrontSide, THREE.BackSide, THREE.DoubleSide ][ outputNode.side ] ?? mat.side;
+		if ( outputNode.ao !== undefined && mat.aoMapIntensity !== undefined ) mat.aoMapIntensity = outputNode.ao;
+		if ( outputNode.emissive !== undefined && mat.emissive ) mat.emissive.setHex( outputNode.emissive );
+		if ( outputNode.specular !== undefined && mat.specular ) mat.specular.setHex( outputNode.specular );
+		if ( outputNode.shininess !== undefined && mat.shininess !== undefined ) mat.shininess = outputNode.shininess;
+		if ( outputNode.clearcoat !== undefined && mat.clearcoat !== undefined ) mat.clearcoat = outputNode.clearcoat;
+		if ( outputNode.clearcoatRoughness !== undefined && mat.clearcoatRoughness !== undefined ) mat.clearcoatRoughness = outputNode.clearcoatRoughness;
+		if ( outputNode.sheen !== undefined && mat.sheen ) mat.sheen.setHex( outputNode.sheen );
+		if ( outputNode.sheenRoughness !== undefined && mat.sheenRoughness !== undefined ) mat.sheenRoughness = outputNode.sheenRoughness;
+		if ( outputNode.iridescence !== undefined && mat.iridescence !== undefined ) mat.iridescence = outputNode.iridescence;
+		if ( outputNode.iridescenceIOR !== undefined && mat.iridescenceIOR !== undefined ) mat.iridescenceIOR = outputNode.iridescenceIOR;
+		if ( outputNode.iridescenceThickness !== undefined && mat.iridescenceThickness !== undefined ) mat.iridescenceThickness = outputNode.iridescenceThickness;
+		if ( outputNode.transmission !== undefined && mat.transmission !== undefined ) mat.transmission = outputNode.transmission;
+		if ( outputNode.thickness !== undefined && mat.thickness !== undefined ) mat.thickness = outputNode.thickness;
+		if ( outputNode.ior !== undefined && mat.ior !== undefined ) mat.ior = outputNode.ior;
+		if ( outputNode.dispersion !== undefined && mat.dispersion !== undefined ) mat.dispersion = outputNode.dispersion;
+		if ( outputNode.anisotropy !== undefined && mat.anisotropy !== undefined ) mat.anisotropy = outputNode.anisotropy;
+		if ( outputNode.attenuationColor !== undefined && mat.attenuationColor ) mat.attenuationColor.setHex( outputNode.attenuationColor );
+		if ( outputNode.attenuationDistance !== undefined && mat.attenuationDistance !== undefined ) mat.attenuationDistance = outputNode.attenuationDistance;
+		if ( outputNode.specularColor !== undefined && mat.specularColor ) mat.specularColor.setHex( outputNode.specularColor );
+		if ( outputNode.specularIntensity !== undefined && mat.specularIntensity !== undefined ) mat.specularIntensity = outputNode.specularIntensity;
+	}
+
+	return material;
 }
 
 var _DEFAULT_CAMERA = new THREE.PerspectiveCamera( 50, 1, 0.01, 1000 );

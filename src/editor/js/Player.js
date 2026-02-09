@@ -1,5 +1,5 @@
 
-import { pc, App, SceneLoader } from '../../engine/dist/three-engine.js';
+import { pc, App, SceneLoader } from '../../engine/dist/three-engine.js?v=2';
 import { WebGPURenderer } from 'three/webgpu';
 
 function Player( editor ) {

@@ -81,13 +81,15 @@
 	--transition-slower: 300ms ease;
 	
 	--z-base: 0;
-	--z-dropdown: 1000;
-	--z-sticky: 1100;
-	--z-fixed: 1200;
-	--z-modal-backdrop: 1300;
-	--z-modal: 1400;
-	--z-popover: 1500;
-	--z-tooltip: 1600;
+	--z-resizer: 1;
+	--z-menubar: 2;
+	--z-dropdown: 3;
+	--z-sticky: 4;
+	--z-fixed: 5;
+	--z-modal-backdrop: 6;
+	--z-modal: 7;
+	--z-popover: 8;
+	--z-tooltip: 9;
 	
 	--sidebar-width: 300px;
 	--sidebar-min-width: 200px;

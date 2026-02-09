@@ -39,10 +39,8 @@ function NodeMaterialInspector( editor ) {
 	const editNodesBtn = new UIButton( 'Edit Nodes' );
 	editNodesBtn.onClick( function () {
 
-		if ( currentNodeMaterial ) {
-
-			editor.tslEditor.open( currentNodeMaterial );
-
+		if ( typeof window.showNodesOverlay === 'function' ) {
+			window.showNodesOverlay();
 		}
 
 	} );

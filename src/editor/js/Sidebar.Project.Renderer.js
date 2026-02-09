@@ -37,6 +37,7 @@ function SidebarProjectRenderer( editor ) {
 			const toneMappingExposure = config.getKey( 'project/renderer/toneMappingExposure' ) !== undefined ? config.getKey( 'project/renderer/toneMappingExposure' ) : 1;
 
 			currentRenderer = new WebGPURenderer( { antialias: antialias } );
+			console.log('[SidebarProjectRenderer] Renderer created', currentRenderer);
 			await currentRenderer.init();
 			
 			currentRenderer.shadowMap.enabled = shadows;

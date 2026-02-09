@@ -4,7 +4,12 @@ import {
 	MeshStandardNodeMaterial,
 	MeshPhysicalNodeMaterial,
 	MeshBasicNodeMaterial,
-	MeshPhongNodeMaterial
+	MeshPhongNodeMaterial,
+	MeshSSSNodeMaterial,
+	MeshToonNodeMaterial,
+	MeshLambertNodeMaterial,
+	MeshNormalNodeMaterial,
+	PointsNodeMaterial,
 } from 'three/webgpu';
 import { MaterialAsset } from '@engine/three-engine.js';
 
@@ -15,12 +20,20 @@ class AssetObjectLoader extends NodeObjectLoader {
 		super( manager );
 		this.projectPath = projectPath;
 		this.editor = editor;
-		// Register node material types so NodeMaterialLoader can instantiate them when loading scene JSON
+		// Use Three.js NodeObjectLoader/NodeMaterialLoader: register node material types so when
+		// scene JSON contains materials with type MeshPhysicalNodeMaterial, MeshToonNodeMaterial, etc.,
+		// the loader instantiates the correct class. NodeMaterialObserver is used internally by
+		// WebGPURenderer to detect when node materials need a refresh; we do not add custom observing.
 		this.nodeMaterials = {
 			MeshStandardNodeMaterial,
 			MeshPhysicalNodeMaterial,
 			MeshBasicNodeMaterial,
-			MeshPhongNodeMaterial
+			MeshPhongNodeMaterial,
+			MeshSSSNodeMaterial,
+			MeshToonNodeMaterial,
+			MeshLambertNodeMaterial,
+			MeshNormalNodeMaterial,
+			PointsNodeMaterial,
 		};
 
 	}

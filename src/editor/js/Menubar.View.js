@@ -98,8 +98,6 @@ function MenubarView( editor ) {
 
 	options.add( new UIHorizontalRule() );
 
-	
-
 	option = new UIRow();
 	option.setClass( 'option' );
 	option.setTextContent( strings.getKey( 'menubar/view/fullscreen' ) );

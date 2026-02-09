@@ -23,7 +23,7 @@ import { setSharedAnimationTime } from './LiveMaterialPreview.js';
 let ParticleSystem = null;
 (async () => {
 	try {
-		const engine = await import('../../engine/dist/three-engine.js');
+		const engine = await import('../../engine/dist/three-engine.js?v=2');
 		ParticleSystem = engine.ParticleSystem;
 	} catch (e) {
 		console.warn('[Viewport] Could not import ParticleSystem:', e);
@@ -536,6 +536,7 @@ const camera = editor.camera;
 		}
 		// Use WebGL for small camera preview window (not main viewport)
 		// This is intentional - the preview doesn't need WebGPU overhead
+		console.log(THREE.WebGLRenderer);
 		previewRenderer = new THREE.WebGLRenderer( { canvas: previewCanvas, antialias: true } );
 		previewRenderer.setSize( 200, 150 );
 		previewRenderer.setPixelRatio( window.devicePixelRatio );

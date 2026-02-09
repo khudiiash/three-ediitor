@@ -740,15 +740,15 @@ function SidebarMaterial( editor ) {
 	} );
 	mainMaterialContainer.add( exportJson );
 
-	// Edit Nodes button - opens TSL Editor (only for node materials)
+	// Edit Nodes button - opens Nodes overlay (only for node materials)
 	const editNodesBtn = new UIButton( 'Edit Nodes' );
 	editNodesBtn.setMarginLeft( '4px' );
 	editNodesBtn.setDisplay( 'none' );
 	editNodesBtn.onClick( function () {
 
-		if ( ! currentObject ) return;
-		const material = editor.getObjectMaterial( currentObject, currentMaterialSlot );
-		if ( material ) editor.tslEditor.open( material );
+		if ( typeof window.showNodesOverlay === 'function' ) {
+			window.showNodesOverlay();
+		}
 
 	} );
 	mainMaterialContainer.add( editNodesBtn );

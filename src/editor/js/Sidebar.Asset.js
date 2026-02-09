@@ -479,7 +479,7 @@ function SidebarAsset( editor ) {
 						if ( url && url !== 'null' && url !== 'undefined' ) {
 							try {
 								const metadata = file.metadata && file.metadata.texture ? file.metadata.texture : {};
-								const textureAsset = new TextureAsset( file.name, url, {
+								let textureAsset = new TextureAsset( file.name, url, {
 									name: file.name,
 									path: file.path,
 									dateCreated: file.dateCreated,

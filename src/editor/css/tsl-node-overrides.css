@@ -1,0 +1,291 @@
+/**
+ * TSL node styling (standalone; no dependency on nodes.css).
+ * Dark theme; category header colors via .tsl-node--category-<id>.
+ */
+
+/* TSL variables + node body background (reference: dark gray #1C1C1E) */
+.react-flow.dark .tsl-node {
+  --tsl-node-bg: #1C1C1E;
+  --tsl-node-header-bg: #3d2e2a;
+  --tsl-node-header-color: #fff;
+  --tsl-node-var-name-color: #b0b0b0;
+  --tsl-node-label-color: #f0f0f0;
+  --tsl-node-value-color: #999;
+  --tsl-node-divider: #444;
+  --tsl-node-handle-bg: #5a5a5a;
+  --tsl-node-boxshadow-hover: 0 1px 4px 1px rgba(255, 255, 255, 0.08);
+  --tsl-node-boxshadow-selected: 0 0 0 1px #999;
+  /* TSL type colors (connected handles and edges) */
+  --tsl-type-float: #9c27b0;
+  --tsl-type-int: #9c27b0;
+  --tsl-type-vec2: #2196f3;
+  --tsl-type-vec3: #ffc107;
+  --tsl-type-vec4: #e91e63;
+  --tsl-type-texture: #4caf50;
+  --tsl-type-bool: #795548;
+}
+
+/* Per-category header colors (reference: constants purple/indigo, material brown) */
+.react-flow.dark .tsl-node--category-constants { --tsl-node-header-bg: #443058; }
+.react-flow.dark .tsl-node--category-material   { --tsl-node-header-bg: #3E2723; }
+.react-flow.dark .tsl-node--category-advanced   { --tsl-node-header-bg: #342844; }
+.react-flow.dark .tsl-node--category-geometry   { --tsl-node-header-bg: #443058; }
+.react-flow.dark .tsl-node--category-logic     { --tsl-node-header-bg: #1b5e20; }
+.react-flow.dark .tsl-node--category-math      { --tsl-node-header-bg: #0a2d6b; }
+.react-flow.dark .tsl-node--category-model      { --tsl-node-header-bg: #37474f; }
+.react-flow.dark .tsl-node--category-noise     { --tsl-node-header-bg: #4a148c; }
+.react-flow.dark .tsl-node--category-texture   { --tsl-node-header-bg: #bf360c; }
+.react-flow.dark .tsl-node--category-utils      { --tsl-node-header-bg: #00695c; }
+.react-flow.dark .tsl-node--category-custom     { --tsl-node-header-bg: #455a64; }
+
+/* Base TSL node: no border, rounded, compact */
+.tsl-node {
+  position: relative;
+  min-height: 32px;
+  min-width: 160px;
+  font-size: 10px;
+  text-align: left;
+  color: var(--tsl-node-label-color);
+  border: none;
+  background-color: var(--tsl-node-bg, #1C1C1E);
+  border-radius: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.react-flow.dark .react-flow__node.selectable:hover .tsl-node {
+  box-shadow: var(--tsl-node-boxshadow-hover);
+}
+
+.react-flow.dark .react-flow__node.selectable.selected .tsl-node,
+.react-flow.dark .react-flow__node.selectable:focus .tsl-node,
+.react-flow.dark .react-flow__node.selectable:focus-visible .tsl-node {
+  box-shadow: var(--tsl-node-boxshadow-selected);
+}
+
+/* Header bar: compact, rounded top; no separator line below */
+.tsl-node__header {
+  background-color: var(--tsl-node-header-bg, #3d2e2a);
+  padding: 6px 10px 6px 12px;
+  border-radius: 10px 10px 0 0;
+}
+
+.tsl-node__title {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tsl-node-header-color, #fff);
+  text-align: left;
+}
+
+.tsl-node__var-name {
+  display: none;
+}
+
+.tsl-node__divider {
+  display: none;
+}
+
+.tsl-node__body {
+  padding: 4px 0;
+}
+
+/* Row: labels near handles – small padding so label sits next to handle */
+.tsl-node__row {
+  display: flex;
+  align-items: center;
+  min-height: 18px;
+  padding: 2px 10px 2px 12px;
+  position: relative;
+}
+
+.tsl-node__row--no-handle {
+  padding-left: 12px;
+}
+
+/* Output row: label left of handle; same distance from handle as input label from input handle (12px) */
+.tsl-node__row--output {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.tsl-node__row--output .tsl-node__label {
+  margin-left: auto;
+  margin-right: 4px;
+  flex: 0 1 auto;
+}
+
+.tsl-node__row--output .tsl-node__label + .tsl-node__value {
+  margin-left: 2px;
+}
+
+/* Label: bright when connected, dimmed when not */
+.tsl-node__label {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--tsl-node-label-color);
+}
+
+.tsl-node__label--dimmed {
+  color: #666;
+  opacity: 0.85;
+}
+
+.tsl-node__label + .tsl-node__value {
+  margin-left: 8px;
+}
+
+.tsl-node__value {
+  font-size: 9px;
+  color: var(--tsl-node-value-color);
+}
+
+.tsl-node__value-swatch {
+  width: 12px;
+  height: 12px;
+  background: #000;
+  border: none;
+  border-radius: 2px;
+}
+
+/* Handles: no border, solid fill; darker when unconnected */
+.tsl-node .react-flow__handle {
+  border: none;
+  background-color: var(--tsl-node-handle-bg);
+}
+
+/* Connected handles use TSL type color */
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-float,
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-int { background-color: var(--tsl-type-float); }
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-vec2 { background-color: var(--tsl-type-vec2); }
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-vec3 { background-color: var(--tsl-type-vec3); }
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-vec4 { background-color: var(--tsl-type-vec4); }
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-texture { background-color: var(--tsl-type-texture); }
+.react-flow.dark .tsl-node .react-flow__handle.connected.type-bool { background-color: var(--tsl-type-bool); }
+
+/* Input (left) */
+.tsl-node .react-flow__handle-left {
+  width: 10px;
+  min-width: 10px;
+  height: 12px;
+  min-height: 12px;
+  border-radius: 0 3px 3px 0;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Output (right) */
+.tsl-node .react-flow__handle-right {
+  width: 8px;
+  min-width: 8px;
+  height: 12px;
+  min-height: 12px;
+  border-radius: 3px 0 0 3px;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+/* Color node: compact, narrower */
+.color-node {
+  min-width: 120px;
+}
+
+/* Simple constant nodes (Float, Int, Vec2, Vec3, Vec4): smaller footprint */
+.tsl-node--compact {
+  min-width: 100px;
+  min-height: 24px;
+  font-size: 9px;
+}
+
+.tsl-node--compact .tsl-node__header {
+  padding: 4px 8px 4px 10px;
+}
+
+.tsl-node--compact .tsl-node__title {
+  font-size: 9px;
+}
+
+.tsl-node--compact .tsl-node__var-name {
+  font-size: 8px;
+  padding-top: 1px;
+  padding-bottom: 2px;
+}
+
+.tsl-node--compact .tsl-node__divider {
+  margin: 0 6px;
+}
+
+.tsl-node--compact .tsl-node__body {
+  padding: 2px 0;
+}
+
+.tsl-node--compact .tsl-node__row {
+  min-height: 14px;
+  padding: 1px 6px 1px 10px;
+}
+
+.tsl-node--compact .tsl-node__row--no-handle {
+  padding-left: 10px;
+}
+
+.tsl-node--compact .tsl-node__row--output {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.tsl-node--compact .tsl-node__label {
+  font-size: 9px;
+}
+
+.tsl-node--compact .tsl-node__value {
+  font-size: 8px;
+}
+
+.tsl-node--compact .react-flow__handle-left {
+  width: 8px;
+  min-width: 8px;
+  height: 10px;
+  min-height: 10px;
+}
+
+.tsl-node--compact .react-flow__handle-right {
+  width: 6px;
+  min-width: 6px;
+  height: 10px;
+  min-height: 10px;
+}
+
+/* Group node: no extra grey box from React Flow wrapper (collapsed or expanded) */
+.react-flow.dark .react-flow__node-group {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Expanded group: fill wrapper so border matches internal nodes area; transparent so nodes/edges visible */
+.react-flow.dark .group-node.group-node--expanded,
+.react-flow.dark .group-node.group-node--expanded.tsl-node {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  box-sizing: border-box;
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  outline: 1px solid rgba(0, 0, 0, 0.2);
+  outline-offset: -1px;
+}
+.react-flow.dark .group-node.group-node--expanded .tsl-node__header {
+  background: rgba(52, 40, 68, 0.92) !important;
+  min-height: 36px;
+  box-sizing: border-box;
+  pointer-events: auto;
+}

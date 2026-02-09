@@ -1,7 +1,7 @@
 /* Resizer Styles */
 .resizer {
 	position: absolute;
-	z-index: 1001;
+	z-index: var(--z-resizer);
 	pointer-events: auto;
 	background: transparent;
 	transition: background-color var(--transition-fast);

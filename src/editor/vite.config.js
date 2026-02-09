@@ -2,13 +2,29 @@ import { defineConfig } from 'vite';
 import { resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { readFileSync } from 'fs';
+import react from '@vitejs/plugin-react';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const projectRoot = resolve(__dirname, '..');
 const projectsRoot = resolve(projectRoot, '..', 'projects');
+const editorNodeModules = resolve(__dirname, 'node_modules');
 
 export default defineConfig({
   root: projectRoot,
+  resolve: {
+    alias: {
+      'react': resolve(editorNodeModules, 'react'),
+      'react-dom': resolve(editorNodeModules, 'react-dom'),
+      'react/jsx-dev-runtime': resolve(editorNodeModules, 'react/jsx-dev-runtime.js'),
+      'react/jsx-runtime': resolve(editorNodeModules, 'react/jsx-runtime.js'),
+      'reactflow': resolve(editorNodeModules, 'reactflow'),
+      // Force engine from source so live preview uses latest createMaterialFromGraph (customFn, etc.)
+      [resolve(projectRoot, 'engine/dist/three-engine.js')]: resolve(projectRoot, 'engine/src/index.ts'),
+    },
+  },
+  esbuild: {
+    jsx: 'preserve' // Let @vitejs/plugin-react handle JSX
+  },
   optimizeDeps: {
     esbuildOptions: {
       target: 'esnext' // Support top-level await
@@ -17,15 +33,26 @@ export default defineConfig({
   build: {
     target: 'esnext', // Support top-level await in build
     outDir: resolve(__dirname, 'dist'),
-    emptyOutDir: false
+    emptyOutDir: false,
+    rollupOptions: {
+      input: {
+        editor: resolve(projectRoot, 'editor/index.html'),
+        nodes: resolve(projectRoot, 'editor/nodes.html'),
+      },
+    },
   },
   plugins: [
+    react({ include: /\.(jsx|tsx)$/, exclude: [] }),
     {
       name: 'resolve-importmap',
       resolveId(id) {
         if (id === 'three' || id === 'three/webgpu') {
           // Use minified WebGPU build (standalone, no three.core.js dependency)
           return resolve(projectRoot, 'editor/build/three.webgpu.min.js');
+        }
+        if (id === 'three/tsl') {
+          // TSL build re-exports positionWorld, uv, etc. from TSL (used for node material geometry nodes)
+          return resolve(projectRoot, 'editor/build/three.tsl.min.js');
         }
         if (id.startsWith('three/addons/')) {
           const subpath = id.replace('three/addons/', '');
@@ -44,6 +71,11 @@ export default defineConfig({
         if (id.startsWith('@engine/')) {
           const subpath = id.replace('@engine/', '');
           return resolve(projectRoot, 'engine/dist', subpath);
+        }
+        // Resolve engine from source so editor uses latest createMaterialFromGraph without rebuilding
+        const engineReq = id.replace(/\?.*$/, '').replace(/\\/g, '/');
+        if (engineReq.includes('engine') && engineReq.includes('three-engine')) {
+          return resolve(projectRoot, 'engine/src/index.ts');
         }
         return null;
       }
@@ -233,6 +265,11 @@ export default defineConfig({
     hmr: {
       protocol: 'ws',
       host: 'localhost'
+    },
+    watch: {
+      // Ensure editor JSX (e.g. js/nodes) is watched so changes trigger HMR
+      ignored: ['**/node_modules/**', '**/dist/**'],
+      usePolling: false,
     },
     fs: {
       allow: ['..']

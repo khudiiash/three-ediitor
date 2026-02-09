@@ -138,15 +138,14 @@
 .scene-tree-item {
 	display: flex;
 	align-items: center;
-	gap: var(--space-1);
 	border-radius: var(--radius-sm);
 	cursor: pointer;
 	user-select: none;
-	transition: background var(--transition-fast);
 	min-height: 24px;
 	color: var(--text-secondary);
 	font-size: var(--font-size-sm);
 	line-height: 1.4;
+	justify-content: space-between;
 	--tree-indent: 0px;
 	padding-left: var(--tree-indent);
 }
@@ -176,12 +175,12 @@
 	color: var(--accent-primary);
 }
 
-.scene-tree-item-name {
-	flex: 1;
+.scene-tree-item .name {
 	font-size: var(--font-size-sm);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	width: 100%;
 }
 
 .scene-tree-item-children {
@@ -214,13 +213,13 @@
 	color: white;
 }
 
-/* Visibility Toggle */
 .visibility-toggle {
 	display: inline-block;
 	width: 5px;
 	height: 5px;
 	border-radius: 50%;
 	margin-left: var(--space-2);
+	margin-right: var(--space-2);
 	cursor: pointer;
 	vertical-align: middle;
 	transition: background-color var(--transition-base);

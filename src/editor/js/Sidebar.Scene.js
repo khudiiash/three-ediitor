@@ -126,43 +126,15 @@ function SidebarScene( editor ) {
 
 	}
 
-	function getObjectType( object ) {
-
-		if ( object.isScene ) return 'Scene';
-		if ( object.isCamera ) return 'Camera';
-		if ( object.isLight ) return 'Light';
-		if ( object.isMesh ) return 'Mesh';
-		if ( object.isLine ) return 'Line';
-		if ( object.isPoints ) return 'Points';
-		if ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) return 'BatchedRenderer';
-		if ( object.type === 'ParticleSystem' || ( object.userData && object.userData.isParticleSystem ) ) return 'Particles';
-
-		return 'Object3D';
-
-	}
-
 	function buildHTML( object ) {
 
 		const objectName = object.name || '';
-		const isSystemEntity = isBatchedRenderer( object );
-		const typeClass = getObjectType( object );
-		const nameClass = isSystemEntity ? 'system-entity-name' : '';
 		const isVisible = object.visible !== false;
 		const visibilityClass = isVisible ? 'visibility-visible' : 'visibility-hidden';
 		
-		let html = `<span class="type ${ typeClass }${ isSystemEntity ? ' system-entity-type' : '' }"></span> <span class="${ nameClass }">${ escapeHTML( objectName ) }</span> <span class="visibility-toggle ${ visibilityClass }" data-object-id="${ object.id }"></span>`;
+		let html = `<span class="name">${ escapeHTML( objectName ) }</span> <span class="visibility-toggle ${ visibilityClass }" data-object-id="${ object.id }"></span>`;
 
 		return html;
-
-	}
-
-	function getScript( uuid ) {
-
-		if ( editor.scripts[ uuid ] === undefined ) return '';
-
-		if ( editor.scripts[ uuid ].length === 0 ) return '';
-
-		return ' <span class="type Script"></span>';
 
 	}
 
@@ -179,7 +151,7 @@ function SidebarScene( editor ) {
 		const objectId = parseInt( outliner.getValue() );
 		const object = editor.scene.getObjectById( objectId );
 		
-		if ( object && ( object.type === 'BatchedRenderer' || object.name === 'BatchedRenderer' ) ) {
+		if ( object) {
 			editor.select( object );
 		} else {
 			editor.selectById( objectId );
